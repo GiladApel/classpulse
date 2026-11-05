@@ -1,7 +1,11 @@
 services:
   pocketbase:
-    image: ghcr.io/muchobien/pocketbase:latest
+    image: ghcr.io/muchobien/pocketbase:0.40.6
     restart: unless-stopped
+    command: ["--migrationsDir=/pb_migrations"]
+    environment:
+      PB_ADMIN_EMAIL: ${PB_SUPERUSER_EMAIL}
+      PB_ADMIN_PASSWORD: ${PB_SUPERUSER_PASSWORD}
     ports: ["8090:8090"]
     volumes:
       - ./pocketbase/pb_data:/pb_data

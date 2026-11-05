@@ -6,14 +6,20 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p .",
     "start": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed": "tsx scripts/seed.ts",
+    "test:int": "vitest run -c vitest.int.config.ts"
   },
   "dependencies": {
+    "@googleapis/sheets": "^18.1.2",
     "@hono/node-server": "^2.1.6",
-    "hono": "^4.13.16"
+    "hono": "^4.13.16",
+    "pocketbase": "^0.28.2",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "eventsource": "^5.1.4",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"

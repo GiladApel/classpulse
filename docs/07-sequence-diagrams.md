@@ -33,7 +33,7 @@ sequenceDiagram
   API->>AS: checkIn(ctx)
   AS->>GF: for(session.geofenceMode)
   GF-->>AS: Lenient or Strict policy
-  loop rules in order: Token, SessionActive, DuplicateStudent, DeviceBinding, Geofence
+  loop rules in order: DuplicateStudent, Token, SessionActive, DeviceBinding, Geofence
     AS->>R: check(ctx)
     R-->>AS: pass / warn / reject
   end

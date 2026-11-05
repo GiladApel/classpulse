@@ -263,25 +263,31 @@ classDiagram
     -baseRules: CheckInRule[]
     -repo: AttendanceRepository
     -clock: Clock
-    +checkIn(ctx: CheckInContext) Promise~AttendanceRecord~
-    +manualApprove(sessionId, studentId, note) Promise~AttendanceRecord~
-    +flag(recordId, reason) Promise~void~
-    +remove(recordId, reason) Promise~void~
-    +presentCount(sessionId) Promise~number~
+    +checkIn(ctx: CheckInContext) Promise~CheckInOutcome~
+    +manualApprove(session, studentNumber, studentName, note) Promise~AttendanceRecord~
+    +remove(recordId, reason) Promise~AttendanceRecord~
+    +get(recordId) Promise~AttendanceRecord~
     +listForSession(sessionId) Promise~AttendanceRecord[]~
+    +flag(recordId, reason) Promise~void~ «M4»
+    +presentCount(sessionId) Promise~number~ «M4»
   }
   class SessionService {
     -sessions: SessionRepository
-    -headcounts: HeadcountRepository
+    -courses: CourseRepository
+    -tokens: QrTokenService
     -clock: Clock
-    +start(courseId, title, location, mode, radiusM) Promise~Session~
-    +end(sessionId) Promise~void~
-    +currentQrToken(sessionId) Promise~string~
+    +start(lecturerId, input: StartSessionInput) Promise~Session~
+    +end(session) Promise~Session~
+    +currentQrToken(session) QrTicket
+    +get(sessionId) Promise~Session~
+    +getOwned(sessionId, lecturerId) Promise~Session~
   }
   class AttendanceExportService {
     -repo: AttendanceRepository
+    -courses: CourseRepository
     -exporters: Map~ExportFormat, SpreadsheetExporter~
-    +export(sessionId, format: ExportFormat) Promise~ExportOutput~
+    +formats() ExportFormat[]
+    +export(session, format: ExportFormat) Promise~ExportOutput~
   }
 
   CheckInRule <|.. TokenRule
@@ -302,9 +308,13 @@ classDiagram
   CheckInRule ..> RuleResult
 ```
 
-**Chain semantics.** The rules run in order. The first `reject` stops the chain and becomes the error shown to the student. Each `warn` sets a flag on the record and evaluation continues. The order is Token, then SessionActive, DuplicateStudent, DeviceBinding and finally the GeofencePolicy chosen per session.
+**Chain semantics.** The rules run in order. The first `reject` stops the chain and becomes the error shown to the student. Each `warn` sets a flag on the record and evaluation continues. The order is DuplicateStudent, then Token, SessionActive, DeviceBinding and finally the GeofencePolicy chosen per session. DuplicateStudent runs first so that a student who is already present and reopens a stale link sees their own record, not "code expired". This is safe because the check can only return the caller's own record.
 
-**Idempotency.** `DuplicateStudentRule` returns `reject` with code `ALREADY_CHECKED_IN`. `AttendanceService` maps that code to "return the existing record" (UC1 4b).
+**Idempotency.** `DuplicateStudentRule` returns `reject` with code `ALREADY_CHECKED_IN`. `AttendanceService` maps that code to "return the existing record" (UC1 4b). Two concurrent scans by the same student are caught by the DB unique index `(session, student_number)`, and the loser also receives the existing record.
+
+**Geofence and GPS accuracy.** `GeoMath.isInside` credits the accuracy the phone reports, capped at 100 m. A fix that is noisy but honest still passes, while a fix with 2 km accuracy cannot pass anywhere. A session with no location (the lecturer denied access) disables the geofence.
+
+**Identity key.** Records are keyed by `studentNumber` (not by user id), so the lecturer can manually approve a student who never signed in.
 
 ## 4. `challenge/`: Template Method + State + Factory
 
@@ -470,32 +480,37 @@ classDiagram
   direction TB
   class Repository~T~ {
     <<interface>>
-    +get(id: string) Promise~T~
-    +find(filter: string) Promise~T[]~
-    +create(data: Partial~T~) Promise~T~
+    +get(id: string) Promise~T | null~
+    +create(data: Omit~T, id~) Promise~T~
     +update(id: string, data: Partial~T~) Promise~T~
   }
   class PbRepository~T~ {
     <<abstract>>
     #pb: PocketBase
-    #collection: string
+    #col: RecordService
+    #expand: string
     #toEntity(rec)* T
     #toRecord(e: Partial~T~)* Record
+    #first(filter, params) Promise~T | null~
   }
   class PbAttendanceRepository {
-    +findBySessionAndStudent(sessionId, studentId) Promise~AttendanceRecord~
+    +findBySessionAndStudentNumber(sessionId, studentNumber) Promise~AttendanceRecord~
     +findBySessionAndDevice(sessionId, deviceId) Promise~AttendanceRecord~
-    +countPresent(sessionId) Promise~number~
+    +listBySession(sessionId) Promise~AttendanceRecord[]~
   }
   class PbSessionRepository {
-    +getSecret(sessionId) Promise~string~
+    expands course to resolve lecturerId
+  }
+  class PbCourseRepository {
+    +get(id) Promise~Course | null~
   }
   class PbHeadcountRepository {
-    +purgeClearPhotos(sessionId) Promise~void~
+    +purgeClearPhotos(sessionId) Promise~void~ «M4»
   }
   class InMemoryRepository~T~ {
     -items: Map~string, T~
   }
+  class InMemoryAttendanceRepository
   class ImageProcessor {
     <<interface>>
     +blur(img: Buffer, sigma: number) Promise~Buffer~
@@ -525,6 +540,7 @@ classDiagram
   PbRepository~T~ <|-- PbAttendanceRepository
   PbRepository~T~ <|-- PbSessionRepository
   PbRepository~T~ <|-- PbHeadcountRepository
+  InMemoryRepository~T~ <|-- InMemoryAttendanceRepository
   ImageProcessor <|.. SharpImageProcessor
   SpreadsheetExporter <|.. XlsxExporter
   SpreadsheetExporter <|.. CsvExporter
@@ -533,7 +549,7 @@ classDiagram
   Clock <|.. FixedClock
 ```
 
-Other repositories follow the same pattern (`PbChallengeRepository`, `PbPollRepository` and so on). Each domain-specific repository is an interface, for example `AttendanceRepository extends Repository<AttendanceRecord>`. Unit tests use `InMemoryRepository`-based fakes.
+Queries are named methods on domain-specific repository interfaces, never raw PocketBase filter strings, so the PocketBase query language never leaks into the domain. Other repositories follow the same pattern (`PbChallengeRepository`, `PbPollRepository` and so on). Each domain-specific repository is an interface, for example `AttendanceRepository extends Repository<AttendanceRecord>`. Unit tests use `InMemoryRepository`-based fakes.
 
 ## 7. SOLID mapping
 | Principle | Evidence |

@@ -1,8 +1,23 @@
+import { createBrowserRouter, RouterProvider } from 'react-router';
+import { RequireLecturer, RequireStudent } from './components/guards';
+import CheckInPage from './pages/CheckInPage';
+import DashboardPage from './pages/DashboardPage';
+import HomePage from './pages/HomePage';
+import LecturerHomePage from './pages/LecturerHomePage';
+import LoginPage from './pages/LoginPage';
+import OnboardingPage from './pages/OnboardingPage';
+import ProjectorPage from './pages/ProjectorPage';
+
+const router = createBrowserRouter([
+  { path: '/', element: <HomePage /> },
+  { path: '/login', element: <LoginPage /> },
+  { path: '/onboarding', element: <OnboardingPage /> },
+  { path: '/c/:token', element: <RequireStudent><CheckInPage /></RequireStudent> },
+  { path: '/dash', element: <RequireLecturer><LecturerHomePage /></RequireLecturer> },
+  { path: '/dash/:id', element: <RequireLecturer><DashboardPage /></RequireLecturer> },
+  { path: '/projector/:id', element: <RequireLecturer><ProjectorPage /></RequireLecturer> },
+]);
+
 export default function App() {
-  return (
-    <main className="min-h-dvh flex flex-col items-center justify-center gap-4 p-4">
-      <h1 className="text-3xl font-bold">ClassPulse</h1>
-      <p className="text-slate-600">סרקו את הקוד על הלוח כדי לסמן נוכחות</p>
-    </main>
-  );
+  return <RouterProvider router={router} />;
 }

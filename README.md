@@ -62,10 +62,20 @@ docs/         design artifacts (see below)
 ## Run locally
 
 ```bash
-cp .env.example .env          # fill in the keys
+cp .env.example .env          # fill in the PocketBase superuser credentials
 npm install
-docker compose up pocketbase  # http://127.0.0.1:8090/_/
+docker compose up pocketbase  # applies pocketbase/pb_migrations; admin UI at http://127.0.0.1:8090/_/
+npm run seed -w apps/api -- lecturer@example.com 'Passw0rd!' "Dr. Lecturer" I2SE "Introduction to Software Engineering"
 npm run dev:api               # http://127.0.0.1:8787/health
-npm run dev:web               # http://127.0.0.1:5173
-npm test
+npm run dev:web               # http://127.0.0.1:5173  (Vite proxies /api → 8787)
+npm test                      # unit + HTTP tests (in-memory, no PocketBase needed)
+npm run test:int -w apps/api  # integration tests against the running PocketBase
 ```
+
+**Google sign-in for students:** in the PocketBase admin, open *users → Options → OAuth2 → Google* and enter the client ID and secret from Google Cloud. Add `https://<pb-host>/api/oauth2-redirect` as an authorized redirect URI.
+
+### Attendance flow (M3)
+1. The lecturer signs in at `/dash`, then clicks **Start session**. The browser location becomes the classroom centre.
+2. **Projector** (`/projector/:id`) shows a QR code with a new HMAC token every 10 s. Each token is valid for ≤20 s.
+3. A student scans with the phone camera and is checked in on opening the page (`/c/:token`). Only the first visit asks for Google sign-in and a student ID.
+4. The lecturer's dashboard updates live through PocketBase realtime. From there the lecturer can approve a student manually, remove a record, and export to Excel, CSV or Google Sheets.

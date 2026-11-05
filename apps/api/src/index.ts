@@ -1,7 +1,14 @@
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
+import { createApp } from './app.js';
+import { loadConfig } from './config.js';
+import { buildProductionContainer } from './container.js';
 
-const app = new Hono();
-app.get('/health', (c) => c.json({ ok: true }));
+try {
+  process.loadEnvFile('../../.env');
+} catch {
+  // No .env in Docker — env comes from compose.
+}
 
-serve({ fetch: app.fetch, port: Number(process.env.PORT ?? 8787) });
+const cfg = loadConfig();
+const app = createApp(await buildProductionContainer(cfg));
+serve({ fetch: app.fetch, port: cfg.port }, ({ port }) => console.log(`ClassPulse API on :${port}`));

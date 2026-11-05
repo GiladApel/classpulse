@@ -1,0 +1,18 @@
+import { Hono } from 'hono';
+import type { Container } from './container.js';
+import { AttendanceController } from './http/AttendanceController.js';
+import { type AppEnv, requireUser } from './http/auth.js';
+import { handleError } from './http/errors.js';
+import { SessionController } from './http/SessionController.js';
+
+export function createApp(c: Container): Hono<AppEnv> {
+  const app = new Hono<AppEnv>();
+  app.onError(handleError);
+  app.get('/health', (ctx) => ctx.json({ ok: true }));
+
+  app.use('*', requireUser(c.resolveUser));
+  app.get('/config', (ctx) => ctx.json({ exportFormats: c.exports.formats() }));
+  app.route('/sessions', new SessionController(c.sessions, c.attendance, c.exports).routes());
+  app.route('/', new AttendanceController(c.attendance, c.sessions, c.tokens, c.clock).routes());
+  return app;
+}
