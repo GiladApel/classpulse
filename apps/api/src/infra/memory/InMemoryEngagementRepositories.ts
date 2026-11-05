@@ -1,5 +1,12 @@
-import type { FeedPostRepository, LostSignalRepository, PollRepository, PollVoteRepository, PostVoteRepository } from '../../engagement/repositories.js';
-import type { FeedPost, LostSignal, Poll, PollVote, PostVote } from '../../engagement/types.js';
+import type {
+  FeedPostRepository,
+  LessonFeedbackRepository,
+  LostSignalRepository,
+  PollRepository,
+  PollVoteRepository,
+  PostVoteRepository,
+} from '../../engagement/repositories.js';
+import type { FeedPost, LessonFeedback, LostSignal, Poll, PollVote, PostVote } from '../../engagement/types.js';
 import { InMemoryRepository } from '../InMemoryRepository.js';
 
 export class InMemoryLostSignalRepository extends InMemoryRepository<LostSignal> implements LostSignalRepository {
@@ -54,5 +61,20 @@ export class InMemoryPollVoteRepository extends InMemoryRepository<PollVote> imp
 
   async listByPoll(pollId: string) {
     return this.all().filter((v) => v.pollId === pollId);
+  }
+}
+
+export class InMemoryLessonFeedbackRepository extends InMemoryRepository<LessonFeedback> implements LessonFeedbackRepository {
+  async create(data: Omit<LessonFeedback, 'id'>) {
+    if (this.all().some((f) => f.sessionId === data.sessionId && f.studentNumber === data.studentNumber)) throw new Error('UNIQUE constraint');
+    return super.create(data);
+  }
+
+  async find(sessionId: string, studentNumber: string) {
+    return this.all().find((f) => f.sessionId === sessionId && f.studentNumber === studentNumber) ?? null;
+  }
+
+  async listBySession(sessionId: string) {
+    return this.all().filter((f) => f.sessionId === sessionId);
   }
 }

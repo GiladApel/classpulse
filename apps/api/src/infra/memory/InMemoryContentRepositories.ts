@@ -1,5 +1,13 @@
-import type { InsightsRepository, RecordingRepository, SubmissionRepository } from '../../content/repositories.js';
-import type { Assignment, AssignmentInsights, Recording, Submission } from '../../content/types.js';
+import type {
+  FileInput,
+  InsightsRepository,
+  MaterialRepository,
+  PracticeAnswerRepository,
+  PracticeQuestionRepository,
+  RecordingRepository,
+  SubmissionRepository,
+} from '../../content/repositories.js';
+import type { Assignment, AssignmentInsights, Material, PracticeAnswer, PracticeQuestion, Recording, Submission } from '../../content/types.js';
 import { InMemoryRepository } from '../InMemoryRepository.js';
 
 export class InMemoryRecordingRepository extends InMemoryRepository<Recording> implements RecordingRepository {
@@ -59,5 +67,42 @@ export class InMemoryInsightsRepository extends InMemoryRepository<AssignmentIns
 
   async findByAssignment(assignmentId: string) {
     return this.all().find((i) => i.assignmentId === assignmentId) ?? null;
+  }
+}
+
+export class InMemoryPracticeQuestionRepository extends InMemoryRepository<PracticeQuestion> implements PracticeQuestionRepository {
+  async listBySession(sessionId: string) {
+    return this.all().filter((q) => q.sessionId === sessionId);
+  }
+
+  async delete(id: string) {
+    this.items.delete(id);
+  }
+}
+
+// The unique check is synchronous so it behaves like the DB's unique index under concurrency.
+export class InMemoryPracticeAnswerRepository extends InMemoryRepository<PracticeAnswer> implements PracticeAnswerRepository {
+  async create(data: Omit<PracticeAnswer, 'id'>) {
+    if (this.all().some((a) => a.questionId === data.questionId && a.studentNumber === data.studentNumber)) throw new Error('UNIQUE constraint');
+    return super.create(data);
+  }
+
+  async find(questionId: string, studentNumber: string) {
+    return this.all().find((a) => a.questionId === questionId && a.studentNumber === studentNumber) ?? null;
+  }
+}
+
+export class InMemoryMaterialRepository extends InMemoryRepository<Material> implements MaterialRepository {
+  readonly files = new Map<string, FileInput>();
+
+  async createWithFile(data: Omit<Material, 'id'>, file: FileInput) {
+    const created = await this.create(data);
+    this.files.set(created.id, file);
+    return created;
+  }
+
+  async delete(id: string) {
+    this.items.delete(id);
+    this.files.delete(id);
   }
 }

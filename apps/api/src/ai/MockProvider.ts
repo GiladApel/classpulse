@@ -34,6 +34,18 @@ export const DEFAULT_FIXTURES: Record<string, unknown> = {
       { question: 'מתי נעדיף Strategy על פני if/else?', options: ['אף פעם', 'כשיש אלגוריתם אחד', 'כשאלגוריתמים מתחלפים בזמן ריצה', 'רק בבדיקות'], correctIndex: 2 },
     ],
   },
+  generate_practice: {
+    questions: [
+      { question: 'מה תפקידו של ה-Subject בתבנית Observer?', options: ['מחזיק רשימת מאזינים ומודיע להם על שינוי', 'יוצר אובייקטים', 'מתרגם ממשק', 'שומר מצב גלובלי'], correctIndex: 0 },
+      { question: 'מה ההבדל המרכזי בין State ל-Strategy?', options: ['אין הבדל', 'ב-State האובייקט מחליף התנהגות בעצמו לפי מצבו', 'Strategy משמש רק ל-UI', 'State לא משתמש בממשקים'], correctIndex: 1 },
+      { question: 'איזה עיקרון מופר כשמחלקה אחת אחראית גם על לוגיקה וגם על שמירה למסד?', options: ['OCP', 'LSP', 'SRP', 'ISP'], correctIndex: 2 },
+      { question: 'מה מאפשר עקרון ה-OCP?', options: ['לשנות קוד קיים בכל הוספה', 'להוסיף התנהגות חדשה בלי לשנות קוד קיים', 'למחוק מחלקות בסיס', 'לוותר על ממשקים'], correctIndex: 1 },
+      { question: 'מה תפקיד Adapter?', options: ['להאיץ ביצועים', 'ליצור אובייקט יחיד', 'להתאים ממשק קיים לממשק שהלקוח מצפה לו', 'לשמור היסטוריה'], correctIndex: 2 },
+      { question: 'למה מזריקים תלויות דרך הבנאי?', options: ['כדי שאפשר יהיה להחליף מימוש בבדיקות', 'כדי לחסוך זיכרון', 'כי אסור להשתמש ב-new', 'כדי להסתיר שדות'], correctIndex: 0 },
+      { question: 'מה מאפיין Template Method?', options: ['כל השלבים מוגדרים בתת-מחלקה', 'מחלקת הבסיס קובעת את סדר השלבים ותת-מחלקות ממלאות חלקים', 'אין ירושה', 'נבחר בזמן ריצה מתוך רשימה'], correctIndex: 1 },
+      { question: 'מתי Chain of Responsibility מתאים?', options: ['כשיש בדיקה אחת', 'כשסדרת בודקים עצמאיים צריכה לעבור על אותה בקשה', 'רק בממשק משתמש', 'כשאין צורך בהרחבה'], correctIndex: 1 },
+    ],
+  },
   // Ids are placeholders: FeedClusterer drops unknown ids, so tests pass their own fixture.
   cluster_feed: { themes: [] },
   summarize_lecture: {

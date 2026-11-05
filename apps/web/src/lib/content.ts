@@ -115,3 +115,29 @@ export async function uploadRecording(sessionId: string, file: File, offsetSec: 
   await api.post(`/recordings/${rec.id}/complete`);
   return rec.id;
 }
+
+export type PracticeRecord = RecordModel & {
+  session: string;
+  question: string;
+  options: string[];
+  source: 'manual' | 'ai';
+  created_at: string;
+};
+
+/** The student's own answer; it carries the correct index, which the question record hides. */
+export type PracticeAnswerRecord = RecordModel & {
+  question: string;
+  option_index: number;
+  correct: boolean;
+  correct_index: number;
+};
+
+export type MaterialRecord = RecordModel & {
+  session: string;
+  title: string;
+  kind: 'file' | 'link';
+  url: string;
+  file: string;
+  filename: string;
+  added_at: string;
+};

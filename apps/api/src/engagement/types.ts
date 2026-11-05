@@ -37,6 +37,8 @@ export interface FeedPost {
   text: string;
   votes: number;
   answered: boolean;
+  /** The lecturer's written answer, shown under the post; empty when none. */
+  answer: string;
   postedAt: Date;
 }
 
@@ -54,8 +56,7 @@ export interface Theme {
 }
 
 export type PollStatus = 'draft' | 'open' | 'closed';
-export type PollSource = 'template' | 'manual' | 'ai';
-export type TemplateKind = 'yes_no' | 'abcd' | 'scale5';
+export type PollSource = 'manual' | 'ai';
 
 export interface McqDraft {
   question: string;
@@ -89,4 +90,32 @@ export interface PollResults {
   counts: number[];
   total: number;
   correctIndex: number | null;
+}
+
+/** End-of-lecture feedback options, each pointing to a different fix: pace (fast/slow) or the explanation itself. */
+export const FEEDBACK_RATINGS = ['clear', 'too_fast', 'too_slow', 'unclear'] as const;
+export type FeedbackRating = (typeof FEEDBACK_RATINGS)[number];
+
+export interface LessonFeedback {
+  id: string;
+  sessionId: string;
+  studentId?: string;
+  studentNumber: string;
+  rating: FeedbackRating;
+  comment: string;
+  submittedAt: Date;
+}
+
+export interface FeedbackStatus {
+  open: boolean;
+  submitted: boolean;
+  closesAt: Date | null;
+}
+
+/** What the lecturer sees: nothing but the count until there are enough responses to stay anonymous. */
+export interface FeedbackSummary {
+  responses: number;
+  visible: boolean;
+  counts: Record<FeedbackRating, number> | null;
+  comments: { rating: FeedbackRating; text: string }[];
 }

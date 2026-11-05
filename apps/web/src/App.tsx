@@ -7,6 +7,7 @@ import CoursePage from './pages/CoursePage';
 import DashboardPage from './pages/DashboardPage';
 import HomePage from './pages/HomePage';
 import LecturerCoursePage from './pages/LecturerCoursePage';
+import LecturePage from './pages/LecturePage';
 import LecturerHomePage from './pages/LecturerHomePage';
 import LoginPage from './pages/LoginPage';
 import OnboardingPage from './pages/OnboardingPage';
@@ -22,6 +23,7 @@ const router = createBrowserRouter([
   { path: '/r/:token', element: <RequireStudent><RollCallPage /></RequireStudent> },
   { path: '/course/:id', element: <RequireStudent><CoursePage /></RequireStudent> },
   { path: '/a/:id', element: <RequireStudent><AssignmentPage /></RequireStudent> },
+  { path: '/lecture/:id', element: <RequireStudent><LecturePage /></RequireStudent> },
   { path: '/dash', element: <RequireLecturer><LecturerHomePage /></RequireLecturer> },
   { path: '/dash/course/:id', element: <RequireLecturer><LecturerCoursePage /></RequireLecturer> },
   { path: '/dash/assignment/:id', element: <RequireLecturer><AssignmentAdminPage /></RequireLecturer> },

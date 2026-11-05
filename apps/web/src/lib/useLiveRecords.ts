@@ -47,7 +47,7 @@ export type PollRecord = RecordModel & {
   question: string;
   options: string[];
   status: 'draft' | 'open' | 'closed';
-  source: 'template' | 'manual' | 'ai';
+  source: 'manual' | 'ai';
   answer_index: number;
   results: { counts: number[]; total: number; correctIndex: number | null } | null;
   created_at: string;
@@ -61,6 +61,7 @@ export type PostRecord = RecordModel & {
   text: string;
   votes: number;
   answered: boolean;
+  answer: string;
   posted_at: string;
 };
 

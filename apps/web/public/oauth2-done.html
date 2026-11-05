@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClassPulse</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f8fafc; color: #334155; font: 18px system-ui, sans-serif; text-align: center; }
+  h1 { color: #4338ca; font-size: 28px; margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ClassPulse</h1>
+  <p id="msg">ההתחברות הושלמה — אפשר לסגור את החלון.</p>
+</main>
+<script>
+  // PocketBase sends the OAuth popup to /_/#/auth/oauth2-redirect-{success,failure}; nginx serves this page instead of its admin UI.
+  if (location.hash.includes('failure')) document.getElementById('msg').textContent = 'ההתחברות נכשלה — סגרו את החלון ונסו שוב.';
+  else setTimeout(() => window.close(), 300);
+</script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import type { Repository } from '../infra/Repository.js';
-import type { FeedPost, LostSignal, Poll, PollVote, PostVote } from './types.js';
+import type { FeedPost, LessonFeedback, LostSignal, Poll, PollVote, PostVote } from './types.js';
 
 export interface LostSignalRepository {
   create(data: Omit<LostSignal, 'id'>): Promise<LostSignal>;
@@ -28,4 +28,11 @@ export interface PollVoteRepository {
   create(data: Omit<PollVote, 'id'>): Promise<PollVote>;
   exists(pollId: string, studentNumber: string): Promise<boolean>;
   listByPoll(pollId: string): Promise<PollVote[]>;
+}
+
+export interface LessonFeedbackRepository {
+  /** Throws on a duplicate (session, studentNumber). */
+  create(data: Omit<LessonFeedback, 'id'>): Promise<LessonFeedback>;
+  find(sessionId: string, studentNumber: string): Promise<LessonFeedback | null>;
+  listBySession(sessionId: string): Promise<LessonFeedback[]>;
 }

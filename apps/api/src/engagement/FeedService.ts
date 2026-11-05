@@ -27,6 +27,7 @@ export class FeedService {
       text,
       votes: 0,
       answered: false,
+      answer: '',
       postedAt: this.clock.now(),
     });
   }
@@ -47,6 +48,13 @@ export class FeedService {
   async markAnswered(postId: string, answered: boolean): Promise<FeedPost> {
     await this.get(postId);
     return this.posts.update(postId, { answered });
+  }
+
+  /** FR-LP-04: a written answer, during or after the lecture. Writing one marks the post answered; clearing it keeps the flag. */
+  async answer(postId: string, text: string): Promise<FeedPost> {
+    await this.get(postId);
+    const answer = text.trim();
+    return this.posts.update(postId, answer ? { answer, answered: true } : { answer });
   }
 
   /** FR-BC-04: AI grouping of open posts. Fewer than 2 posts is not worth a model call. */

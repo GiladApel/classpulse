@@ -152,9 +152,9 @@ sequenceDiagram
   actor S as Checked-in students
   participant P as Projector view
 
-  L->>API: POST /polls/drafts (slide image and/or text)
-  API->>PS: draftFromSlide({slide, text})
-  PS->>MG: generate(input)
+  L->>API: POST /polls/drafts (slide image: camera or upload)
+  API->>PS: draftFromSlide(slide)
+  PS->>MG: fromSlide(slide)
   MG->>LLM: generateStructured(task=generate_mcq, schema, slide)
   LLM-->>MG: {questions[]}
   MG-->>PS: McqDraft[] (≤3, invalid ones dropped)

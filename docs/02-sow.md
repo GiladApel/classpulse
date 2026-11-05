@@ -28,6 +28,8 @@ Deliver a working, demo-ready web application and a complete set of design artif
 | M5 | Backchannel + polls | F3, F4 |
 | M6 | Lecture summary + homework review | F5, F6 |
 | M7 | Tests, deployment, demo rehearsal, conclusion | D9–D11 |
+| M8 | Lecture page | F7 |
+| M9 | Lecture feedback | F8 |
 
 ## 4. Assumptions
 - Students have a smartphone with a camera and a browser (iOS Safari or Android Chrome).

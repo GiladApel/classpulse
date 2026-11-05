@@ -19,9 +19,11 @@ Lecturers need **one simple tool** that students open with a phone camera and th
 | F1 | **Attendance**: rotating server-signed QR → one-tap check-in; live dashboard; xlsx + Google Sheet export; geofence (lenient/strict); manual approval | **Core** |
 | F2 | **Anti-fraud**: AI headcount from a class photo; Roll-call challenge; **Blurred Photo Heatmap challenge** | Core |
 | F3 | **Live backchannel**: "I'm lost" confusion meter + questions feed (anonymous option) | High |
-| F4 | **KISS polls**: templates or AI-generated MCQ from a slide; live results | High |
+| F4 | **KISS polls**: AI-generated MCQ from a photographed or uploaded slide; live results | High |
 | F5 | **Lecture summary**: AI summary, chapters and review questions from a recording, with confusion spikes on the timeline | Medium |
 | F6 | **Homework review**: rubric-based AI review, percentiles and class-wide common mistakes (peers' work never shown) | Medium |
+| F7 | **Lecture page**: per-lecture page for the whole course (also for those who missed it): summary, materials, practice questions, poll results, questions with the lecturer's answers | Medium |
+| F8 | **Lecture feedback**: when the lecture ends, students get an optional anonymous form (4 options + comment); the lecturer sees the aggregate from 3 answers | Medium |
 
 **Out of scope:**
 - Integration with Moodle, Zoom or the university's personal-information system (מידע אישי).
@@ -94,7 +96,7 @@ SSH_HOST=do-server PB_ADMIN_URL=http://127.0.0.1:18092/pb loadtest/run.sh https:
 After checking in, the student's page stays open and shows:
 - **🤯 הלכתי לאיבוד** ("I'm lost"): one tap, at most once a minute. The dashboard's confusion meter shows how many of those present pressed it in the last 2 minutes, never who.
 - **Questions and comments**: posted with a name or anonymously, upvoted by classmates, and allowed after class too. The lecturer marks them answered, and **✨ קיבוץ לנושאים** (group into themes) asks the AI to group open questions.
-- **Polls**: when the lecturer opens one, every phone switches to it. Templates (Yes/No, A–D, 1–5) launch in one click. **✨ שאלה משקף** (question from a slide) photographs a slide, or **✨ מהטקסט** (from text) uses pasted slide text, and the AI drafts 3 multiple-choice questions to pick from and edit. The projector shows live bars and reveals the correct answer when the lecturer closes the poll.
+- **Polls**: when the lecturer opens one, every phone switches to it. **📷 צילום שקף** (photograph slide) opens the camera; **🖼️ העלאת תמונה** (upload image) takes a screenshot or photo from the gallery or computer. The AI drafts 3 multiple-choice questions to pick from and edit. The projector shows live bars and reveals the correct answer when the lecturer closes the poll.
 
 ### Anti-fraud flow (M4)
 1. On the dashboard, **📷 צילום כיתה** (class photo): take or upload a photo of the room. AI (Gemini, or the mock) returns the people count and person boxes; the server blurs a copy. The dashboard shows "~N in the photo · M registered" and warns when check-ins exceed the count.

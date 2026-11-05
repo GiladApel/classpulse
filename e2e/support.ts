@@ -1,4 +1,4 @@
-import { type Browser, type BrowserContext, devices, expect, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, devices, expect, type Page, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import PocketBase from 'pocketbase';
 
@@ -14,6 +14,12 @@ export const CLASSROOM = { latitude: 32.1048, longitude: 35.2073, accuracy: 15 }
 export const metersNorth = (m: number) => ({ ...CLASSROOM, latitude: CLASSROOM.latitude + m / 111_320 });
 const PASSWORD = 'e2e-pass-1234';
 const PHONES = [devices['iPhone 13'], devices['Pixel 7']];
+
+// Every phone and lecturer window keeps live connections open; close them after each test so tests don't starve each other.
+const opened: BrowserContext[] = [];
+test.afterEach(async () => {
+  await Promise.all(opened.splice(0).map((c) => c.close()));
+});
 
 export interface Person {
   id: string;
@@ -41,6 +47,7 @@ export async function makeClass(tag: string, studentNames: string[]) {
   return {
     lecturer,
     students,
+    courseId: course.id,
     async cleanup() {
       await pb.collection('courses').delete(course.id).catch(() => {});
       for (const u of [lecturer, ...students]) await pb.collection('users').delete(u.id).catch(() => {});
@@ -49,6 +56,7 @@ export async function makeClass(tag: string, studentNames: string[]) {
 }
 
 async function login(context: BrowserContext, email: string): Promise<Page> {
+  opened.push(context);
   const page = await context.newPage();
   await page.goto('/login');
   await page.getByText('כניסת מרצה עם סיסמה').click();

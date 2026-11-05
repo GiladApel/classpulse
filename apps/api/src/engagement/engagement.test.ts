@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FeedClusterer } from '../ai/FeedClusterer.js';
-import { McqGenerator } from '../ai/McqGenerator.js';
+import { LECTURE_QUESTIONS, McqGenerator } from '../ai/McqGenerator.js';
 import { MockProvider } from '../ai/MockProvider.js';
 import { FixedClock } from '../infra/Clock.js';
 import {
@@ -15,7 +15,6 @@ import { makeSession, T0 } from '../test/fixtures.js';
 import { ConfusionMeter } from './ConfusionMeter.js';
 import { FeedService } from './FeedService.js';
 import { PollService } from './PollService.js';
-import { PollTemplateFactory } from './PollTemplateFactory.js';
 import type { Participant } from './types.js';
 
 const dana: Participant = { id: 'u1', studentNumber: '111', name: 'דנה' };
@@ -97,6 +96,16 @@ describe('FeedService', () => {
     expect(await code(feed.upvote(p.id, outsider))).toBe('NOT_CHECKED_IN');
   });
 
+  it('a written answer marks the post answered; clearing the text keeps the flag', async () => {
+    const p = await feed.post(session, dana, 'מה ההבדל בין Strategy ל-State?', true);
+    expect(await feed.answer(p.id, '  Strategy בוחר אלגוריתם; State משנה התנהגות לפי מצב.  ')).toMatchObject({
+      answer: 'Strategy בוחר אלגוריתם; State משנה התנהגות לפי מצב.',
+      answered: true,
+    });
+    expect(await feed.answer(p.id, ' ')).toMatchObject({ answer: '', answered: true });
+    expect(await code(feed.answer('ghost', 'x'))).toBe('NOT_FOUND');
+  });
+
   it('clusters only open posts and skips the model for fewer than two', async () => {
     const a = await feed.post(session, dana, 'a', false);
     expect(await feed.clusterOpen(session.id)).toEqual([{ title: 'a', summary: '', postIds: [a.id] }]);
@@ -120,7 +129,7 @@ describe('PollService', () => {
     polls = new PollService(new InMemoryPollRepository(), new InMemoryPollVoteRepository(), attendance, new McqGenerator(new MockProvider()), new FixedClock(T0));
   });
 
-  it('template → open → vote → close with tallies and reveal', async () => {
+  it('create → open → vote → close with tallies and reveal', async () => {
     const draft = await polls.create(session, { question: 'מה נכון?', options: ['א', 'ב', 'ג'], correctIndex: 1 }, 'manual');
     expect(draft.status).toBe('draft');
     expect(await code(polls.vote(draft.id, dana, 0))).toBe('POLL_CLOSED');
@@ -139,15 +148,14 @@ describe('PollService', () => {
   });
 
   it('opening a poll closes the one already open', async () => {
-    const a = await polls.createFromTemplate(session, 'yes_no', 'ברור?');
-    const b = await polls.createFromTemplate(session, 'scale5', 'כמה ברור?');
-    expect(a.options).toEqual(PollTemplateFactory.options('yes_no'));
+    const a = await polls.create(session, { question: 'ברור?', options: ['כן', 'לא'], correctIndex: null }, 'ai');
+    const b = await polls.create(session, { question: 'כמה ברור?', options: ['1', '2', '3'], correctIndex: null }, 'ai');
     await polls.open(session, a.id);
     await polls.open(session, b.id);
     expect((await polls.get(a.id)).status).toBe('closed');
     expect((await polls.get(b.id)).status).toBe('open');
     expect(await code(polls.open(session, a.id))).toBe('POLL_STATE');
-    const c = await polls.createFromTemplate(session, 'abcd', 'איזה?');
+    const c = await polls.create(session, { question: 'איזה?', options: ['A', 'B'], correctIndex: 0 }, 'ai');
     expect(await code(polls.open(makeSession({ status: 'ended' }), c.id))).toBe('SESSION_ENDED');
   });
 
@@ -172,16 +180,25 @@ describe('McqGenerator', () => {
         ],
       },
     });
-    const drafts = await new McqGenerator(llm).generate({ text: 'slide' });
+    const drafts = await new McqGenerator(llm).fromSlide({ mimeType: 'image/png', data: Buffer.from([1]) });
     expect(drafts).toEqual([
       { question: 'ok', options: ['a', 'b', 'c', 'd'], correctIndex: 3 },
       { question: 'ok2', options: ['a', 'b'], correctIndex: 0 },
     ]);
-    expect(llm.calls[0].prompt).toContain('Slide text:\nslide');
+    expect(llm.calls[0].files).toHaveLength(1);
   });
 
   it('throws when nothing usable comes back', async () => {
     const llm = new MockProvider({ generate_mcq: { questions: [{ question: 'x', options: [], correctIndex: 0 }] } });
-    await expect(new McqGenerator(llm).generate({ text: 's' })).rejects.toThrow('no valid questions');
+    await expect(new McqGenerator(llm).fromSlide({ mimeType: 'image/png', data: Buffer.from([1]) })).rejects.toThrow('no valid questions');
+  });
+
+  it('drafts up to 8 practice questions from a whole deck', async () => {
+    const many = Array.from({ length: 10 }, (_, i) => ({ question: `q${i}`, options: ['a', 'b'], correctIndex: 0 }));
+    const llm = new MockProvider({ generate_practice: { questions: many } });
+    const deck = { mimeType: 'application/pdf', data: Buffer.from('%PDF') };
+    expect(await new McqGenerator(llm).fromLecture(deck)).toHaveLength(LECTURE_QUESTIONS);
+    expect(llm.calls[0]).toMatchObject({ task: 'generate_practice', files: [deck] });
+    expect(llm.calls[0].prompt).toContain(`exactly ${LECTURE_QUESTIONS}`);
   });
 });

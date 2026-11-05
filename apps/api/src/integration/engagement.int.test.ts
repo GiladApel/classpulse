@@ -98,9 +98,9 @@ describe('Integration: backchannel + polls against real PocketBase', () => {
     expect(closed.correct_index).toBeUndefined();
   });
 
-  it('template poll without a correct answer reveals -1, and a new poll closes the open one', async () => {
-    const p1 = (await h.call(h.lecturer, 'POST', `/sessions/${sessionId}/polls`, { template: 'yes_no', question: 'ברור?', open: true })).body;
-    const p2 = (await h.call(h.lecturer, 'POST', `/sessions/${sessionId}/polls`, { template: 'scale5', question: 'כמה?', open: true })).body;
+  it('a poll without a correct answer reveals -1, and a new poll closes the open one', async () => {
+    const p1 = (await h.call(h.lecturer, 'POST', `/sessions/${sessionId}/polls`, { question: 'ברור?', options: ['כן', 'לא'], open: true })).body;
+    const p2 = (await h.call(h.lecturer, 'POST', `/sessions/${sessionId}/polls`, { question: 'כמה?', options: ['1', '2', '3'], open: true })).body;
     expect((await h.admin.collection('polls').getOne(p1.id)).status).toBe('closed');
     expect((await h.admin.collection('polls').getOne(p2.id)).status).toBe('open');
     const r = (await h.call(h.lecturer, 'POST', `/polls/${p1.id}/close`)).body;

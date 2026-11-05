@@ -46,7 +46,7 @@
 ### F3: Live backchannel
 | ID | Requirement |
 |----|-------------|
-| FR-BC-01 | A student can press "I'm lost" (at most once per 60 s). The dashboard shows a confusion level over a rolling 2-minute window. |
+| FR-BC-01 | A student can press "I'm lost" (at most once per 60 s). The dashboard shows a confusion level over a rolling 2-minute window. After the tap, the student may optionally write what is unclear; the note is posted to the questions feed anonymously. |
 | FR-BC-02 | A student can post a question or suggestion, optionally anonymously, during or after the lecture. |
 | FR-BC-03 | Participants can upvote posts (once each). The lecturer can mark a post as answered. |
 | FR-BC-04 | The lecturer can request an AI clustering of open posts into themes. |
@@ -54,8 +54,8 @@
 ### F4: Polls
 | ID | Requirement |
 |----|-------------|
-| FR-PL-01 | The lecturer can create a poll from a template (Yes/No, A–D, 1–5) or with free options in under 10 s. |
-| FR-PL-02 | The lecturer can upload a slide image or text and receive 3 AI-generated MCQ drafts to choose from. |
+| FR-PL-01 | A poll is created from a slide: the lecturer photographs it (camera) or uploads an image of it (gallery or computer). |
+| FR-PL-02 | The AI returns 3 MCQ drafts for the slide; the lecturer picks one, may edit it, and opens it. |
 | FR-PL-03 | When a poll opens, every connected student's screen switches to it automatically. One vote per student. |
 | FR-PL-04 | Results update live on the projector. The correct answer is revealed when the poll closes. |
 
@@ -75,6 +75,21 @@
 | FR-HW-02 | A student can upload a submission (PDF, code or text) and receive an AI review per rubric criterion: score, strengths and concrete fixes. |
 | FR-HW-03 | The student sees their percentile per criterion and the class-wide common mistakes. Peers' raw work and identities are never shown. |
 | FR-HW-04 | The lecturer sees the score distribution, common mistakes and highly similar submission pairs for human review. |
+
+### F7: Lecture page
+| ID | Requirement |
+|----|-------------|
+| FR-LP-01 | Every lecture has a page for every course participant, including students who missed it: published summary, materials, practice questions, the closed polls with results, and the questions with answers. Posting and upvoting stay limited to students checked in to that lecture. |
+| FR-LP-02 | During or after the lecture, the lecturer adds multiple-choice practice questions, written by hand or drafted by the AI from the lecture's slide deck (PDF or image, ≤50 MB): up to 8 drafts, of which the lecturer adds the ones they select. A student answers each once and then sees the correct answer; the correct answer is never readable before that. |
+| FR-LP-03 | During or after the lecture, the lecturer attaches files (≤50 MB) and links. Files are downloadable only by course participants. |
+| FR-LP-04 | The lecturer can write an answer under a student's question, during or after the lecture; it marks the question answered. |
+
+### F8: Lecture feedback
+| ID | Requirement |
+|----|-------------|
+| FR-FB-01 | When the lecturer ends the lecture, every student who was checked in is offered optional, anonymous feedback: one of four options (clear and well paced · too fast · too slow · the material was not clear) and an optional comment. It appears at once on phones still open and stays available on the lecture page for 24 hours. |
+| FR-FB-02 | One answer per student. The form states that it is anonymous. |
+| FR-FB-03 | The lecturer sees only the aggregate (count per option and the comments, ordered by option, never by time) and only from 3 answers. No one, the lecturer included, can read a single answer or its author. |
 
 ## 4. Non-functional requirements
 | ID | Requirement |

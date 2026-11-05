@@ -8,7 +8,9 @@ HOST=${HOST:-do-server}
 ROOT=/opt/classpulse
 
 npm run build -w apps/api
-VITE_PB_URL=/pb VITE_API_URL=/api npm run build -w apps/web
+# MSYS_NO_PATHCONV: Git Bash would otherwise rewrite /pb to C:/Program Files/Git/pb.
+MSYS_NO_PATHCONV=1 VITE_PB_URL=/pb VITE_API_URL=/api npm run build -w apps/web
+if grep -q 'Program Files' apps/web/dist/assets/*.js; then echo "Web build contains a Windows path; aborting"; exit 1; fi
 
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT

@@ -1,16 +1,18 @@
 import type { McqDraft } from '../engagement/types.js';
 import { type Attachment, type LLMProvider, LLMOutputError } from './LLMProvider.js';
 
-export interface SlideInput {
-  slide?: Attachment;
-  text?: string;
-}
-
-const PROMPT = `You are helping a university lecturer run a quick in-class poll.
-From the lecture slide (image and/or text below), write exactly 3 different multiple-choice questions that check understanding of its key idea.
-Each question has 4 short options (max 80 characters each) and exactly one correct option ("correctIndex", 0-based).
+const RULES = `Each question has 4 short options (max 80 characters each) and exactly one correct option ("correctIndex", 0-based).
 Prefer conceptual questions over trivia. Distractors must be plausible misconceptions.
-Write in the same language as the slide (Hebrew slide -> Hebrew questions).`;
+Write in the same language as the slides (Hebrew slides -> Hebrew questions).`;
+
+const SLIDE_PROMPT = `You are helping a university lecturer run a quick in-class poll.
+From the attached lecture slide, write exactly 3 different multiple-choice questions that check understanding of its key idea.
+${RULES}`;
+
+export const LECTURE_QUESTIONS = 8;
+const LECTURE_PROMPT = `You are helping a university lecturer prepare practice questions for after the lecture.
+The attached file is the full slide deck. Write exactly ${LECTURE_QUESTIONS} different multiple-choice questions spread across its main topics, in the order they appear.
+${RULES}`;
 
 const SCHEMA = {
   type: 'object',
@@ -40,12 +42,21 @@ interface RawQuestion {
 export class McqGenerator {
   constructor(private readonly llm: LLMProvider) {}
 
-  async generate(input: SlideInput): Promise<McqDraft[]> {
-    const prompt = input.text ? `${PROMPT}\n\nSlide text:\n${input.text}` : PROMPT;
-    const raw = await this.llm.generateStructured<{ questions?: RawQuestion[] }>({ task: 'generate_mcq', prompt, schema: SCHEMA, files: input.slide ? [input.slide] : [] });
+  /** 3 poll drafts from one slide image. */
+  fromSlide(slide: Attachment): Promise<McqDraft[]> {
+    return this.generate('generate_mcq', SLIDE_PROMPT, slide, 3);
+  }
+
+  /** Practice-question drafts from a whole deck (PDF or image). */
+  fromLecture(deck: Attachment): Promise<McqDraft[]> {
+    return this.generate('generate_practice', LECTURE_PROMPT, deck, LECTURE_QUESTIONS);
+  }
+
+  private async generate(task: string, prompt: string, file: Attachment, max: number): Promise<McqDraft[]> {
+    const raw = await this.llm.generateStructured<{ questions?: RawQuestion[] }>({ task, prompt, schema: SCHEMA, files: [file] });
     const drafts = (Array.isArray(raw?.questions) ? raw.questions : []).map(McqGenerator.toDraft).filter((d): d is McqDraft => d !== null);
-    if (drafts.length === 0) throw new LLMOutputError('generate_mcq: no valid questions');
-    return drafts.slice(0, 3);
+    if (drafts.length === 0) throw new LLMOutputError(`${task}: no valid questions`);
+    return drafts.slice(0, max);
   }
 
   static toDraft(q: RawQuestion | null): McqDraft | null {

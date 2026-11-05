@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Navigate, useParams } from 'react-router';
+import { Link, Navigate, useParams } from 'react-router';
 import ChallengeOverlay from '../components/ChallengeOverlay';
 import StudentLivePanel from '../components/StudentLivePanel';
 import { Card, Screen } from '../components/ui';
 import { api, ApiError, type RecordDto } from '../lib/api';
 import { formatTime, getDeviceId, getLocation } from '../lib/device';
-import { pb } from '../lib/pb';
+import { useSessionActive } from '../lib/pb';
 
 type State =
   | { kind: 'locating' | 'sending' }
@@ -23,7 +23,6 @@ interface CheckInResponse {
 export default function CheckInPage() {
   const { token = '' } = useParams();
   const [state, setState] = useState<State>({ kind: 'locating' });
-  const [active, setActive] = useState(true);
   const started = useRef(false);
 
   useEffect(() => {
@@ -35,13 +34,14 @@ export default function CheckInPage() {
       try {
         const res = await api.post<CheckInResponse>('/checkins', { token, deviceId: getDeviceId(), location });
         setState({ kind: 'done', record: res.record, already: res.alreadyCheckedIn, title: res.sessionTitle });
-        if (res.record.sessionId) pb.collection('sessions').getOne(res.record.sessionId).then((s) => setActive(s.status === 'active'), () => {});
       } catch (e) {
         if (e instanceof ApiError && e.code === 'ONBOARDING_REQUIRED') return setState({ kind: 'onboarding' });
         setState({ kind: 'error', message: e instanceof ApiError && e.status < 500 ? e.message : 'שגיאת רשת — נסו לסרוק שוב' });
       }
     })();
   }, [token]);
+
+  const active = useSessionActive(state.kind === 'done' ? state.record.sessionId : undefined);
 
   if (state.kind === 'onboarding') return <Navigate to={`/onboarding?next=/c/${token}`} replace />;
 
@@ -67,6 +67,11 @@ export default function CheckInPage() {
               </p>
             )}
             <p className="mt-2 text-xs text-slate-400">השאירו את הדף פתוח — סקרים ובדיקות נוכחות יופיעו כאן.</p>
+            {state.record.sessionId && (
+              <Link to={`/lecture/${state.record.sessionId}`} className="text-sm text-indigo-600 hover:underline">
+                דף השיעור — חומרים, תרגול וסיכום ←
+              </Link>
+            )}
             {state.record.sessionId && <ChallengeOverlay sessionId={state.record.sessionId} />}
           </>
         )}

@@ -7,6 +7,7 @@ import { ContentController } from './http/ContentController.js';
 import { EngagementController } from './http/EngagementController.js';
 import { handleError } from './http/errors.js';
 import { HomeworkController } from './http/HomeworkController.js';
+import { LectureContentController } from './http/LectureContentController.js';
 import { PollController } from './http/PollController.js';
 import { SessionController } from './http/SessionController.js';
 
@@ -20,9 +21,10 @@ export function createApp(c: Container): Hono<AppEnv> {
   app.route('/sessions', new SessionController(c.sessions, c.attendance, c.exports).routes());
   app.route('/', new AttendanceController(c.attendance, c.sessions, c.tokens, c.clock).routes());
   app.route('/', new ChallengeController(c.challenges, c.sessions, c.attendance).routes());
-  app.route('/', new EngagementController(c.sessions, c.confusion, c.feed).routes());
+  app.route('/', new EngagementController(c.sessions, c.confusion, c.feed, c.feedback).routes());
   app.route('/', new PollController(c.polls, c.sessions).routes());
   app.route('/', new ContentController(c.recordings, c.sessions).routes());
   app.route('/', new HomeworkController(c.homework, c.sessions).routes());
+  app.route('/', new LectureContentController(c.practice, c.materials, c.sessions).routes());
   return app;
 }

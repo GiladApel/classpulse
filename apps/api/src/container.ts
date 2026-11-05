@@ -18,13 +18,31 @@ import { type ChallengeOptions, ChallengeManager } from './challenge/ChallengeMa
 import type { ChallengeRepository, ChallengeResponseRepository, HeadcountRepository } from './challenge/repositories.js';
 import type { Config } from './config.js';
 import { HomeworkAnalysisService } from './content/HomeworkAnalysisService.js';
+import { MaterialService } from './content/MaterialService.js';
+import { PracticeService } from './content/PracticeService.js';
 import { RecordingPipeline } from './content/RecordingPipeline.js';
-import type { AssignmentRepository, InsightsRepository, RecordingRepository, SubmissionRepository } from './content/repositories.js';
+import type {
+  AssignmentRepository,
+  InsightsRepository,
+  MaterialRepository,
+  PracticeAnswerRepository,
+  PracticeQuestionRepository,
+  RecordingRepository,
+  SubmissionRepository,
+} from './content/repositories.js';
 import { TextExtractor } from './content/TextExtractor.js';
 import { ConfusionMeter } from './engagement/ConfusionMeter.js';
 import { FeedService } from './engagement/FeedService.js';
+import { FeedbackService } from './engagement/FeedbackService.js';
 import { PollService } from './engagement/PollService.js';
-import type { FeedPostRepository, LostSignalRepository, PollRepository, PollVoteRepository, PostVoteRepository } from './engagement/repositories.js';
+import type {
+  FeedPostRepository,
+  LessonFeedbackRepository,
+  LostSignalRepository,
+  PollRepository,
+  PollVoteRepository,
+  PostVoteRepository,
+} from './engagement/repositories.js';
 import type { UserResolver } from './http/auth.js';
 import { BackgroundQueue } from './infra/BackgroundQueue.js';
 import type { Clock } from './infra/Clock.js';
@@ -37,10 +55,19 @@ import { type ImageProcessor, SharpImageProcessor } from './infra/ImageProcessor
 import { PbAttendanceRepository } from './infra/pb/PbAttendanceRepository.js';
 import { PbChallengeRepository, PbChallengeResponseRepository, PbHeadcountRepository } from './infra/pb/PbChallengeRepositories.js';
 import { createSuperuserClient, resolveUser } from './infra/pb/pbClient.js';
-import { PbAssignmentRepository, PbInsightsRepository, PbRecordingRepository, PbSubmissionRepository } from './infra/pb/PbContentRepositories.js';
+import {
+  PbAssignmentRepository,
+  PbInsightsRepository,
+  PbMaterialRepository,
+  PbPracticeAnswerRepository,
+  PbPracticeQuestionRepository,
+  PbRecordingRepository,
+  PbSubmissionRepository,
+} from './infra/pb/PbContentRepositories.js';
 import { PbCourseRepository } from './infra/pb/PbCourseRepository.js';
 import {
   PbFeedPostRepository,
+  PbLessonFeedbackRepository,
   PbLostSignalRepository,
   PbPollRepository,
   PbPollVoteRepository,
@@ -58,9 +85,12 @@ export interface Container {
   challenges: ChallengeManager;
   confusion: ConfusionMeter;
   feed: FeedService;
+  feedback: FeedbackService;
   polls: PollService;
   recordings: RecordingPipeline;
   homework: HomeworkAnalysisService;
+  practice: PracticeService;
+  materials: MaterialService;
   /** Background AI jobs (summaries, reviews); tests await queue.idle(). */
   queue: BackgroundQueue;
   resolveUser: UserResolver;
@@ -77,12 +107,16 @@ export interface Ports {
   lostRepo: LostSignalRepository;
   postRepo: FeedPostRepository;
   postVoteRepo: PostVoteRepository;
+  feedbackRepo: LessonFeedbackRepository;
   pollRepo: PollRepository;
   pollVoteRepo: PollVoteRepository;
   recordingRepo: RecordingRepository;
   assignmentRepo: AssignmentRepository;
   submissionRepo: SubmissionRepository;
   insightsRepo: InsightsRepository;
+  practiceRepo: PracticeQuestionRepository;
+  practiceAnswerRepo: PracticeAnswerRepository;
+  materialRepo: MaterialRepository;
   uploads: UploadStore;
   exporters: Map<ExportFormat, SpreadsheetExporter>;
   llm: LLMProvider;
@@ -105,6 +139,7 @@ export function buildContainer(p: Ports): Container {
   const attendance = new AttendanceService(rules, p.attendanceRepo, p.clock);
   const confusion = new ConfusionMeter(p.lostRepo, attendance, p.clock);
   const queue = new BackgroundQueue();
+  const mcq = new McqGenerator(p.llm);
   return {
     clock: p.clock,
     tokens,
@@ -124,7 +159,8 @@ export function buildContainer(p: Ports): Container {
     ),
     confusion,
     feed: new FeedService(p.postRepo, p.postVoteRepo, attendance, new FeedClusterer(p.llm), p.clock),
-    polls: new PollService(p.pollRepo, p.pollVoteRepo, attendance, new McqGenerator(p.llm), p.clock),
+    feedback: new FeedbackService(p.feedbackRepo, attendance, p.clock),
+    polls: new PollService(p.pollRepo, p.pollVoteRepo, attendance, mcq, p.clock),
     recordings: new RecordingPipeline(p.recordingRepo, p.uploads, new LectureSummarizer(p.llm), confusion, attendance, queue, p.clock),
     homework: new HomeworkAnalysisService(
       p.assignmentRepo,
@@ -136,6 +172,8 @@ export function buildContainer(p: Ports): Container {
       queue,
       p.clock,
     ),
+    practice: new PracticeService(p.practiceRepo, p.practiceAnswerRepo, attendance, mcq, p.clock),
+    materials: new MaterialService(p.materialRepo, p.clock),
     queue,
     resolveUser: p.resolveUser,
   };
@@ -161,12 +199,16 @@ export async function buildProductionContainer(cfg: Config): Promise<Container> 
     lostRepo: new PbLostSignalRepository(pb),
     postRepo: new PbFeedPostRepository(pb),
     postVoteRepo: new PbPostVoteRepository(pb),
+    feedbackRepo: new PbLessonFeedbackRepository(pb),
     pollRepo: new PbPollRepository(pb),
     pollVoteRepo: new PbPollVoteRepository(pb),
     recordingRepo: new PbRecordingRepository(pb),
     assignmentRepo: new PbAssignmentRepository(pb),
     submissionRepo: new PbSubmissionRepository(pb),
     insightsRepo: new PbInsightsRepository(pb),
+    practiceRepo: new PbPracticeQuestionRepository(pb),
+    practiceAnswerRepo: new PbPracticeAnswerRepository(pb),
+    materialRepo: new PbMaterialRepository(pb),
     uploads: new UploadStore(),
     exporters,
     llm: LLMProviderFactory.create(cfg.ai),

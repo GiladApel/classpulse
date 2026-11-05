@@ -1,7 +1,14 @@
 import type { RecordModel } from 'pocketbase';
 import type PocketBase from 'pocketbase';
-import type { FeedPostRepository, LostSignalRepository, PollRepository, PollVoteRepository, PostVoteRepository } from '../../engagement/repositories.js';
-import type { FeedPost, LostSignal, Poll, PollResults, PollVote, PostVote } from '../../engagement/types.js';
+import type {
+  FeedPostRepository,
+  LessonFeedbackRepository,
+  LostSignalRepository,
+  PollRepository,
+  PollVoteRepository,
+  PostVoteRepository,
+} from '../../engagement/repositories.js';
+import type { FeedPost, LessonFeedback, LostSignal, Poll, PollResults, PollVote, PostVote } from '../../engagement/types.js';
 import { KeyedLock } from '../KeyedLock.js';
 import { compact, PbRepository, toDate } from './PbRepository.js';
 
@@ -57,6 +64,7 @@ export class PbFeedPostRepository extends PbRepository<FeedPost> implements Feed
       text: r.text,
       votes: r.votes,
       answered: r.answered,
+      answer: r.answer ?? '',
       postedAt: toDate(r.posted_at)!,
     };
   }
@@ -71,6 +79,7 @@ export class PbFeedPostRepository extends PbRepository<FeedPost> implements Feed
       text: d.text,
       votes: d.votes,
       answered: d.answered,
+      answer: d.answer,
       posted_at: d.postedAt?.toISOString(),
     });
   }
@@ -158,5 +167,42 @@ export class PbPollVoteRepository extends PbRepository<PollVote> implements Poll
 
   protected toRecord(d: Partial<Omit<PollVote, 'id'>>) {
     return compact({ poll: d.pollId, student: d.studentId, student_number: d.studentNumber, option_index: d.optionIndex });
+  }
+}
+
+export class PbLessonFeedbackRepository extends PbRepository<LessonFeedback> implements LessonFeedbackRepository {
+  constructor(pb: PocketBase) {
+    super(pb, 'lesson_feedback');
+  }
+
+  find(sessionId: string, studentNumber: string) {
+    return this.first('session = {:s} && student_number = {:n}', { s: sessionId, n: studentNumber });
+  }
+
+  async listBySession(sessionId: string) {
+    return (await this.col.getFullList({ filter: this.pb.filter('session = {:s}', { s: sessionId }) })).map((r) => this.toEntity(r));
+  }
+
+  protected toEntity(r: RecordModel): LessonFeedback {
+    return {
+      id: r.id,
+      sessionId: r.session,
+      studentId: r.student || undefined,
+      studentNumber: r.student_number,
+      rating: r.rating,
+      comment: r.comment,
+      submittedAt: toDate(r.submitted_at)!,
+    };
+  }
+
+  protected toRecord(d: Partial<Omit<LessonFeedback, 'id'>>) {
+    return compact({
+      session: d.sessionId,
+      student: d.studentId,
+      student_number: d.studentNumber,
+      rating: d.rating,
+      comment: d.comment,
+      submitted_at: d.submittedAt?.toISOString(),
+    });
   }
 }

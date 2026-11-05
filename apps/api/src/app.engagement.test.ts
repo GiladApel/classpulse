@@ -90,13 +90,13 @@ describe('HTTP: backchannel + polls', () => {
     expect((await call('lect', 'POST', `/polls/${poll.body.id}/close`)).body).toEqual({ counts: [1, 0, 1, 0], total: 2, correctIndex: 0 });
   });
 
-  it('template poll and validation', async () => {
-    const yn = await call('lect', 'POST', `/sessions/${sessionId}/polls`, { template: 'yes_no', question: 'ברור?' });
-    expect(yn.body).toMatchObject({ status: 'draft', source: 'template', options: ['כן', 'לא'], correctIndex: null });
-    expect((await call('lect', 'POST', `/sessions/${sessionId}/polls`, { template: 'nope', question: 'q' })).status).toBe(400);
+  it('poll validation', async () => {
+    const yn = await call('lect', 'POST', `/sessions/${sessionId}/polls`, { question: 'ברור?', options: ['כן', 'לא'] });
+    expect(yn.body).toMatchObject({ status: 'draft', source: 'manual', options: ['כן', 'לא'], correctIndex: null });
+    expect((await call('lect', 'POST', `/sessions/${sessionId}/polls`, { question: 'q', options: ['a', 'b'], source: 'template' })).status).toBe(400);
     expect((await call('lect', 'POST', `/sessions/${sessionId}/polls`, { question: 'q', options: 'a,b' })).status).toBe(400);
     expect((await call('lect', 'POST', `/sessions/${sessionId}/polls`, { question: 'q', options: ['a'] })).body.code).toBe('INVALID_POLL');
-    expect((await call('dana', 'POST', `/sessions/${sessionId}/polls`, { template: 'yes_no', question: 'q' })).status).toBe(403);
+    expect((await call('dana', 'POST', `/sessions/${sessionId}/polls`, { question: 'q', options: ['a', 'b'] })).status).toBe(403);
     expect((await call('lect', 'POST', `/polls/${yn.body.id}/open`)).body.status).toBe('open');
   });
 });

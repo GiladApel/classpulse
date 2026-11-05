@@ -17,12 +17,16 @@ import {
 import {
   InMemoryAssignmentRepository,
   InMemoryInsightsRepository,
+  InMemoryMaterialRepository,
+  InMemoryPracticeAnswerRepository,
+  InMemoryPracticeQuestionRepository,
   InMemoryRecordingRepository,
   InMemorySubmissionRepository,
 } from '../infra/memory/InMemoryContentRepositories.js';
 import { InMemoryCourseRepository } from '../infra/memory/InMemoryCourseRepository.js';
 import {
   InMemoryFeedPostRepository,
+  InMemoryLessonFeedbackRepository,
   InMemoryLostSignalRepository,
   InMemoryPollRepository,
   InMemoryPollVoteRepository,
@@ -68,12 +72,16 @@ export function makeTestPorts(over: Partial<Ports> = {}) {
     lostRepo: new InMemoryLostSignalRepository(),
     postRepo: new InMemoryFeedPostRepository(),
     postVoteRepo: new InMemoryPostVoteRepository(),
+    feedbackRepo: new InMemoryLessonFeedbackRepository(),
     pollRepo: new InMemoryPollRepository(),
     pollVoteRepo: new InMemoryPollVoteRepository(),
     recordingRepo: new InMemoryRecordingRepository(),
     assignmentRepo: new InMemoryAssignmentRepository(),
     submissionRepo: new InMemorySubmissionRepository(),
     insightsRepo: new InMemoryInsightsRepository(),
+    practiceRepo: new InMemoryPracticeQuestionRepository(),
+    practiceAnswerRepo: new InMemoryPracticeAnswerRepository(),
+    materialRepo: new InMemoryMaterialRepository(),
     uploads: new UploadStore(join(tmpdir(), `classpulse-test-${process.pid}-${++storeSeq}`)),
     exporters: new Map([['csv' as const, new CsvExporter()]]),
     llm,

@@ -74,7 +74,6 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
   const votes = useLiveRecords<RecordModel & { option_index: number }>('poll_votes', pb.filter('poll = {:p}', { p: shown?.id ?? '' }), '', !!shown);
   // correct_index is hidden from PB reads; remember it from the API response of the poll we launched.
   const [answers, setAnswers] = useState<Record<string, number | null>>({});
-  const [question, setQuestion] = useState('');
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [busy, setBusy] = useState('');
@@ -98,10 +97,7 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
       setAnswers((a) => ({ ...a, [p.id]: p.correctIndex }));
       setEditing(null);
       setDrafts([]);
-      setQuestion('');
     });
-
-  const template = (kind: string, fallback: string) => launch({ template: kind, question: question.trim() || fallback });
 
   const fromSlide = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -109,15 +105,10 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
     if (!file) return;
     const form = new FormData();
     form.set('slide', file);
-    if (question.trim()) form.set('text', question.trim());
     return run('drafts', async () => setDrafts((await api.upload<{ drafts: Draft[] }>('/polls/drafts', form)).drafts));
   };
 
-  const fromText = () => {
-    const form = new FormData();
-    form.set('text', question.trim());
-    return run('drafts', async () => setDrafts((await api.upload<{ drafts: Draft[] }>('/polls/drafts', form)).drafts));
-  };
+  const pickButton = `inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-medium ${busy ? 'pointer-events-none opacity-50' : ''}`;
 
   const close = (id: string) => run('close', () => api.post(`/polls/${id}/close`));
 
@@ -126,7 +117,7 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
 
   return (
     <Card>
-      <h2 className="mb-3 font-semibold">סקר מהיר</h2>
+      <h2 className="mb-3 font-semibold">שאלה משקף</h2>
 
       {shown && (
         <div className="mb-4 rounded-xl border border-slate-200 p-3">
@@ -148,24 +139,17 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
 
       {active && !editing && (
         <div className="flex flex-col gap-2">
-          <input value={question} onChange={(e) => setQuestion(e.target.value)} maxLength={300} placeholder="שאלה (או טקסט מהשקף ליצירת שאלה עם AI)" className={inputClass} />
+          <p className="text-xs text-slate-500">צלמו את השקף או העלו תמונה שלו — ה-AI יציע 3 שאלות, תבחרו אחת ותפתחו אותה לסטודנטים.</p>
+          {/* Two inputs: "capture" forces the camera on phones, so the gallery/computer needs its own. */}
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" disabled={!!busy} onClick={() => template('yes_no', 'ברור עד עכשיו?')}>
-              כן / לא
-            </Button>
-            <Button variant="secondary" disabled={!!busy} onClick={() => template('abcd', 'מה התשובה?')}>
-              A–D
-            </Button>
-            <Button variant="secondary" disabled={!!busy} onClick={() => template('scale5', 'כמה ברור החומר? (1–5)')}>
-              1–5
-            </Button>
-            <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 font-medium text-white hover:bg-indigo-700 ${busy ? 'pointer-events-none opacity-50' : ''}`}>
-              ✨ שאלה משקף
+            <label className={`${pickButton} bg-indigo-600 text-white hover:bg-indigo-700`}>
+              📷 צילום שקף
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={fromSlide} />
             </label>
-            <Button variant="ghost" disabled={!!busy || question.trim().length < 20} onClick={fromText} title="לפחות 20 תווים של טקסט מהשקף">
-              ✨ מהטקסט
-            </Button>
+            <label className={`${pickButton} border border-slate-300 bg-white text-slate-800 hover:bg-slate-50`}>
+              🖼️ העלאת תמונה
+              <input type="file" accept="image/*" className="hidden" onChange={fromSlide} />
+            </label>
           </div>
           {busy === 'drafts' && <p className="text-sm text-slate-500">ה-AI מכין 3 שאלות…</p>}
         </div>
@@ -230,6 +214,13 @@ function FeedBoard({ sessionId }: { sessionId: string }) {
   const open = posts.filter((p) => !p.answered).length;
 
   const setAnswered = (p: PostRecord) => api.post(`/posts/${p.id}/answered`, { answered: !p.answered }).catch((e) => setError(message(e)));
+  const [answering, setAnswering] = useState('');
+  const [draft, setDraft] = useState('');
+  const saveAnswer = (p: PostRecord) =>
+    api.post(`/posts/${p.id}/answer`, { text: draft }).then(
+      () => setAnswering(''),
+      (e) => setError(message(e)),
+    );
 
   const cluster = async () => {
     setError('');
@@ -276,15 +267,38 @@ function FeedBoard({ sessionId }: { sessionId: string }) {
 
       <ul className="flex max-h-[32rem] flex-col divide-y divide-slate-100 overflow-y-auto">
         {sorted.map((p) => (
-          <li key={p.id} className={`flex items-start gap-3 py-2 ${p.answered ? 'opacity-50' : ''}`}>
+          <li key={p.id} className={`flex items-start gap-3 py-2 ${p.answered && answering !== p.id ? 'opacity-60' : ''}`}>
             <span className="min-w-10 rounded-lg bg-slate-100 px-2 py-1 text-center text-sm tabular-nums">▲{p.votes}</span>
             <div className="flex-1">
               <p className="whitespace-pre-wrap break-words">{p.text}</p>
               <p className="text-xs text-slate-400">{p.anonymous ? 'אנונימי' : p.display_name}</p>
+              {p.answer && answering !== p.id && <p className="mt-1 whitespace-pre-wrap rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">{p.answer}</p>}
+              {answering === p.id && (
+                <div className="mt-2 flex flex-col gap-2">
+                  <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} maxLength={2000} autoFocus aria-label="תשובה" className={inputClass} />
+                  <div className="flex gap-2">
+                    <Button onClick={() => saveAnswer(p)}>שמירת תשובה</Button>
+                    <Button variant="ghost" onClick={() => setAnswering('')}>
+                      ביטול
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-            <button onClick={() => setAnswered(p)} className="shrink-0 text-xs text-emerald-700 hover:underline">
-              {p.answered ? 'בטל' : 'נענה ✓'}
-            </button>
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              <button
+                onClick={() => {
+                  setDraft(p.answer ?? '');
+                  setAnswering(p.id);
+                }}
+                className="text-xs text-indigo-700 hover:underline"
+              >
+                {p.answer ? 'עריכת תשובה' : 'כתיבת תשובה'}
+              </button>
+              <button onClick={() => setAnswered(p)} className="text-xs text-emerald-700 hover:underline">
+                {p.answered ? 'בטל' : 'נענה ✓'}
+              </button>
+            </div>
           </li>
         ))}
         {sorted.length === 0 && <li className="py-6 text-center text-sm text-slate-400">עוד אין שאלות</li>}

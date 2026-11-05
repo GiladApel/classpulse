@@ -1,11 +1,11 @@
-import type { McqGenerator, SlideInput } from '../ai/McqGenerator.js';
+import type { Attachment } from '../ai/LLMProvider.js';
+import type { McqGenerator } from '../ai/McqGenerator.js';
 import type { AttendanceService } from '../attendance/AttendanceService.js';
 import type { Session } from '../attendance/types.js';
 import type { Clock } from '../infra/Clock.js';
 import { DomainError, NotFoundError } from '../shared/errors.js';
-import { PollTemplateFactory } from './PollTemplateFactory.js';
 import type { PollRepository, PollVoteRepository } from './repositories.js';
-import type { McqDraft, Participant, Poll, PollResults, PollSource, TemplateKind } from './types.js';
+import type { McqDraft, Participant, Poll, PollResults, PollSource } from './types.js';
 
 export class PollService {
   constructor(
@@ -16,26 +16,28 @@ export class PollService {
     private readonly clock: Clock,
   ) {}
 
-  createFromTemplate(session: Session, kind: TemplateKind, question: string): Promise<Poll> {
-    return this.create(session, { question, options: PollTemplateFactory.options(kind), correctIndex: null }, 'template');
+  draftFromSlide(slide: Attachment): Promise<McqDraft[]> {
+    return this.generator.fromSlide(slide);
   }
 
-  draftFromSlide(input: SlideInput): Promise<McqDraft[]> {
-    return this.generator.generate(input);
-  }
-
-  async create(session: Session, draft: McqDraft, source: PollSource): Promise<Poll> {
+  /** Shared by polls and practice questions: trimmed question, 2–6 non-empty options, a correct index that exists. */
+  static normalizeDraft(draft: McqDraft): McqDraft {
     const options = draft.options.map((o) => o.trim());
     if (!draft.question.trim()) throw new DomainError('INVALID_POLL', 'חסרה שאלה');
     if (options.length < 2 || options.length > 6 || options.some((o) => !o)) throw new DomainError('INVALID_POLL', 'לסקר צריכות להיות 2–6 תשובות לא ריקות');
     if (draft.correctIndex !== null && (draft.correctIndex < 0 || draft.correctIndex >= options.length)) {
       throw new DomainError('INVALID_POLL', 'התשובה הנכונה לא קיימת ברשימה');
     }
+    return { question: draft.question.trim(), options, correctIndex: draft.correctIndex };
+  }
+
+  async create(session: Session, draft: McqDraft, source: PollSource): Promise<Poll> {
+    const { question, options, correctIndex } = PollService.normalizeDraft(draft);
     return this.polls.create({
       sessionId: session.id,
-      question: draft.question.trim(),
+      question,
       options,
-      correctIndex: draft.correctIndex,
+      correctIndex,
       status: 'draft',
       source,
       results: null,

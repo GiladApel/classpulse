@@ -3,6 +3,7 @@ import { api, ApiError } from '../lib/api';
 import { pb } from '../lib/pb';
 import { useCountdown } from '../lib/useChallenge';
 import { currentPoll, type PollRecord, type PostRecord, useLiveRecords, useTick } from '../lib/useLiveRecords';
+import FeedbackCard from './FeedbackCard';
 import PollBars from './PollBars';
 import { Button, Card, ErrorText, inputClass } from './ui';
 
@@ -11,9 +12,10 @@ const message = (e: unknown) => (e instanceof ApiError && e.status < 500 ? e.mes
 export default function StudentLivePanel({ sessionId, active }: { sessionId: string; active: boolean }) {
   return (
     <div className="flex w-full flex-col gap-4 text-start">
+      <FeedbackCard sessionId={sessionId} ended={!active} />
       <PollCard sessionId={sessionId} />
       {active && <LostButton sessionId={sessionId} />}
-      <Feed sessionId={sessionId} />
+      <Feed sessionId={sessionId} canPost />
     </div>
   );
 }
@@ -21,6 +23,7 @@ export default function StudentLivePanel({ sessionId, active }: { sessionId: str
 function LostButton({ sessionId }: { sessionId: string }) {
   const [until, setUntil] = useState<string>();
   const [error, setError] = useState('');
+  const [note, setNote] = useState<'open' | 'sending' | 'sent' | 'closed'>('closed');
   const left = useCountdown(until);
 
   const signal = async () => {
@@ -28,8 +31,25 @@ function LostButton({ sessionId }: { sessionId: string }) {
     try {
       const r = await api.post<{ accepted: boolean; retryInSec: number }>(`/sessions/${sessionId}/lost`);
       setUntil(new Date(Date.now() + r.retryInSec * 1000).toISOString());
+      setNote('open');
     } catch (e) {
       setError(message(e));
+    }
+  };
+
+  // The tap says *when* students got lost; this optional note says *what*, as an anonymous post in the questions feed.
+  const sendNote = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const text = String(new FormData(e.currentTarget).get('text') ?? '').trim();
+    if (!text) return;
+    setError('');
+    setNote('sending');
+    try {
+      await api.post(`/sessions/${sessionId}/posts`, { text, anonymous: true });
+      setNote('sent');
+    } catch (err) {
+      setNote('open');
+      setError(message(err));
     }
   };
 
@@ -43,6 +63,23 @@ function LostButton({ sessionId }: { sessionId: string }) {
         {left > 0 ? `המרצה קיבל/ה את זה ✓ (${left})` : '🤯 הלכתי לאיבוד'}
       </button>
       <p className="text-xs text-slate-500">אנונימי לגמרי — המרצה רואה רק כמה סטודנטים לחצו.</p>
+      {(note === 'open' || note === 'sending') && (
+        <form onSubmit={sendNote} className="flex w-full flex-col gap-2 text-start">
+          <label className="text-sm font-medium text-slate-700" htmlFor="lost-note">
+            רוצים לכתוב מה לא ברור? (לא חובה)
+          </label>
+          <textarea id="lost-note" name="text" maxLength={500} rows={2} autoFocus placeholder="למשל: לא הבנתי את הדוגמה האחרונה" className={inputClass} />
+          <div className="flex items-center justify-between gap-2">
+            <button type="button" onClick={() => setNote('closed')} className="text-sm text-slate-500 hover:underline">
+              לא תודה
+            </button>
+            <Button type="submit" disabled={note === 'sending'}>
+              שליחה כשאלה אנונימית
+            </Button>
+          </div>
+        </form>
+      )}
+      {note === 'sent' && <p className="text-sm text-emerald-700">נוסף לשאלות ✓ חברים לכיתה יכולים להצביע עליה</p>}
       <ErrorText>{error}</ErrorText>
     </Card>
   );
@@ -110,7 +147,8 @@ function PollCard({ sessionId }: { sessionId: string }) {
   );
 }
 
-function Feed({ sessionId }: { sessionId: string }) {
+/** Questions with the lecturer's answers. Only students checked in to this lecture may post or upvote (`canPost`). */
+export function Feed({ sessionId, canPost }: { sessionId: string; canPost: boolean }) {
   const userId = pb.authStore.record?.id ?? '';
   const posts = useLiveRecords<PostRecord>('feed_posts', pb.filter('session = {:s}', { s: sessionId }));
   const myVotes = useLiveRecords<PostRecord & { post: string }>('post_votes', pb.filter('voter = {:u} && post.session = {:s}', { u: userId, s: sessionId }));
@@ -149,25 +187,27 @@ function Feed({ sessionId }: { sessionId: string }) {
   return (
     <Card>
       <h2 className="mb-3 font-semibold">שאלות והערות</h2>
-      <form onSubmit={submit} className="flex flex-col gap-2">
-        <textarea name="text" required maxLength={500} rows={2} placeholder="שאלה, הערה או הצעה למרצה…" className={inputClass} />
-        <div className="flex items-center justify-between gap-2">
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} className="h-4 w-4" />
-            אנונימי
-          </label>
-          <Button type="submit" disabled={sending}>
-            שליחה
-          </Button>
-        </div>
-      </form>
+      {canPost && (
+        <form onSubmit={submit} className="flex flex-col gap-2">
+          <textarea name="text" required maxLength={500} rows={2} placeholder="שאלה, הערה או הצעה למרצה…" className={inputClass} />
+          <div className="flex items-center justify-between gap-2">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} className="h-4 w-4" />
+              אנונימי
+            </label>
+            <Button type="submit" disabled={sending}>
+              שליחה
+            </Button>
+          </div>
+        </form>
+      )}
       <ErrorText>{error}</ErrorText>
       <ul className="mt-3 flex flex-col divide-y divide-slate-100">
         {sorted.map((p) => (
           <li key={p.id} className={`flex items-start gap-3 py-2 ${p.answered ? 'opacity-50' : ''}`}>
             <button
               onClick={() => upvote(p.id)}
-              disabled={voted.has(p.id)}
+              disabled={!canPost || voted.has(p.id)}
               aria-label="גם אני"
               className="flex min-w-12 flex-col items-center rounded-lg border border-slate-200 px-2 py-1 text-sm tabular-nums enabled:hover:bg-indigo-50 disabled:border-indigo-200 disabled:bg-indigo-50 disabled:text-indigo-700"
             >
@@ -179,10 +219,16 @@ function Feed({ sessionId }: { sessionId: string }) {
                 {p.anonymous ? 'אנונימי' : p.display_name}
                 {p.answered && ' · נענה ✓'}
               </p>
+              {p.answer && (
+                <p className="mt-1 whitespace-pre-wrap break-words rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                  <span className="font-semibold">תשובת המרצה: </span>
+                  {p.answer}
+                </p>
+              )}
             </div>
           </li>
         ))}
-        {sorted.length === 0 && <li className="py-3 text-center text-sm text-slate-400">עוד אין שאלות. תהיו הראשונים!</li>}
+        {sorted.length === 0 && <li className="py-3 text-center text-sm text-slate-400">{canPost ? 'עוד אין שאלות. תהיו הראשונים!' : 'לא נשאלו שאלות בשיעור הזה.'}</li>}
       </ul>
     </Card>
   );

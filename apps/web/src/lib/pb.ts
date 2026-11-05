@@ -20,3 +20,18 @@ export function useUser(): UserRecord | null {
   useEffect(() => pb.authStore.onChange(() => setUser(currentUser())), []);
   return user;
 }
+
+/** Live session status: the student's page learns the lecture ended the moment the lecturer ends it. */
+export function useSessionActive(sessionId: string | undefined): boolean {
+  const [active, setActive] = useState(true);
+  useEffect(() => {
+    if (!sessionId) return;
+    const col = pb.collection('sessions');
+    col.getOne(sessionId).then((s) => setActive(s.status === 'active'), () => {});
+    const unsubscribe = col.subscribe(sessionId, ({ record }) => setActive(record.status === 'active'));
+    return () => {
+      unsubscribe.then((fn) => fn()).catch(() => {});
+    };
+  }, [sessionId]);
+  return active;
+}

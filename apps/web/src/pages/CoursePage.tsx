@@ -1,7 +1,6 @@
 import type { RecordModel } from 'pocketbase';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import SummaryView from '../components/SummaryView';
 import { Card } from '../components/ui';
 import type { AssignmentRecord, RecordingRecord } from '../lib/content';
 import { parseDate } from '../lib/device';
@@ -9,22 +8,23 @@ import { pb } from '../lib/pb';
 
 const SUBMISSION_HE = { processing: 'בבדיקה', done: 'נבדק', failed: 'נכשל' } as const;
 
-/** Student: published lecture summaries (including lectures they missed) and assignments of one course. */
+/** Student: the course's lectures (each with its own page, including lectures they missed) and assignments. */
 export default function CoursePage() {
   const { id = '' } = useParams();
   const userId = pb.authStore.record?.id ?? '';
   const [course, setCourse] = useState<RecordModel | null>(null);
-  const [recordings, setRecordings] = useState<RecordingRecord[]>([]);
+  const [sessions, setSessions] = useState<RecordModel[]>([]);
+  const [summarized, setSummarized] = useState<Set<string>>(new Set());
   const [assignments, setAssignments] = useState<AssignmentRecord[]>([]);
   const [mine, setMine] = useState<Map<string, RecordModel>>(new Map());
-  const [open, setOpen] = useState('');
 
   useEffect(() => {
     pb.collection('courses').getOne(id).then(setCourse, () => {});
     // PocketBase rules return only published summaries of courses this student takes part in.
+    pb.collection('sessions').getFullList({ filter: pb.filter('course = {:c}', { c: id }), sort: '-started_at' }).then(setSessions, () => {});
     pb.collection('recordings')
-      .getFullList<RecordingRecord>({ filter: pb.filter('session.course = {:c}', { c: id }), sort: '-created_at', expand: 'session' })
-      .then(setRecordings, () => {});
+      .getFullList<RecordingRecord>({ filter: pb.filter('session.course = {:c}', { c: id }), fields: 'session' })
+      .then((list) => setSummarized(new Set(list.map((r) => r.session))), () => {});
     pb.collection('assignments').getFullList<AssignmentRecord>({ filter: pb.filter('course = {:c}', { c: id }), sort: '-created_at' }).then(setAssignments, () => {});
     pb.collection('submissions')
       .getFullList({ filter: pb.filter('assignment.course = {:c} && student = {:u}', { c: id, u: userId }) })
@@ -39,6 +39,26 @@ export default function CoursePage() {
       <h1 className="text-2xl font-bold">
         {course?.code} · {course?.name}
       </h1>
+
+      <Card>
+        <h2 className="mb-3 font-semibold">שיעורים</h2>
+        {sessions.length === 0 && <p className="text-sm text-slate-500">עוד אין שיעורים.</p>}
+        <ul className="divide-y divide-slate-100">
+          {sessions.map((x) => (
+            <li key={x.id}>
+              <Link to={`/lecture/${x.id}`} className="flex items-center justify-between gap-2 py-3 hover:text-indigo-700">
+                <span>
+                  <span className="font-medium">{x.title}</span>
+                  <span className="ms-2 text-xs text-slate-500">{parseDate(x.started_at).toLocaleDateString('he-IL')}</span>
+                </span>
+                <span className="text-xs text-slate-500">
+                  {x.status === 'active' ? <span className="text-emerald-700">● עכשיו</span> : summarized.has(x.id) ? 'סיכום ✓' : ''}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
 
       <Card>
         <h2 className="mb-3 font-semibold">מטלות</h2>
@@ -67,26 +87,6 @@ export default function CoursePage() {
               </li>
             );
           })}
-        </ul>
-      </Card>
-
-      <Card>
-        <h2 className="mb-3 font-semibold">סיכומי הרצאות</h2>
-        {recordings.length === 0 && <p className="text-sm text-slate-500">עוד לא פורסמו סיכומים.</p>}
-        <ul className="flex flex-col gap-2">
-          {recordings.map((r) => (
-            <li key={r.id} className="rounded-xl border border-slate-200">
-              <button onClick={() => setOpen(open === r.id ? '' : r.id)} className="flex w-full items-center justify-between p-3 text-start">
-                <span className="font-medium">{(r.expand?.session as RecordModel | undefined)?.title ?? r.filename}</span>
-                <span className="text-slate-400">{open === r.id ? '▲' : '▼'}</span>
-              </button>
-              {open === r.id && r.summary && (
-                <div className="border-t border-slate-100 p-3">
-                  <SummaryView summary={r.summary} />
-                </div>
-              )}
-            </li>
-          ))}
         </ul>
       </Card>
     </main>

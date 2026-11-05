@@ -9,12 +9,16 @@ flowchart LR
   S --- UC6[UC6 Signal lost / post question]
   S --- UC7[UC7 Vote in poll]
   S --- UC10[UC10 Get homework review]
+  S --- UC12[UC12 Review a lecture]
+  S --- UC14[UC14 Give lecture feedback]
   L([Lecturer]) --- UC2[UC2 Run session]
   L --- UC3[UC3 Manage attendance & export]
   L --- UC4[UC4 Snap headcount & launch challenge]
   L --- UC8[UC8 Create poll]
   L --- UC9[UC9 Summarize lecture]
   L --- UC11[UC11 Review class homework insights]
+  L --- UC13[UC13 Add content after the lecture]
+  UC13 --- AI
   UC4 --- AI([LLM Provider])
   UC8 --- AI
   UC9 --- AI
@@ -35,6 +39,9 @@ flowchart LR
 | UC9 | As a **lecturer**, I upload last week's recording and get chapters, review questions and the moments students got lost. | VS-01..05 |
 | UC10 | As a **student**, I upload my homework and get rubric-based feedback and see where I stand versus the class. | HW-02, 03 |
 | UC11 | As a **lecturer**, I see the class's common mistakes and suspicious similarity pairs. | HW-01, 04, BC-04 |
+| UC12 | As a **student**, I open a lecture's page (even one I missed) to get the materials, practise and read the answers to the class's questions. | LP-01..03 |
+| UC13 | As a **lecturer**, after the lecture I answer open questions, add practice questions and upload the slides. | LP-02..04 |
+| UC14 | As a **student**, when the lecture ends I tell the lecturer anonymously how it went, in one tap, so the next lecture can improve. | FB-01..03 |
 
 ## Detailed use cases
 
@@ -102,7 +109,9 @@ flowchart LR
 - **Main flow:**
   1. The student taps "I'm lost", or writes a post and toggles "anonymous".
   2. The confusion meter and the feed update live on the dashboard.
-- **Alternate flow:** 1a. Offline: the post is queued in IndexedDB and sent when the connection returns.
+- **Alternate flows:**
+  - 1a. Offline: the post is queued in IndexedDB and sent when the connection returns.
+  - 1b. After "I'm lost", the student writes what is unclear (optional); it is posted anonymously to the feed, where classmates can upvote it.
 
 ### UC7: Vote
 - **Actor:** Student.
@@ -115,9 +124,10 @@ flowchart LR
 ### UC8: Create a poll
 - **Actor:** Lecturer.
 - **Main flow:**
-  1. The lecturer chooses a template or "From slide".
-  2. If "From slide": the lecturer uploads an image or text, the LLM returns 3 MCQ drafts, and the lecturer picks one and edits it.
+  1. The lecturer taps "Photograph slide" (camera) or "Upload image" (gallery or computer).
+  2. The LLM returns 3 MCQ drafts; the lecturer picks one and may edit it.
   3. The lecturer clicks "Open", then "Close & reveal".
+- **Alternate flow:** 1a. The file is not an image or is over 10 MB: rejected.
 
 ### UC9: Summarize a lecture
 - **Actor:** Lecturer.
@@ -144,3 +154,36 @@ flowchart LR
   1. The lecturer clicks "Analyze class".
   2. The system computes the distribution, groups common mistakes, and finds pairs with near-identical structure (fingerprint similarity ≥ 0.5, robust to renamed identifiers).
   3. The lecturer reviews the flagged pairs manually.
+
+### UC12: Review a lecture (student)
+- **Actor:** Student who attended at least one lecture of the course.
+- **Main flow:**
+  1. The student opens the course and picks a lecture (or follows "lecture page" after checking in).
+  2. The page shows the published summary, materials, practice questions, the class polls with results, and the questions with the lecturer's answers.
+  3. The student answers a practice question and immediately sees whether it was right and which answer is correct.
+- **Alternate flows:**
+  - 1a. The student missed this lecture: the page is read-only for questions (no posting or upvoting); everything else works.
+  - 3a. The student already answered: the result is shown and the options are locked.
+
+### UC13: Add content after the lecture (lecturer)
+- **Actor:** Lecturer. **Secondary:** LLM Provider.
+- **Main flow:**
+  1. On the lecture dashboard (also after "End lecture"), the lecturer writes an answer under an open question.
+  2. The lecturer writes a practice question with 2–4 options and marks the correct one, or uploads the slide deck (PDF), gets 8 AI drafts, unticks the ones they don't want and adds the rest (or opens one to edit first).
+  3. The lecturer uploads the slides or adds a link.
+  4. Students in the course see each addition on the lecture page at once (realtime).
+- **Alternate flows:**
+  - 2a. No correct answer marked: rejected with "mark the correct answer".
+  - 2b. The deck is not a PDF or an image (e.g. .pptx), or is over 50 MB: rejected; the screen says to save PowerPoint as PDF.
+  - 3a. A file over 50 MB or a non-http(s) link: rejected.
+
+### UC14: Give lecture feedback (student)
+- **Actor:** Student who was checked in to the lecture.
+- **Main flow:**
+  1. The lecturer ends the lecture; the student's open page shows "How was the lecture?" with the note that the feedback is anonymous.
+  2. The student picks one of four options and may add a comment.
+  3. The student sends it and sees "thanks". The lecturer's dashboard shows the aggregate once 3 students have answered.
+- **Alternate flows:**
+  - 1a. The student already closed the page: the form waits on the lecture page for 24 hours.
+  - 2a. The student taps "not now": nothing is sent.
+  - 3a. The student already answered, or 24 hours have passed: the form is not shown.

@@ -127,3 +127,40 @@ export interface AssignmentInsights {
   similarPairs: SimilarPair[];
   builtAt: Date;
 }
+
+/** A multiple-choice question the lecturer adds to a lecture page for self-study; the answer is revealed per student. */
+export interface PracticeQuestion {
+  id: string;
+  sessionId: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  source: 'manual' | 'ai';
+  createdAt: Date;
+}
+
+/** One attempt per student; carries the correct answer so the student can read it once they have answered. */
+export interface PracticeAnswer {
+  id: string;
+  questionId: string;
+  studentId?: string;
+  studentNumber: string;
+  optionIndex: number;
+  correct: boolean;
+  correctIndex: number;
+  answeredAt: Date;
+}
+
+export type MaterialKind = 'file' | 'link';
+
+export interface Material {
+  id: string;
+  sessionId: string;
+  title: string;
+  kind: MaterialKind;
+  /** Link target; empty for files. */
+  url: string;
+  /** Original file name; empty for links. */
+  filename: string;
+  addedAt: Date;
+}
