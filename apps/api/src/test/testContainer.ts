@@ -13,6 +13,13 @@ import {
   InMemoryHeadcountRepository,
 } from '../infra/memory/InMemoryChallengeRepositories.js';
 import { InMemoryCourseRepository } from '../infra/memory/InMemoryCourseRepository.js';
+import {
+  InMemoryFeedPostRepository,
+  InMemoryLostSignalRepository,
+  InMemoryPollRepository,
+  InMemoryPollVoteRepository,
+  InMemoryPostVoteRepository,
+} from '../infra/memory/InMemoryEngagementRepositories.js';
 import { T0 } from './fixtures.js';
 
 /** Records calls; returns tagged buffers so tests can tell clear from blurred. */
@@ -45,6 +52,11 @@ export function makeTestPorts(over: Partial<Ports> = {}) {
     headcountRepo: new InMemoryHeadcountRepository(),
     challengeRepo: new InMemoryChallengeRepository(),
     responseRepo: new InMemoryChallengeResponseRepository(),
+    lostRepo: new InMemoryLostSignalRepository(),
+    postRepo: new InMemoryFeedPostRepository(),
+    postVoteRepo: new InMemoryPostVoteRepository(),
+    pollRepo: new InMemoryPollRepository(),
+    pollVoteRepo: new InMemoryPollVoteRepository(),
     exporters: new Map([['csv' as const, new CsvExporter()]]),
     llm: new MockProvider(),
     images: new FakeImageProcessor(),

@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Button, Card, ErrorText, Field, inputClass } from '../components/ui';
 import { api, ApiError, type SessionDto } from '../lib/api';
-import { getLocation } from '../lib/device';
+import { getLocation, parseDate } from '../lib/device';
 import { pb, useUser } from '../lib/pb';
 
 export default function LecturerHomePage() {
@@ -107,7 +107,7 @@ export default function LecturerHomePage() {
                   {s.expand?.course?.code} · {s.title}
                 </span>
                 <span className="flex items-center gap-2 text-sm text-slate-500">
-                  {new Date(s.started_at).toLocaleDateString('he-IL')}
+                  {parseDate(s.started_at).toLocaleDateString('he-IL')}
                   {s.status === 'active' && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">פעיל</span>}
                 </span>
               </Link>

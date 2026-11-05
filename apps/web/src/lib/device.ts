@@ -31,5 +31,8 @@ export function getLocation(timeoutMs = 4000): Promise<GeoPoint | undefined> {
   });
 }
 
+/** PocketBase dates look like "2026-11-05 11:43:57.123Z"; older iOS Safari can't parse the space. */
+export const parseDate = (s: string) => new Date(s.replace(' ', 'T'));
+
 export const formatTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  parseDate(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });

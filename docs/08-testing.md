@@ -48,12 +48,13 @@ Coverage key: **U** = unit test, **C** = contract test, **I** = integration test
 ### engagement/ and content/
 | Class | Test cases | Type | FRs |
 |---|---|---|---|
-| `ConfusionMeter` | cooldown of 60 s per student; level counts only the window; `series` buckets correctly | U | BC-01, VS-04 |
-| `FeedService` | an anonymous post has no `display_name`; double upvote is rejected; `markAnswered` | U | BC-02, 03 |
-| `FeedClusterer` | schema validation of themes | C | BC-04 |
+| `ConfusionMeter` | cooldown of 60 s per student returns `retryInSec` instead of failing; level counts distinct students inside the window only; non-participant and ended session rejected; `series` buckets correctly (M6) | U | BC-01, VS-04 |
+| `FeedService` | an anonymous post has no `display_name`; concurrent double upvote counts once; non-participant rejected; `clusterOpen` skips the model for fewer than 2 posts and sends only unanswered ones | U | BC-02, 03, 04 |
+| `FeedClusterer` | unknown post ids dropped; a post appears in at most one theme | C | BC-04 |
 | `PollTemplateFactory` | each template returns the expected options | U | PL-01 |
-| `PollService` | voting on a non-open poll is rejected; one vote per student; `close` tallies and reveals the answer | U | PL-01..04 |
-| `McqGenerator` | 3 drafts with 4 options each and `correctIndex` in range | C | PL-02 |
+| `PollService` | voting on a draft or closed poll is rejected; one vote per student; option range checked; opening a poll closes the open one; `close` is idempotent, tallies and reveals the answer; draft validation | U | PL-01..04 |
+| `McqGenerator` | malformed drafts (bad index, empty question, null) dropped; at most 3 returned; nothing valid → `LLMOutputError` | C | PL-02 |
+| Access rules (M5) | anonymous author unreadable by peers and lecturer; lost-signal identity hidden from the lecturer; drafts invisible to students; `correct_index` hidden until close; students see only their own votes; students cannot write any M5 collection directly; 12 concurrent upvotes → exact count | I | BC-01..03, PL-03, NFR-05 |
 | `RecordingPipeline` | status transitions queued → processing → done / failed; `timelineSpikes` applies `offsetSec` | U | VS-02, 04 |
 | `LectureSummarizer` | schema validation; the fallback path is taken on a provider error | C | VS-03 |
 | `PercentileCalculator` | edge cases: n = 1, ties, min and max | U | HW-03 |
@@ -66,7 +67,7 @@ Coverage key: **U** = unit test, **C** = contract test, **I** = integration test
 2. **Expired token:** opening a 25-second-old token URL shows the expiry message.
 3. **Strict geofence:** a mocked location 300 m away is rejected; in lenient mode it is accepted and flagged.
 4. **Visual Ping:** 3 student contexts check in; the lecturer uploads a fixture photo; the mock returns 2 boxes; 2 students tap inside the boxes and 1 taps an empty area; after expiry exactly 1 record is flagged as `empty_seat`.
-5. **Poll:** the lecturer opens a poll, 3 students vote, and the projector shows 3 votes.
+5. **Backchannel + poll** (implemented as a Puppeteer script during M5, real Gemini): 4 phones check in; 2 press "I'm lost" → dashboard shows 2 of 4; 3 posts (2 anonymous) and upvotes appear live; AI groups them into themes; AI drafts 3 questions from slide text; the lecturer opens one; 4 phones vote; the projector shows live bars, then the revealed answer; a template poll replaces it. Every page is also reloaded mid-flow to check that initial loads (not just realtime events) show the data.
 6. **Export:** the downloaded xlsx contains all present students.
 
 ## 4. Load test (k6)

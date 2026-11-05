@@ -1,5 +1,7 @@
+import { FeedClusterer } from './ai/FeedClusterer.js';
 import type { LLMProvider } from './ai/LLMProvider.js';
 import { LLMProviderFactory } from './ai/LLMProviderFactory.js';
+import { McqGenerator } from './ai/McqGenerator.js';
 import { PeopleDetector } from './ai/PeopleDetector.js';
 import { AttendanceExportService } from './attendance/AttendanceExportService.js';
 import { AttendanceService } from './attendance/AttendanceService.js';
@@ -13,6 +15,10 @@ import { TokenRule } from './attendance/TokenRule.js';
 import { type ChallengeOptions, ChallengeManager } from './challenge/ChallengeManager.js';
 import type { ChallengeRepository, ChallengeResponseRepository, HeadcountRepository } from './challenge/repositories.js';
 import type { Config } from './config.js';
+import { ConfusionMeter } from './engagement/ConfusionMeter.js';
+import { FeedService } from './engagement/FeedService.js';
+import { PollService } from './engagement/PollService.js';
+import type { FeedPostRepository, LostSignalRepository, PollRepository, PollVoteRepository, PostVoteRepository } from './engagement/repositories.js';
 import type { UserResolver } from './http/auth.js';
 import type { Clock } from './infra/Clock.js';
 import { SystemClock } from './infra/Clock.js';
@@ -25,6 +31,13 @@ import { PbAttendanceRepository } from './infra/pb/PbAttendanceRepository.js';
 import { PbChallengeRepository, PbChallengeResponseRepository, PbHeadcountRepository } from './infra/pb/PbChallengeRepositories.js';
 import { createSuperuserClient, resolveUser } from './infra/pb/pbClient.js';
 import { PbCourseRepository } from './infra/pb/PbCourseRepository.js';
+import {
+  PbFeedPostRepository,
+  PbLostSignalRepository,
+  PbPollRepository,
+  PbPollVoteRepository,
+  PbPostVoteRepository,
+} from './infra/pb/PbEngagementRepositories.js';
 import { PbSessionRepository } from './infra/pb/PbSessionRepository.js';
 
 export interface Container {
@@ -34,6 +47,9 @@ export interface Container {
   attendance: AttendanceService;
   exports: AttendanceExportService;
   challenges: ChallengeManager;
+  confusion: ConfusionMeter;
+  feed: FeedService;
+  polls: PollService;
   resolveUser: UserResolver;
 }
 
@@ -45,6 +61,11 @@ export interface Ports {
   headcountRepo: HeadcountRepository;
   challengeRepo: ChallengeRepository;
   responseRepo: ChallengeResponseRepository;
+  lostRepo: LostSignalRepository;
+  postRepo: FeedPostRepository;
+  postVoteRepo: PostVoteRepository;
+  pollRepo: PollRepository;
+  pollVoteRepo: PollVoteRepository;
   exporters: Map<ExportFormat, SpreadsheetExporter>;
   llm: LLMProvider;
   images: ImageProcessor;
@@ -81,6 +102,9 @@ export function buildContainer(p: Ports): Container {
       p.clock,
       p.challengeOptions,
     ),
+    confusion: new ConfusionMeter(p.lostRepo, attendance, p.clock),
+    feed: new FeedService(p.postRepo, p.postVoteRepo, attendance, new FeedClusterer(p.llm), p.clock),
+    polls: new PollService(p.pollRepo, p.pollVoteRepo, attendance, new McqGenerator(p.llm), p.clock),
     resolveUser: p.resolveUser,
   };
 }
@@ -102,6 +126,11 @@ export async function buildProductionContainer(cfg: Config): Promise<Container> 
     headcountRepo: new PbHeadcountRepository(pb),
     challengeRepo: new PbChallengeRepository(pb),
     responseRepo: new PbChallengeResponseRepository(pb),
+    lostRepo: new PbLostSignalRepository(pb),
+    postRepo: new PbFeedPostRepository(pb),
+    postVoteRepo: new PbPostVoteRepository(pb),
+    pollRepo: new PbPollRepository(pb),
+    pollVoteRepo: new PbPollVoteRepository(pb),
     exporters,
     llm: LLMProviderFactory.create(cfg.ai),
     images: new SharpImageProcessor(),

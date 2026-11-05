@@ -71,20 +71,33 @@ classDiagram
     +rollcallTokenOk: boolean
     +verdict: Verdict
   }
+  class LostSignal {
+    +studentNumber: string
+    +at: Date
+  }
   class FeedPost {
     +id: string
     +text: string
     +anonymous: boolean
+    +displayName: string | null
     +votes: number
     +answered: boolean
+  }
+  class PostVote {
+    +voterNumber: string
   }
   class Poll {
     +id: string
     +question: string
     +options: string[]
-    +correctIndex: number
+    +correctIndex: number | null
     +status: PollStatus
     +source: PollSource
+    +results: PollResults
+  }
+  class PollVote {
+    +studentNumber: string
+    +optionIndex: number
   }
   class Recording {
     +id: string
@@ -111,8 +124,11 @@ classDiagram
   Session "1" *-- "*" Headcount
   Headcount "1" --> "*" ChallengeData : triggers
   ChallengeData "1" *-- "*" ChallengeResponse
+  Session "1" *-- "*" LostSignal
   Session "1" *-- "*" FeedPost
+  FeedPost "1" *-- "*" PostVote
   Session "1" *-- "*" Poll
+  Poll "1" *-- "*" PollVote
   Session "1" *-- "0..1" Recording
   Course "1" *-- "*" Assignment
   Assignment "1" *-- "*" Submission
@@ -169,7 +185,7 @@ classDiagram
   }
   class McqGenerator {
     -llm: LLMProvider
-    +generate(slide: Attachment) Promise~McqDraft[]~
+    +generate(input: SlideInput) Promise~McqDraft[]~
   }
   class LectureSummarizer {
     -llm: LLMProvider
@@ -201,9 +217,11 @@ classDiagram
 
 Each AI service owns its prompt and JSON schema. All LLM output is schema-validated before use, so a malformed reply raises `LLMOutputError` and never reaches the domain.
 
-**Implemented so far:** `GeminiProvider` and `MockProvider`, chosen by `LLMProviderFactory` from `LLM_PROVIDER`. `ClaudeProvider` and `N8nWebhookProvider` are planned extension points; adding one is a new class plus one factory line (OCP).
+**Implemented so far:** `GeminiProvider` (default model `gemini-3.1-flash-lite`; the SDK retries 429/5xx up to 4 times) and `MockProvider`, chosen by `LLMProviderFactory` from `LLM_PROVIDER`; `PeopleDetector`, `McqGenerator` and `FeedClusterer`. `ClaudeProvider` and `N8nWebhookProvider` are planned extension points; adding one is a new class plus one factory line (OCP).
 
 **`PeopleDetector`** asks Gemini for `box_2d = [ymin, xmin, ymax, xmax]` on a 0–1000 grid, which is Gemini's native detection format. It converts them to normalized `{x, y, w, h}`, clamps out-of-range values, and drops malformed or degenerate boxes. The count is the number of valid boxes, so the number shown always matches the boxes drawn.
+
+**`McqGenerator`** takes a slide image and/or its text (`SlideInput`) and returns up to 3 drafts. Drafts with fewer than 2 options, an empty option or an out-of-range `correctIndex` are dropped; if none survive it raises `LLMOutputError`. **`FeedClusterer`** keeps only post ids it was given and assigns each post to at most one theme, so the model cannot invent or double-count questions.
 
 ## 3. `attendance/`: Chain of Responsibility + Strategy
 
@@ -437,38 +455,49 @@ stateDiagram-v2
 ```mermaid
 classDiagram
   direction TB
+  class ConfusionMeter {
+    -signals: LostSignalRepository
+    -attendance: AttendanceService
+    -clock: Clock
+    -cooldownSec: number = 60
+    +record(session, student: Participant) Promise~LostOutcome~
+    +level(sessionId, windowSec = 120) Promise~ConfusionLevel~
+    +series(sessionId, bucketSec) Promise~TimePoint[]~ «M6»
+  }
   class FeedService {
     -posts: FeedPostRepository
     -votes: PostVoteRepository
+    -attendance: AttendanceService
     -clusterer: FeedClusterer
-    +post(sessionId, authorId, text, anonymous) Promise~FeedPost~
-    +upvote(postId, userId) Promise~void~
-    +markAnswered(postId) Promise~void~
-    +clusterOpen(sessionId) Promise~Theme[]~
-  }
-  class ConfusionMeter {
-    -signals: LostSignalRepository
     -clock: Clock
-    -cooldownSec: number
-    +record(sessionId, studentId) Promise~boolean~
-    +level(sessionId, windowSec) Promise~number~
-    +series(sessionId, bucketSec) Promise~TimePoint[]~
+    +post(session, author: Participant, text, anonymous) Promise~FeedPost~
+    +upvote(postId, voter: Participant) Promise~void~
+    +markAnswered(postId, answered) Promise~FeedPost~
+    +clusterOpen(sessionId) Promise~Theme[]~
   }
   class PollService {
     -polls: PollRepository
     -votes: PollVoteRepository
+    -attendance: AttendanceService
     -generator: McqGenerator
-    +createFromTemplate(sessionId, kind: TemplateKind, question) Promise~Poll~
-    +draftFromSlide(slide: Attachment) Promise~McqDraft[]~
-    +create(sessionId, draft: McqDraft) Promise~Poll~
-    +open(pollId) Promise~void~
-    +vote(pollId, studentId, optionIndex) Promise~void~
+    -clock: Clock
+    +createFromTemplate(session, kind: TemplateKind, question) Promise~Poll~
+    +draftFromSlide(input: SlideInput) Promise~McqDraft[]~
+    +create(session, draft: McqDraft, source) Promise~Poll~
+    +open(session, pollId) Promise~Poll~
+    +vote(pollId, student: Participant, optionIndex) Promise~void~
     +close(pollId) Promise~PollResults~
   }
   class PollTemplateFactory {
+    +kinds$ TemplateKind[]
     +options(kind: TemplateKind)$ string[]
   }
+  class AttendanceService {
+    +requireParticipant(sessionId, studentNumber) Promise~AttendanceRecord~
+    +presentCount(sessionId) Promise~number~
+  }
   class RecordingPipeline {
+    «M6»
     -recordings: RecordingRepository
     -summarizer: LectureSummarizer
     -timeline: ConfusionMeter
@@ -477,6 +506,7 @@ classDiagram
     +timelineSpikes(recordingId) Promise~Spike[]~
   }
   class HomeworkAnalysisService {
+    «M6»
     -submissions: SubmissionRepository
     -reviewer: HomeworkReviewer
     -embeddings: EmbeddingProvider
@@ -485,16 +515,22 @@ classDiagram
     +buildInsights(assignmentId) Promise~AssignmentInsights~
   }
   class PercentileCalculator {
+    «M6»
     +percentile(value, population: number[])$ number
   }
   class SimilarityAnalyzer {
+    «M6»
     +pairsAbove(vectors: Map~string, number[]~, threshold) SimilarPair[]
     +cosine(a: number[], b: number[])$ number
   }
   class TextExtractor {
+    «M6»
     +extract(file: Attachment) Promise~string~
   }
 
+  ConfusionMeter ..> AttendanceService : participant + present count
+  FeedService ..> AttendanceService : participant check
+  PollService ..> AttendanceService : participant check
   PollService ..> PollTemplateFactory
   PollService o-- McqGenerator
   FeedService o-- FeedClusterer
@@ -506,6 +542,15 @@ classDiagram
   HomeworkAnalysisService ..> PercentileCalculator
   HomeworkAnalysisService ..> SimilarityAnalyzer
 ```
+
+**Who may take part:** the backchannel and polls are open to students checked in to the session and not removed (`AttendanceService.requireParticipant`, error `NOT_CHECKED_IN`). PocketBase list rules enforce the same condition, so it also decides who receives realtime events.
+
+**Rules encoded in the classes:**
+- `ConfusionMeter.record` accepts one signal per student per 60 s. A repeat inside the cooldown returns `{accepted: false, retryInSec}` instead of an error, so pressing twice never shows a failure. `level` counts *distinct* students in the last 120 s, relative to those present.
+- Lost signals and post authors are stored in **hidden** fields: the lecturer sees how many are lost and what was asked, never who (unless the student chose to post with their name).
+- `FeedService.post` works after the session ends (FR-BC-02); `ConfusionMeter.record` and `PollService.open` require an active session.
+- `PollService.open` closes any other open poll in the session, so phones never show two polls. `close` is idempotent and stores the tally in `results`. The correct answer lives in a hidden field and is copied to `answer_index` only on close.
+- Duplicate votes are stopped twice: an `exists` check gives a friendly `ALREADY_VOTED`, and the unique index on (poll, student) and (post, voter) catches the concurrent case.
 
 ## 6. `infra/`: Repository + Strategy
 
@@ -541,6 +586,14 @@ classDiagram
   class PbHeadcountRepository {
     +purgeClearPhotos(sessionId) Promise~void~ «M4»
   }
+  class PbFeedPostRepository {
+    -voteLock: KeyedLock
+    +listBySession(sessionId) Promise~FeedPost[]~
+    +incrementVotes(id) Promise~void~
+  }
+  class KeyedLock {
+    +run~T~(key, task) Promise~T~
+  }
   class InMemoryRepository~T~ {
     -items: Map~string, T~
   }
@@ -574,6 +627,8 @@ classDiagram
   PbRepository~T~ <|-- PbAttendanceRepository
   PbRepository~T~ <|-- PbSessionRepository
   PbRepository~T~ <|-- PbHeadcountRepository
+  PbRepository~T~ <|-- PbFeedPostRepository
+  PbFeedPostRepository o-- KeyedLock
   InMemoryRepository~T~ <|-- InMemoryAttendanceRepository
   ImageProcessor <|.. SharpImageProcessor
   SpreadsheetExporter <|.. XlsxExporter
@@ -584,6 +639,8 @@ classDiagram
 ```
 
 Queries are named methods on domain-specific repository interfaces, never raw PocketBase filter strings, so the PocketBase query language never leaks into the domain. Other repositories follow the same pattern (`PbChallengeRepository`, `PbPollRepository` and so on). Each domain-specific repository is an interface, for example `AttendanceRepository extends Repository<AttendanceRecord>`. Unit tests use `InMemoryRepository`-based fakes.
+
+**Why `KeyedLock`:** PocketBase's `votes+` modifier is a read-modify-write in Go, not an atomic SQL update. An integration test fired 12 concurrent upvotes from 6 students; all 6 valid votes were accepted but only 2 were counted. `PbFeedPostRepository` now serialises increments per post inside the API process. This is valid because the API runs as a single instance; scaling out would need a recount or a database-side counter.
 
 ## 7. SOLID mapping
 | Principle | Evidence |

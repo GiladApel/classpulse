@@ -25,4 +25,13 @@ export const DEFAULT_FIXTURES: Record<string, unknown> = {
     ],
     confidence: 0.9,
   },
+  generate_mcq: {
+    questions: [
+      { question: 'איזה תבנית עיצוב מפרידה בין יצירת אובייקט לשימוש בו?', options: ['Factory', 'Observer', 'Adapter', 'Singleton'], correctIndex: 0 },
+      { question: 'מה מבטיח עקרון ה-LSP?', options: ['מחלקה אחת לכל אחריות', 'תת-מחלקה יכולה להחליף את מחלקת הבסיס', 'תלות בממשקים', 'ממשקים קטנים'], correctIndex: 1 },
+      { question: 'מתי נעדיף Strategy על פני if/else?', options: ['אף פעם', 'כשיש אלגוריתם אחד', 'כשאלגוריתמים מתחלפים בזמן ריצה', 'רק בבדיקות'], correctIndex: 2 },
+    ],
+  },
+  // Ids are placeholders: FeedClusterer drops unknown ids, so tests pass their own fixture.
+  cluster_feed: { themes: [] },
 };

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router';
 import ChallengeOverlay from '../components/ChallengeOverlay';
+import StudentLivePanel from '../components/StudentLivePanel';
 import { Card, Screen } from '../components/ui';
 import { api, ApiError, type RecordDto } from '../lib/api';
 import { formatTime, getDeviceId, getLocation } from '../lib/device';
+import { pb } from '../lib/pb';
 
 type State =
   | { kind: 'locating' | 'sending' }
@@ -21,6 +23,7 @@ interface CheckInResponse {
 export default function CheckInPage() {
   const { token = '' } = useParams();
   const [state, setState] = useState<State>({ kind: 'locating' });
+  const [active, setActive] = useState(true);
   const started = useRef(false);
 
   useEffect(() => {
@@ -32,6 +35,7 @@ export default function CheckInPage() {
       try {
         const res = await api.post<CheckInResponse>('/checkins', { token, deviceId: getDeviceId(), location });
         setState({ kind: 'done', record: res.record, already: res.alreadyCheckedIn, title: res.sessionTitle });
+        if (res.record.sessionId) pb.collection('sessions').getOne(res.record.sessionId).then((s) => setActive(s.status === 'active'), () => {});
       } catch (e) {
         if (e instanceof ApiError && e.code === 'ONBOARDING_REQUIRED') return setState({ kind: 'onboarding' });
         setState({ kind: 'error', message: e instanceof ApiError && e.status < 500 ? e.message : 'שגיאת רשת — נסו לסרוק שוב' });
@@ -62,7 +66,7 @@ export default function CheckInPage() {
                 לא הצלחנו לאמת שאתם בכיתה לפי המיקום — המרצה יראה סימון ליד שמכם.
               </p>
             )}
-            <p className="mt-2 text-xs text-slate-400">השאירו את הדף פתוח — ייתכן שהמרצה יבקש בדיקת נוכחות קצרה.</p>
+            <p className="mt-2 text-xs text-slate-400">השאירו את הדף פתוח — סקרים ובדיקות נוכחות יופיעו כאן.</p>
             {state.record.sessionId && <ChallengeOverlay sessionId={state.record.sessionId} />}
           </>
         )}
@@ -74,6 +78,9 @@ export default function CheckInPage() {
           </>
         )}
       </Card>
+      {state.kind === 'done' && state.record.sessionId && state.record.status !== 'removed' && (
+        <StudentLivePanel sessionId={state.record.sessionId} active={active} />
+      )}
     </Screen>
   );
 }

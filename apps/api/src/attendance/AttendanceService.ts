@@ -100,6 +100,13 @@ export class AttendanceService {
     return (await this.repo.listBySession(sessionId)).filter((r) => r.status !== 'removed').length;
   }
 
+  /** Backchannel and polls are open to students checked in to the session (and not removed). */
+  async requireParticipant(sessionId: string, studentNumber: string): Promise<AttendanceRecord> {
+    const record = await this.repo.findBySessionAndStudentNumber(sessionId, studentNumber);
+    if (!record || record.status === 'removed') throw new DomainError('NOT_CHECKED_IN', 'יש לסמן נוכחות בשיעור הזה קודם');
+    return record;
+  }
+
   async get(recordId: string): Promise<AttendanceRecord> {
     return this.mustGet(recordId);
   }

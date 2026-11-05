@@ -74,6 +74,12 @@ npm run test:int -w apps/api  # integration tests against the running PocketBase
 
 **Google sign-in for students:** in the PocketBase admin, open *users → Options → OAuth2 → Google* and enter the client ID and secret from Google Cloud. Add `https://<pb-host>/api/oauth2-redirect` as an authorized redirect URI.
 
+### Live class flow (M5)
+After checking in, the student's page stays open and shows:
+- **🤯 הלכתי לאיבוד** ("I'm lost"): one tap, at most once a minute. The dashboard's confusion meter shows how many of those present pressed it in the last 2 minutes, never who.
+- **Questions and comments**: posted with a name or anonymously, upvoted by classmates, and allowed after class too. The lecturer marks them answered, and **✨ קיבוץ לנושאים** (group into themes) asks the AI to group open questions.
+- **Polls**: when the lecturer opens one, every phone switches to it. Templates (Yes/No, A–D, 1–5) launch in one click. **✨ שאלה משקף** (question from a slide) photographs a slide, or **✨ מהטקסט** (from text) uses pasted slide text, and the AI drafts 3 multiple-choice questions to pick from and edit. The projector shows live bars and reveals the correct answer when the lecturer closes the poll.
+
 ### Anti-fraud flow (M4)
 1. On the dashboard, **📷 צילום כיתה** (class photo): take or upload a photo of the room. AI (Gemini, or the mock) returns the people count and person boxes; the server blurs a copy. The dashboard shows "~N in the photo · M registered" and warns when check-ins exceed the count.
 2. **בדיקה ויזואלית** (visual check, 45 s): every checked-in phone shows the *blurred* photo and the student taps where they sit. The lecturer watches a live heatmap on the clear photo.
@@ -81,7 +87,7 @@ npm run test:int -w apps/api  # integration tests against the running PocketBase
 4. When time runs out, each student gets a verdict: `ok`, `empty_seat`, `collision` or `no_response`. Every non-ok record is flagged in the table, and the lecturer chooses **keep** or **remove**.
 5. Privacy: no face recognition, and only the blurred photo ever reaches students. The clear photo is deleted when the session ends.
 
-Real AI: set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY=…` in `.env`. Without them the mock detector is used, which finds 3 people.
+Real AI: set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY=…` in `.env` (default model `gemini-3.1-flash-lite`; `gemini-2.5-*` is closed to new keys). Without them the mock provider is used: it finds 3 people and returns fixed poll drafts.
 
 ### Attendance flow (M3)
 1. The lecturer signs in at `/dash`, then clicks **Start session**. The browser location becomes the classroom centre.

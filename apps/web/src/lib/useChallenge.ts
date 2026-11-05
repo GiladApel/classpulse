@@ -1,5 +1,6 @@
 import type { RecordModel } from 'pocketbase';
 import { useEffect, useState } from 'react';
+import { parseDate } from './device';
 import { pb } from './pb';
 
 export type ChallengeRecord = RecordModel & {
@@ -45,7 +46,7 @@ export function useLatestChallenge(sessionId: string): ChallengeRecord | null {
 
 /** Seconds left until an ISO timestamp, ticking every 250 ms; 0 when passed. */
 export function useCountdown(until: string | undefined): number {
-  const calc = () => (until ? Math.max(0, Math.ceil((new Date(until).getTime() - Date.now()) / 1000)) : 0);
+  const calc = () => (until ? Math.max(0, Math.ceil((parseDate(until).getTime() - Date.now()) / 1000)) : 0);
   const [left, setLeft] = useState(calc);
   useEffect(() => {
     setLeft(calc());

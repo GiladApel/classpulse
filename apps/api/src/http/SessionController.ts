@@ -18,10 +18,10 @@ export class SessionController {
   ) {}
 
   routes(): Hono<AppEnv> {
+    // Guard per route: a blanket app.use() here would also cover other controllers' /sessions/:id/* student routes.
     const app = new Hono<AppEnv>();
-    app.use(requireLecturer);
 
-    app.post('/', async (c) => {
+    app.post('/', requireLecturer, async (c) => {
       const b = await jsonBody(c.req);
       const session = await this.sessions.start(c.get('user').id, {
         courseId: str(b, 'courseId'),
@@ -33,17 +33,17 @@ export class SessionController {
       return c.json(sessionDto(session), 201);
     });
 
-    app.post('/:id/end', async (c) => {
+    app.post('/:id/end', requireLecturer, async (c) => {
       const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
       return c.json(sessionDto(await this.sessions.end(session)));
     });
 
-    app.get('/:id/qr', async (c) => {
+    app.get('/:id/qr', requireLecturer, async (c) => {
       const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
       return c.json(this.sessions.currentQrToken(session));
     });
 
-    app.post('/:id/attendance', async (c) => {
+    app.post('/:id/attendance', requireLecturer, async (c) => {
       const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
       const b = await jsonBody(c.req);
       const record = await this.attendance.manualApprove(
@@ -55,7 +55,7 @@ export class SessionController {
       return c.json(recordDto(record), 201);
     });
 
-    app.get('/:id/export', async (c) => {
+    app.get('/:id/export', requireLecturer, async (c) => {
       const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
       const format = oneOf({ format: c.req.query('format') }, 'format', FORMATS);
       const out = await this.exports.export(session, format);

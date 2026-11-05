@@ -1,9 +1,12 @@
 import QRCode from 'qrcode';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
+import PollBars from '../components/PollBars';
 import { api, ApiError } from '../lib/api';
+import { pb } from '../lib/pb';
 import { useAttendance } from '../lib/useAttendance';
 import { isRunning, useCountdown, useLatestChallenge } from '../lib/useChallenge';
+import { currentPoll, type PollRecord, tally, useLiveRecords, useTick } from '../lib/useLiveRecords';
 
 interface QrTicket {
   token: string;
@@ -24,6 +27,11 @@ export default function ProjectorPage() {
   const running = isRunning(challenge, left);
   const rollcallId = running && challenge.type === 'rollcall' ? challenge.id : '';
   const visualPing = running && challenge.type === 'visual_ping';
+  useTick(5000);
+  const polls = useLiveRecords<PollRecord>('polls', pb.filter('session = {:s}', { s: id }));
+  // A challenge outranks a poll; a closed poll's results stay up for 60 s.
+  const poll = running ? null : currentPoll(polls, 60);
+  const votes = useLiveRecords<PollRecord & { option_index: number }>('poll_votes', pb.filter('poll = {:p}', { p: poll?.id ?? '' }), '', !!poll);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -56,10 +64,29 @@ export default function ProjectorPage() {
     };
   }, [id, rollcallId]);
 
+  // The canvas unmounts while a poll or visual check is shown; redraw the last QR as soon as it is back.
+  const showingQr = !ended && !poll && !visualPing;
+  useEffect(() => {
+    if (showingQr && url && canvas.current) QRCode.toCanvas(canvas.current, url, { width: 640, margin: 1, errorCorrectionLevel: 'M' }).catch(() => {});
+  }, [showingQr, url]);
+
   return (
     <main className={`flex min-h-dvh flex-col items-center justify-center gap-6 p-6 text-white transition-colors ${rollcallId ? 'bg-rose-950' : 'bg-slate-950'}`}>
       {ended ? (
         <h1 className="text-5xl font-bold">השיעור הסתיים · {present} נוכחים</h1>
+      ) : poll ? (
+        <div className="flex w-full max-w-5xl flex-col gap-8">
+          <h1 className="text-center text-5xl font-bold leading-tight">{poll.question}</h1>
+          <PollBars
+            size="xl"
+            options={poll.options}
+            counts={poll.status === 'closed' && poll.results ? poll.results.counts : tally(poll.options, votes)}
+            correctIndex={poll.status === 'closed' ? poll.answer_index : -1}
+          />
+          <p className="text-center text-2xl text-slate-300">
+            {poll.status === 'open' ? `הצביעו בטלפון · ${votes.length} הצבעות` : `${poll.results?.total ?? 0} הצבעות · הסקר נסגר`}
+          </p>
+        </div>
       ) : visualPing ? (
         <div className="flex flex-col items-center gap-6 text-center">
           <div className="text-8xl">📱</div>

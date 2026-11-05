@@ -142,35 +142,40 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   autonumber
-  actor L as Lecturer
+  actor L as Lecturer dashboard
   participant API as PollController
   participant PS as PollService
   participant MG as McqGenerator
   participant LLM as LLMProvider
+  participant AS as AttendanceService
   participant PB as PocketBase
-  actor S as Students
+  actor S as Checked-in students
   participant P as Projector view
 
-  L->>API: POST /polls/drafts (slide image)
-  API->>PS: draftFromSlide(slide)
-  PS->>MG: generate(slide)
-  MG->>LLM: generateStructured(task=mcq, schema, slide)
-  LLM-->>MG: 3 drafts {question, options[4], correctIndex}
-  MG-->>PS: McqDraft[]
+  L->>API: POST /polls/drafts (slide image and/or text)
+  API->>PS: draftFromSlide({slide, text})
+  PS->>MG: generate(input)
+  MG->>LLM: generateStructured(task=generate_mcq, schema, slide)
+  LLM-->>MG: {questions[]}
+  MG-->>PS: McqDraft[] (≤3, invalid ones dropped)
   PS-->>L: drafts
-  L->>API: POST /polls {chosen draft (edited)}
-  API->>PS: create(sessionId, draft)
-  L->>API: POST /polls/:id/open
-  API->>PS: open(pollId)
-  PS->>PB: update polls.status = open
-  PB--)S: realtime -> phones switch to poll
+  L->>L: pick one, edit text / correct answer
+  L->>API: POST /sessions/:id/polls {question, options, correctIndex, source: ai, open: true}
+  API->>PS: create(session, draft, ai)
+  API->>PS: open(session, pollId)
+  PS->>PB: close any open poll, then polls.status = open
+  PB--)S: realtime "update" (list rule: checked-in, not draft) -> phone shows the poll
+  PB--)P: realtime -> projector switches to live bars
   S->>API: POST /polls/:id/votes {optionIndex}
-  API->>PS: vote(pollId, studentId, optionIndex)
-  PS->>PB: create poll_votes (unique poll+student)
-  PB--)P: realtime -> live bar chart
+  API->>PS: vote(pollId, participant, optionIndex)
+  PS->>AS: requireParticipant(sessionId, studentNumber)
+  PS->>PB: create poll_votes (unique poll + student)
+  PB--)P: realtime -> bar grows
   L->>API: POST /polls/:id/close
   API->>PS: close(pollId)
-  PS-->>P: results + correct answer revealed
+  PS->>PB: update {status: closed, results, answer_index}
+  PB--)S: realtime -> results with ✓ on the correct option
+  PB--)P: realtime -> answer revealed (shown for 60 s)
 ```
 
 ## SD5: Lecture summary with confusion timeline (UC9)
@@ -242,4 +247,45 @@ sequenceDiagram
   HA->>HR: common mistakes across reviews (LLM aggregate)
   HA->>PB: upsert assignment_insights + submissions.percentiles
   HA-->>L: distribution, common mistakes, similar pairs
+```
+
+## SD7: "I'm lost" and the questions feed (UC6)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor S as Student phone
+  participant API as EngagementController
+  participant CMt as ConfusionMeter
+  participant FS as FeedService
+  participant AS as AttendanceService
+  participant PB as PocketBase
+  actor L as Lecturer dashboard
+
+  S->>API: POST /sessions/:id/lost
+  API->>CMt: record(session, participant)
+  CMt->>AS: requireParticipant(sessionId, studentNumber)
+  CMt->>PB: last signal of this student
+  alt within 60 s cooldown
+    CMt-->>S: {accepted: false, retryInSec}
+  else
+    CMt->>PB: create lost_signals {student hidden, at}
+    PB--)L: realtime "create" (no identity)
+    L->>API: GET /sessions/:id/confusion
+    API->>CMt: level(sessionId, 120)
+    CMt-->>L: {lost, present, ratio}
+  end
+
+  S->>API: POST /sessions/:id/posts {text, anonymous}
+  API->>FS: post(session, participant, text, anonymous)
+  FS->>PB: create feed_posts {author hidden, display_name only if not anonymous}
+  PB--)L: realtime -> new question
+  PB--)S: realtime -> other students see it
+  S->>API: POST /posts/:id/votes
+  API->>FS: upvote(postId, participant)
+  FS->>PB: create post_votes (unique post + voter)
+  FS->>PB: votes + 1 (serialised per post by KeyedLock)
+  L->>API: POST /sessions/:id/themes
+  API->>FS: clusterOpen(sessionId)
+  FS-->>L: Theme[] (AI groups open questions)
 ```

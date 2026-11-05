@@ -1,6 +1,7 @@
 import type { RecordModel } from 'pocketbase';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import EngagementPanel from '../components/EngagementPanel';
 import { Button, Card, ErrorText, inputClass } from '../components/ui';
 import VerificationPanel from '../components/VerificationPanel';
 import { api, ApiError, type RecordDto } from '../lib/api';
@@ -118,6 +119,8 @@ export default function DashboardPage() {
       </div>
 
       <ErrorText>{error}</ErrorText>
+
+      {session && <EngagementPanel sessionId={id} active={active} />}
 
       {session && <VerificationPanel sessionId={id} active={active} presentCount={present} />}
 
