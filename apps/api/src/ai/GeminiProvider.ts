@@ -8,7 +8,8 @@ export class GeminiProvider implements LLMProvider {
     apiKey: string,
     private readonly model: string,
   ) {
-    this.client = new GoogleGenAI({ apiKey });
+    // Gemini returns 503 "high demand" spikes; retries are off unless retryOptions is set. Bounded so a lecturer waits ≤ ~15 s.
+    this.client = new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 4, initialDelay: 1, maxDelay: 8 } } });
   }
 
   async generateStructured<T>(req: StructuredRequest): Promise<T> {

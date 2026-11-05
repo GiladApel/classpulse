@@ -29,7 +29,7 @@ export function loadConfig(): Config {
     ai: {
       provider: process.env.LLM_PROVIDER === 'gemini' ? 'gemini' : 'mock',
       geminiApiKey: process.env.GEMINI_API_KEY || undefined,
-      geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      geminiModel: process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
     },
   };
 }
