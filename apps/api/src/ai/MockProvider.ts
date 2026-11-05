@@ -1,17 +1,19 @@
 import { type LLMProvider, LLMOutputError, type StructuredRequest } from './LLMProvider.js';
 
+type Fixture = unknown | ((req: StructuredRequest) => unknown);
+
 /** Deterministic provider for tests, offline development and the demo fallback. */
 export class MockProvider implements LLMProvider {
   readonly calls: StructuredRequest[] = [];
 
-  constructor(private readonly fixtures: Record<string, unknown> = DEFAULT_FIXTURES) {}
+  constructor(private readonly fixtures: Record<string, Fixture> = DEFAULT_FIXTURES) {}
 
   async generateStructured<T>(req: StructuredRequest): Promise<T> {
     this.calls.push(req);
     if (!(req.task in this.fixtures)) throw new LLMOutputError(`No mock fixture for task ${req.task}`);
     const fixture = this.fixtures[req.task];
     if (fixture instanceof Error) throw fixture;
-    return structuredClone(fixture) as T;
+    return structuredClone(typeof fixture === 'function' ? fixture(req) : fixture) as T;
   }
 }
 
@@ -34,4 +36,36 @@ export const DEFAULT_FIXTURES: Record<string, unknown> = {
   },
   // Ids are placeholders: FeedClusterer drops unknown ids, so tests pass their own fixture.
   cluster_feed: { themes: [] },
+  summarize_lecture: {
+    tldr: 'ההרצאה הציגה את תבניות העיצוב Strategy ו-State, את ההבדל ביניהן ומתי לבחור בכל אחת.',
+    chapters: [
+      { startSec: 0, title: 'פתיחה', summary: 'סקירת השיעור הקודם ומטרות השיעור.' },
+      { startSec: 300, title: 'Strategy', summary: 'משפחת אלגוריתמים מתחלפים מאחורי ממשק אחד.' },
+      { startSec: 1200, title: 'State', summary: 'אובייקט שמשנה התנהגות לפי מצבו הפנימי.' },
+      { startSec: 2100, title: 'השוואה ודוגמאות', summary: 'מתי כל תבנית מתאימה, עם דוגמאות קוד.' },
+    ],
+    concepts: [
+      { term: 'Strategy', explanation: 'החלפת אלגוריתם בזמן ריצה דרך ממשק משותף.' },
+      { term: 'State', explanation: 'העברת ההתנהגות למחלקת מצב נפרדת לכל מצב.' },
+    ],
+    questions: [
+      { question: 'מה ההבדל העיקרי בין Strategy ל-State?', answer: 'ב-Strategy הלקוח בוחר את האלגוריתם; ב-State האובייקט עובר בין מצבים בעצמו.' },
+      { question: 'איזה עקרון SOLID Strategy מממשת?', answer: 'OCP — אלגוריתם חדש הוא מחלקה חדשה.' },
+      { question: 'מתי עדיף if/else פשוט על פני Strategy?', answer: 'כשיש מעט מקרים קבועים שלא צפויים להשתנות.' },
+      { question: 'איך State מונעת תנאים מפוזרים?', answer: 'כל מצב מטפל בהתנהגות שלו במחלקה אחת.' },
+      { question: 'תנו דוגמה ל-Strategy מהפרויקט.', answer: 'LLMProvider: Gemini או Mock מתחלפים בלי לשנות את השירותים.' },
+    ],
+  },
+  // Score follows submission length so mock reviews differ between students (and percentiles are meaningful).
+  review_homework: (req: StructuredRequest) => {
+    const body = /<submission>\n([\s\S]*)\n<\/submission>/.exec(req.prompt)?.[1] ?? '';
+    const ids = [...req.prompt.matchAll(/- id "([^"]+)"/g)].map((m) => m[1]);
+    const score = Math.min(100, 40 + Math.round(body.length / 20));
+    return {
+      summary: 'הגשה סבירה; יש מקום לשיפור בבדיקות.',
+      criteria: ids.map((id) => ({ id, score, strengths: ['מבנה ברור'], fixes: score < 80 ? ['חסרות בדיקות יחידה'] : [] })),
+      mistakes: score < 80 ? ['חסרות בדיקות יחידה'] : [],
+    };
+  },
+  aggregate_mistakes: { mistakes: [{ title: 'חסרות בדיקות יחידה', description: 'כתבו בדיקה לכל מחלקה בדומיין לפני ההגשה.', count: 1 }] },
 };

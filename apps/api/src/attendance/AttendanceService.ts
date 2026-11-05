@@ -107,6 +107,11 @@ export class AttendanceService {
     return record;
   }
 
+  /** Course material (summaries, homework) is open to anyone who attended at least one session of the course. */
+  async requireCourseParticipant(courseId: string, studentNumber: string): Promise<void> {
+    if (!(await this.repo.attendedCourse(courseId, studentNumber))) throw new DomainError('NOT_IN_COURSE', 'יש להשתתף לפחות בשיעור אחד בקורס');
+  }
+
   async get(recordId: string): Promise<AttendanceRecord> {
     return this.mustGet(recordId);
   }

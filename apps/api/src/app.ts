@@ -3,8 +3,10 @@ import type { Container } from './container.js';
 import { AttendanceController } from './http/AttendanceController.js';
 import { type AppEnv, requireUser } from './http/auth.js';
 import { ChallengeController } from './http/ChallengeController.js';
+import { ContentController } from './http/ContentController.js';
 import { EngagementController } from './http/EngagementController.js';
 import { handleError } from './http/errors.js';
+import { HomeworkController } from './http/HomeworkController.js';
 import { PollController } from './http/PollController.js';
 import { SessionController } from './http/SessionController.js';
 
@@ -20,5 +22,7 @@ export function createApp(c: Container): Hono<AppEnv> {
   app.route('/', new ChallengeController(c.challenges, c.sessions, c.attendance).routes());
   app.route('/', new EngagementController(c.sessions, c.confusion, c.feed).routes());
   app.route('/', new PollController(c.polls, c.sessions).routes());
+  app.route('/', new ContentController(c.recordings, c.sessions).routes());
+  app.route('/', new HomeworkController(c.homework, c.sessions).routes());
   return app;
 }

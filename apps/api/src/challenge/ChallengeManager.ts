@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { Attachment } from '../ai/LLMProvider.js';
+import type { InlineAttachment } from '../ai/LLMProvider.js';
 import type { Detection, PeopleDetector } from '../ai/PeopleDetector.js';
 import type { AttendanceService } from '../attendance/AttendanceService.js';
 import type { QrTokenService } from '../attendance/QrTokenService.js';
@@ -53,7 +53,7 @@ export class ChallengeManager {
     this.opts = { ...DEFAULTS, ...opts };
   }
 
-  async snapHeadcount(session: Session, photo: Attachment): Promise<HeadcountResult> {
+  async snapHeadcount(session: Session, photo: InlineAttachment): Promise<HeadcountResult> {
     const normalized = await this.images.normalize(photo.data);
     const [presentCount, detection, blurred] = await Promise.all([
       this.attendance.presentCount(session.id),

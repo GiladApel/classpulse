@@ -2,6 +2,7 @@ import type { RecordModel } from 'pocketbase';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import EngagementPanel from '../components/EngagementPanel';
+import RecordingPanel from '../components/RecordingPanel';
 import { Button, Card, ErrorText, inputClass } from '../components/ui';
 import VerificationPanel from '../components/VerificationPanel';
 import { api, ApiError, type RecordDto } from '../lib/api';
@@ -123,6 +124,8 @@ export default function DashboardPage() {
       {session && <EngagementPanel sessionId={id} active={active} />}
 
       {session && <VerificationPanel sessionId={id} active={active} presentCount={present} />}
+
+      {session && <RecordingPanel sessionId={id} />}
 
       <Card>
         <h2 className="mb-3 font-semibold">אישור ידני</h2>

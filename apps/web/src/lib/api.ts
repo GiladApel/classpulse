@@ -14,10 +14,12 @@ export class ApiError extends Error {
 
 async function request(path: string, method: string, body?: unknown): Promise<Response> {
   const isForm = body instanceof FormData;
+  const isBlob = body instanceof Blob;
+  const type: Record<string, string> = isForm ? {} : { 'Content-Type': isBlob ? 'application/octet-stream' : 'application/json' };
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { ...(isForm ? {} : { 'Content-Type': 'application/json' }), Authorization: `Bearer ${pb.authStore.token}` },
-    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+    headers: { ...type, Authorization: `Bearer ${pb.authStore.token}` },
+    body: body === undefined ? undefined : isForm || isBlob ? body : JSON.stringify(body),
   });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
@@ -29,6 +31,7 @@ async function request(path: string, method: string, body?: unknown): Promise<Re
 export const api = {
   get: async <T>(path: string) => (await request(path, 'GET')).json() as Promise<T>,
   post: async <T>(path: string, body?: unknown) => (await request(path, 'POST', body ?? {})).json() as Promise<T>,
+  put: async <T>(path: string, body: Blob) => (await request(path, 'PUT', body)).json() as Promise<T>,
   del: async <T>(path: string) => (await request(path, 'DELETE')).json() as Promise<T>,
   upload: async <T>(path: string, form: FormData) => (await request(path, 'POST', form)).json() as Promise<T>,
   /** Downloads a file response, or returns the JSON body when the server answers with a link. */

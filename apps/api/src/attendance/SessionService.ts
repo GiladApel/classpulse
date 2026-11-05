@@ -4,7 +4,7 @@ import type { Clock } from '../infra/Clock.js';
 import { DomainError, ForbiddenError, NotFoundError } from '../shared/errors.js';
 import type { QrTokenService } from './QrTokenService.js';
 import type { CourseRepository, SessionRepository } from './repositories.js';
-import type { GeofenceMode, GeoPoint, Session } from './types.js';
+import type { Course, GeofenceMode, GeoPoint, Session } from './types.js';
 
 export interface StartSessionInput {
   courseId: string;
@@ -61,6 +61,18 @@ export class SessionService {
     const session = await this.sessions.get(sessionId);
     if (!session) throw new NotFoundError('Session');
     return session;
+  }
+
+  async getCourse(courseId: string): Promise<Course> {
+    const course = await this.courses.get(courseId);
+    if (!course) throw new NotFoundError('Course');
+    return course;
+  }
+
+  async getOwnedCourse(courseId: string, lecturerId: string): Promise<Course> {
+    const course = await this.getCourse(courseId);
+    if (course.lecturerId !== lecturerId) throw new ForbiddenError('Not your course');
+    return course;
   }
 
   async getOwned(sessionId: string, lecturerId: string): Promise<Session> {

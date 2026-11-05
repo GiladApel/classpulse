@@ -58,7 +58,7 @@ flowchart TB
 | **challenge/** | Headcount, challenge lifecycle, tap classification | attendance, ai, infra | `Challenge` (abstract) |
 | **engagement/** | Feed, confusion level, polls | ai, infra | — |
 | **content/** | Recording summary jobs, homework review and class insights | ai, infra | — |
-| **ai/** | One place for all LLM access; prompts + JSON schemas per use case | Gemini / Claude / n8n | `LLMProvider`, `EmbeddingProvider` |
+| **ai/** | One place for all LLM access; prompts + JSON schemas per use case | Gemini / Claude / n8n | `LLMProvider` |
 | **infra/** | Persistence (only layer that touches the PB SDK), image blur, spreadsheets, time | PB, sharp, SheetJS, Google API | `Repository<T>`, `ImageProcessor`, `SpreadsheetExporter`, `Clock` |
 | **PocketBase** | Users / OAuth, storage, access rules, realtime push to clients | — | Collections (see the plan's schema) |
 

@@ -3,7 +3,7 @@ import type { Session } from '../attendance/types.js';
 import type { Clock } from '../infra/Clock.js';
 import { DomainError } from '../shared/errors.js';
 import type { LostSignalRepository } from './repositories.js';
-import type { ConfusionLevel, Participant } from './types.js';
+import type { ConfusionLevel, Participant, TimePoint } from './types.js';
 
 export interface LostOutcome {
   accepted: boolean;
@@ -38,5 +38,17 @@ export class ConfusionMeter {
     const [recent, present] = await Promise.all([this.signals.listSince(sessionId, since), this.attendance.presentCount(sessionId)]);
     const lost = new Set(recent.map((s) => s.studentNumber)).size;
     return { lost, present, ratio: present > 0 ? Math.min(1, lost / present) : 0, windowSec };
+  }
+
+  /** Distinct students per bucket from `from` onward; empty buckets included so the timeline has no gaps. */
+  async series(sessionId: string, from: Date, to: Date, bucketSec = 60): Promise<TimePoint[]> {
+    const signals = await this.signals.listSince(sessionId, from);
+    const n = Math.max(1, Math.ceil((to.getTime() - from.getTime()) / (bucketSec * 1000)));
+    const buckets = Array.from({ length: n }, () => new Set<string>());
+    for (const s of signals) {
+      const i = Math.floor((s.at.getTime() - from.getTime()) / (bucketSec * 1000));
+      if (i >= 0 && i < n) buckets[i].add(s.studentNumber);
+    }
+    return buckets.map((set, i) => ({ t: new Date(from.getTime() + i * bucketSec * 1000), count: set.size }));
   }
 }

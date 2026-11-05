@@ -19,6 +19,7 @@
     "hono": "^4.13.16",
     "pocketbase": "^0.28.2",
     "sharp": "^0.35.5",
+    "unpdf": "1.9.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {

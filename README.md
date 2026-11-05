@@ -74,6 +74,10 @@ npm run test:int -w apps/api  # integration tests against the running PocketBase
 
 **Google sign-in for students:** in the PocketBase admin, open *users → Options → OAuth2 → Google* and enter the client ID and secret from Google Cloud. Add `https://<pb-host>/api/oauth2-redirect` as an authorized redirect URI.
 
+### Lecture summary and homework (M6)
+- **Summary:** on the session dashboard, upload the recording (video/audio up to 2 GB, sent in 50 MB chunks) or a transcript (vtt/srt/txt), and set how many minutes after the session start the recording began. Gemini returns a TL;DR, timestamped chapters, key concepts and 5 review questions. The timeline marks "I'm lost" spikes inside the chapter where they happened. The recording itself is deleted after processing. **Publish** makes the summary visible to every student who attended any session of the course.
+- **Homework:** the lecturer creates an assignment with a weighted rubric (*מטלות לפי קורס*, "assignments by course", on the home page). Students submit a PDF or code file from *הקורסים שלי* ("my courses"). The AI scores each criterion with strengths and fixes; percentiles appear from 5 reviewed submissions. **✨ ניתוח הכיתה** ("analyse class") shows the score distribution, class-wide common mistakes (which students also see, without names) and near-identical submission pairs for the lecturer to check by hand.
+
 ### Live class flow (M5)
 After checking in, the student's page stays open and shows:
 - **🤯 הלכתי לאיבוד** ("I'm lost"): one tap, at most once a minute. The dashboard's confusion meter shows how many of those present pressed it in the last 2 minutes, never who.

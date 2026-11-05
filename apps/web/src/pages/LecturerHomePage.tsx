@@ -96,6 +96,21 @@ export default function LecturerHomePage() {
         )}
       </Card>
 
+      {courses.length > 0 && (
+        <Card>
+          <h2 className="mb-3 text-lg font-semibold">מטלות לפי קורס</h2>
+          <ul className="flex flex-wrap gap-2">
+            {courses.map((c) => (
+              <li key={c.id}>
+                <Link to={`/dash/course/${c.id}`} className="inline-block rounded-xl border border-slate-200 px-3 py-2 hover:border-indigo-400 hover:text-indigo-700">
+                  📝 {c.code} · {c.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card>
         <h2 className="mb-3 text-lg font-semibold">שיעורים אחרונים</h2>
         {sessions.length === 0 && <p className="text-slate-600">עדיין אין שיעורים.</p>}

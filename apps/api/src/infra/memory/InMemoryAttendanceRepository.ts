@@ -1,8 +1,21 @@
 import type { AttendanceRepository } from '../../attendance/repositories.js';
-import type { AttendanceRecord } from '../../attendance/types.js';
+import type { AttendanceRecord, Session } from '../../attendance/types.js';
 import { InMemoryRepository } from '../InMemoryRepository.js';
 
 export class InMemoryAttendanceRepository extends InMemoryRepository<AttendanceRecord> implements AttendanceRepository {
+  /** Sessions are needed to answer course-level questions, like PB's relation filter does. */
+  constructor(private readonly sessions?: { get(id: string): Promise<Session | null> }) {
+    super();
+  }
+
+  async attendedCourse(courseId: string, studentNumber: string) {
+    for (const r of this.all()) {
+      if (r.studentNumber !== studentNumber || r.status === 'removed') continue;
+      if ((await this.sessions?.get(r.sessionId))?.courseId === courseId) return true;
+    }
+    return false;
+  }
+
   async create(data: Omit<AttendanceRecord, 'id'>): Promise<AttendanceRecord> {
     // Mirrors the DB unique index (session, student_number); checked synchronously so it is atomic like the DB.
     const taken = this.all().some((r) => r.sessionId === data.sessionId && r.studentNumber === data.studentNumber);

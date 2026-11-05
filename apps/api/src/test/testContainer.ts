@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { MockProvider } from '../ai/MockProvider.js';
 import type { Session } from '../attendance/types.js';
 import { buildContainer, type Ports } from '../container.js';
@@ -12,6 +14,12 @@ import {
   InMemoryChallengeResponseRepository,
   InMemoryHeadcountRepository,
 } from '../infra/memory/InMemoryChallengeRepositories.js';
+import {
+  InMemoryAssignmentRepository,
+  InMemoryInsightsRepository,
+  InMemoryRecordingRepository,
+  InMemorySubmissionRepository,
+} from '../infra/memory/InMemoryContentRepositories.js';
 import { InMemoryCourseRepository } from '../infra/memory/InMemoryCourseRepository.js';
 import {
   InMemoryFeedPostRepository,
@@ -20,6 +28,7 @@ import {
   InMemoryPollVoteRepository,
   InMemoryPostVoteRepository,
 } from '../infra/memory/InMemoryEngagementRepositories.js';
+import { UploadStore } from '../infra/UploadStore.js';
 import { T0 } from './fixtures.js';
 
 /** Records calls; returns tagged buffers so tests can tell clear from blurred. */
@@ -42,12 +51,16 @@ export const USERS: Record<string, UserIdentity> = {
   fresh: { id: 'u3', name: 'חדש', email: 'n@x', role: 'student', studentNumber: '' },
 };
 
+let storeSeq = 0;
+
 export function makeTestPorts(over: Partial<Ports> = {}) {
   const clock = new FixedClock(T0);
+  const sessionRepo = new InMemoryRepository<Session>();
+  const llm = new MockProvider();
   const ports: Ports = {
     clock,
-    attendanceRepo: new InMemoryAttendanceRepository(),
-    sessionRepo: new InMemoryRepository<Session>(),
+    attendanceRepo: new InMemoryAttendanceRepository(sessionRepo),
+    sessionRepo,
     courseRepo: new InMemoryCourseRepository([{ id: 'c1', code: 'I2SE', name: 'הנדסת תוכנה', lecturerId: 'lect1' }]),
     headcountRepo: new InMemoryHeadcountRepository(),
     challengeRepo: new InMemoryChallengeRepository(),
@@ -57,8 +70,13 @@ export function makeTestPorts(over: Partial<Ports> = {}) {
     postVoteRepo: new InMemoryPostVoteRepository(),
     pollRepo: new InMemoryPollRepository(),
     pollVoteRepo: new InMemoryPollVoteRepository(),
+    recordingRepo: new InMemoryRecordingRepository(),
+    assignmentRepo: new InMemoryAssignmentRepository(),
+    submissionRepo: new InMemorySubmissionRepository(),
+    insightsRepo: new InMemoryInsightsRepository(),
+    uploads: new UploadStore(join(tmpdir(), `classpulse-test-${process.pid}-${++storeSeq}`)),
     exporters: new Map([['csv' as const, new CsvExporter()]]),
-    llm: new MockProvider(),
+    llm,
     images: new FakeImageProcessor(),
     resolveUser: async (t: string) => USERS[t] ?? null,
     qrWindowSec: 10,

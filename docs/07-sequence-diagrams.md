@@ -183,35 +183,49 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   autonumber
-  actor L as Lecturer
-  participant API as RecordingController
+  actor L as Lecturer dashboard
+  participant API as ContentController
   participant RP as RecordingPipeline
+  participant US as UploadStore
+  participant Q as BackgroundQueue
   participant LS as LectureSummarizer
-  participant LLM as LLMProvider
+  participant LLM as GeminiProvider
   participant CMt as ConfusionMeter
   participant PB as PocketBase
 
-  L->>API: POST /sessions/:id/recordings (file, offsetSec)
-  API->>RP: enqueue(sessionId, file, offsetSec)
-  RP->>PB: create recordings {status: queued}
+  L->>API: POST /sessions/:id/recordings {filename, mimeType, sizeBytes, offsetSec}
+  API->>RP: start(session, meta)
+  RP->>PB: create recordings {status: uploading}
+  API-->>L: {id, chunkBytes: 50 MB}
+  loop each 50 MB chunk (Cloudflare caps requests at 100 MB)
+    L->>API: PUT /recordings/:id/data?offset=n (raw bytes)
+    API->>RP: appendChunk(recording, n, bytes)
+    RP->>US: append(id, n, bytes) (repeat ignored, gap rejected)
+    API-->>L: {received}
+  end
+  L->>API: POST /recordings/:id/complete
+  API->>RP: complete(recording)
+  RP->>PB: update status = queued
+  RP->>Q: add(process)
   API-->>L: 202 Accepted
-  RP->>RP: process(recordingId) (async)
+  Q->>RP: process(recordingId)
   RP->>PB: update status = processing
   PB--)L: realtime -> "processing"
-  RP->>LS: summarize(media)
-  LS->>LLM: generateStructured(task=summary, schema, media)
-  alt media too long / provider error
-    LS->>LS: fallback: audio -> transcript -> summarize
-  end
-  LLM-->>LS: {tldr, chapters[], concepts[], questions[]}
-  LS-->>RP: LectureSummary
+  RP->>LS: summarize({media: path} or {transcript})
+  LS->>LLM: generateStructured(task=summarize_lecture, schema, video)
+  LLM->>LLM: Files API upload, wait until ACTIVE, low media resolution
+  LLM-->>LS: {tldr, chapters[startSec], concepts[], questions[5]}
+  LS-->>RP: LectureSummary (validated, chapters sorted)
   RP->>PB: update {summary, status: done}
+  RP->>US: remove(id) (the recording is never kept)
   PB--)L: realtime -> summary ready
   L->>API: GET /recordings/:id/timeline
-  API->>RP: timelineSpikes(recordingId)
-  RP->>CMt: series(sessionId, 60 s)
+  API->>RP: timeline(session, recording)
+  RP->>CMt: series(sessionId, startedAt, endedAt, 60 s)
   CMt-->>RP: TimePoint[]
-  RP-->>L: spikes shifted by offsetSec (overlaid on chapters)
+  RP-->>L: buckets shifted by offsetSec + spikes labelled with their chapter
+  L->>API: POST /recordings/:id/publish {published: true}
+  Note over PB: list rule now lets every course participant read the summary
 ```
 
 ## SD6: Homework review (UC10, UC11)
@@ -224,29 +238,37 @@ sequenceDiagram
   participant API as HomeworkController
   participant HA as HomeworkAnalysisService
   participant TE as TextExtractor
+  participant FP as Fingerprinter
+  participant Q as BackgroundQueue
   participant HR as HomeworkReviewer
-  participant EP as EmbeddingProvider
   participant PB as PocketBase
 
   S->>API: POST /assignments/:id/submissions (file)
-  API->>HA: submit(assignmentId, studentId, file)
+  API->>HA: submit(assignment, participant, file)
+  HA->>HA: requireCourseParticipant
   HA->>TE: extract(file)
-  TE-->>HA: text
-  HA->>HR: review(text, rubric)
-  HR-->>HA: Review {criterionScores, strengths, fixes}
-  HA->>EP: embed([text])
-  EP-->>HA: vector
-  HA->>PB: create submissions {review, scores, embedding}
-  HA-->>S: review (percentiles shown once n >= 5)
+  TE-->>HA: {text, kind: code | prose} (or UNSUPPORTED / EMPTY_FILE)
+  HA->>PB: create submissions {file, status: processing}
+  HA->>FP: sketch(text, kind)
+  HA->>PB: save text_extract + fingerprint (hidden fields)
+  HA->>Q: add(review)
+  API-->>S: 202 "being reviewed"
+  Q->>HR: review(text, assignment) (submission wrapped as data)
+  HR-->>HA: Review {criteria[score, strengths, fixes], mistakes}
+  HA->>PB: update {review, total = weighted, status: done}
+  PB--)S: realtime -> status done
+  S->>API: GET /submissions/:id
+  API->>HA: view(submission)
+  HA-->>S: review + percentiles (only if ≥5 reviewed) + class mistakes
 
   L->>API: POST /assignments/:id/insights
-  API->>HA: buildInsights(assignmentId)
-  HA->>PB: list submissions
-  HA->>HA: PercentileCalculator per criterion
-  HA->>HA: SimilarityAnalyzer.pairsAbove(vectors, 0.92)
-  HA->>HR: common mistakes across reviews (LLM aggregate)
-  HA->>PB: upsert assignment_insights + submissions.percentiles
-  HA-->>L: distribution, common mistakes, similar pairs
+  API->>HA: buildInsights(assignment)
+  HA->>HA: histograms per criterion (PercentileCalculator for students)
+  HA->>HR: commonMistakes(labels per student, assignment)
+  HA->>PB: getFingerprints(assignmentId)
+  HA->>HA: SimilarityAnalyzer.pairsAbove(sketches, 0.5)
+  HA->>PB: upsert assignment_insights (similar_pairs hidden)
+  API-->>L: distribution, common mistakes, named pairs for manual review
 ```
 
 ## SD7: "I'm lost" and the questions feed (UC6)

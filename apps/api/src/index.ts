@@ -12,6 +12,8 @@ try {
 const cfg = loadConfig();
 const container = await buildProductionContainer(cfg);
 const app = createApp(container);
+const stuck = (await container.recordings.recoverInterrupted()) + (await container.homework.recoverInterrupted());
+if (stuck) console.warn(`Marked ${stuck} interrupted AI job(s) as failed`);
 serve({ fetch: app.fetch, port: cfg.port }, ({ port }) => console.log(`ClassPulse API on :${port} (LLM: ${cfg.ai.provider})`));
 
 // Challenges close on their own when the timer runs out.

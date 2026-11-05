@@ -126,7 +126,9 @@ flowchart LR
   2. The job is queued.
   3. The LLM produces the summary.
   4. The lecturer views the timeline with lost-spikes and clicks "Publish".
-- **Alternate flow:** 3a. The video is too long: the system extracts the audio, transcribes it and summarizes the transcript.
+- **Alternate flows:**
+  - **1a. No recording:** the lecturer uploads a transcript (vtt/srt/txt, e.g. from Zoom or Teams) instead.
+  - **3a. Processing fails** (e.g. the provider is overloaded): the status becomes `failed` with a message, the temp file is deleted, and the lecturer can upload again or upload a transcript.
 
 ### UC10: Homework review (student)
 - **Actor:** Student.
@@ -140,5 +142,5 @@ flowchart LR
 - **Actor:** Lecturer.
 - **Main flow:**
   1. The lecturer clicks "Analyze class".
-  2. The system computes the distribution, clusters common mistakes and finds embedding-similarity pairs above a threshold.
+  2. The system computes the distribution, groups common mistakes, and finds pairs with near-identical structure (fingerprint similarity ≥ 0.5, robust to renamed identifiers).
   3. The lecturer reviews the flagged pairs manually.

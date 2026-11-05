@@ -13,6 +13,10 @@ export class PbAttendanceRepository extends PbRepository<AttendanceRecord> imple
     return this.first('session = {:s} && student_number = {:n}', { s: sessionId, n: studentNumber });
   }
 
+  async attendedCourse(courseId: string, studentNumber: string) {
+    return (await this.first("session.course = {:c} && student_number = {:n} && status != 'removed'", { c: courseId, n: studentNumber })) !== null;
+  }
+
   findBySessionAndDevice(sessionId: string, deviceId: string) {
     return this.first('session = {:s} && device_id = {:d}', { s: sessionId, d: deviceId });
   }

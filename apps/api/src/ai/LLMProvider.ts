@@ -1,9 +1,8 @@
 import { DomainError } from '../shared/errors.js';
 
-export interface Attachment {
-  mimeType: string;
-  data: Buffer;
-}
+/** In-memory bytes for small inputs (photos, slides); a file path for large media that must not be loaded into memory. */
+export type InlineAttachment = { mimeType: string; data: Buffer };
+export type Attachment = InlineAttachment | { mimeType: string; path: string };
 
 export type JsonSchema = Record<string, unknown>;
 
