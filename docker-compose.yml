@@ -1,0 +1,16 @@
+services:
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:latest
+    restart: unless-stopped
+    ports: ["8090:8090"]
+    volumes:
+      - ./pocketbase/pb_data:/pb_data
+      - ./pocketbase/pb_migrations:/pb_migrations
+  api:
+    build: ./apps/api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PB_URL: http://pocketbase:8090
+    ports: ["8787:8787"]
+    depends_on: [pocketbase]

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.env
+pocketbase/pb_data/
+*.log
+*.tsbuildinfo
