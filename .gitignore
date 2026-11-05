@@ -4,3 +4,4 @@ dist/
 pocketbase/pb_data/
 *.log
 *.tsbuildinfo
+secrets/

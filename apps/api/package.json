@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "seed": "tsx scripts/seed.ts",
+    "setup:oauth": "tsx scripts/setup-google-oauth.ts",
     "test:int": "vitest run -c vitest.int.config.ts"
   },
   "dependencies": {

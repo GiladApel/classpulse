@@ -16,6 +16,7 @@ export default function ProjectorPage() {
   const [ended, setEnded] = useState(false);
   const [offline, setOffline] = useState(false);
   const [cycle, setCycle] = useState({ key: 0, ms: 10_000 });
+  const [url, setUrl] = useState('');
   const { present } = useAttendance(id);
 
   useEffect(() => {
@@ -27,8 +28,10 @@ export default function ProjectorPage() {
         const { token, refreshInMs } = await api.get<QrTicket>(`/sessions/${id}/qr`);
         if (stopped) return;
         setOffline(false);
+        const checkInUrl = `${location.origin}/c/${token}`;
+        setUrl(checkInUrl);
         if (canvas.current) {
-          await QRCode.toCanvas(canvas.current, `${location.origin}/c/${token}`, { width: 640, margin: 1, errorCorrectionLevel: 'M' });
+          await QRCode.toCanvas(canvas.current, checkInUrl, { width: 640, margin: 1, errorCorrectionLevel: 'M' });
         }
         setCycle((c) => ({ key: c.key + 1, ms: refreshInMs }));
         timer = setTimeout(tick, refreshInMs + 50);
@@ -66,6 +69,12 @@ export default function ProjectorPage() {
             <span className="font-bold text-emerald-400">{present}</span> נרשמו
           </p>
           {offline && <p className="text-amber-400">אין חיבור לשרת — מנסה שוב…</p>}
+          {/* Dev only: lets you test check-in on the same laptop (right-click → open in incognito). */}
+          {import.meta.env.DEV && url && (
+            <a href={url} target="_blank" rel="noreferrer" className="text-xs text-slate-500 underline" dir="ltr">
+              {url}
+            </a>
+          )}
         </>
       )}
       <style>{'@keyframes shrink { from { width: 100% } to { width: 0% } }'}</style>

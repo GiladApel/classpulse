@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { auth, sheets, type sheets_v4 } from '@googleapis/sheets';
 import type { AttendanceRecord } from '../../attendance/types.js';
 import { baseFilename, type ExportOutput, HEADERS, type SessionMeta, type SpreadsheetExporter, toRows } from './SpreadsheetExporter.js';
@@ -10,8 +11,9 @@ export class GoogleSheetsExporter implements SpreadsheetExporter {
     keyFile: string,
     private readonly spreadsheetId: string,
   ) {
-    const credentials = new auth.GoogleAuth({ keyFile, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
-    this.client = sheets({ version: 'v4', auth: credentials });
+    const key = JSON.parse(readFileSync(keyFile, 'utf8')) as { client_email: string; private_key: string };
+    const jwt = new auth.JWT({ email: key.client_email, key: key.private_key, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
+    this.client = sheets({ version: 'v4', auth: jwt });
   }
 
   async export(records: AttendanceRecord[], meta: SessionMeta): Promise<ExportOutput> {
