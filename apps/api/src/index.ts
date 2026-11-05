@@ -10,5 +10,20 @@ try {
 }
 
 const cfg = loadConfig();
-const app = createApp(await buildProductionContainer(cfg));
-serve({ fetch: app.fetch, port: cfg.port }, ({ port }) => console.log(`ClassPulse API on :${port}`));
+const container = await buildProductionContainer(cfg);
+const app = createApp(container);
+serve({ fetch: app.fetch, port: cfg.port }, ({ port }) => console.log(`ClassPulse API on :${port} (LLM: ${cfg.ai.provider})`));
+
+// Challenges close on their own when the timer runs out.
+let closing = false;
+setInterval(async () => {
+  if (closing) return;
+  closing = true;
+  try {
+    await container.challenges.closeExpired();
+  } catch (e) {
+    console.error('closeExpired failed:', e);
+  } finally {
+    closing = false;
+  }
+}, 2000);

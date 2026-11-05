@@ -9,13 +9,16 @@
     "test": "vitest run",
     "seed": "tsx scripts/seed.ts",
     "setup:oauth": "tsx scripts/setup-google-oauth.ts",
-    "test:int": "vitest run -c vitest.int.config.ts"
+    "test:int": "vitest run -c vitest.int.config.ts",
+    "typecheck": "tsc -p tsconfig.test.json"
   },
   "dependencies": {
+    "@google/genai": "^2.32.0",
     "@googleapis/sheets": "^18.1.2",
     "@hono/node-server": "^2.1.6",
     "hono": "^4.13.16",
     "pocketbase": "^0.28.2",
+    "sharp": "^0.35.5",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {

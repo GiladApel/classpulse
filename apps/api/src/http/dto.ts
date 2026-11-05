@@ -2,6 +2,7 @@ import type { AttendanceRecord, Session } from '../attendance/types.js';
 
 export const recordDto = (r: AttendanceRecord) => ({
   id: r.id,
+  sessionId: r.sessionId,
   studentNumber: r.studentNumber,
   studentName: r.studentName,
   checkedInAt: r.checkedInAt.toISOString(),

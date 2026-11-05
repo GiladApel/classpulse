@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, useParams } from 'react-router';
+import ChallengeOverlay from '../components/ChallengeOverlay';
 import { Card, Screen } from '../components/ui';
 import { api, ApiError, type RecordDto } from '../lib/api';
 import { formatTime, getDeviceId, getLocation } from '../lib/device';
@@ -61,6 +62,8 @@ export default function CheckInPage() {
                 לא הצלחנו לאמת שאתם בכיתה לפי המיקום — המרצה יראה סימון ליד שמכם.
               </p>
             )}
+            <p className="mt-2 text-xs text-slate-400">השאירו את הדף פתוח — ייתכן שהמרצה יבקש בדיקת נוכחות קצרה.</p>
+            {state.record.sessionId && <ChallengeOverlay sessionId={state.record.sessionId} />}
           </>
         )}
         {state.kind === 'error' && (

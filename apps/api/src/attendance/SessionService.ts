@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import type { HeadcountRepository } from '../challenge/repositories.js';
 import type { Clock } from '../infra/Clock.js';
 import { DomainError, ForbiddenError, NotFoundError } from '../shared/errors.js';
 import type { QrTokenService } from './QrTokenService.js';
@@ -24,6 +25,7 @@ export class SessionService {
     private readonly courses: CourseRepository,
     private readonly tokens: QrTokenService,
     private readonly clock: Clock,
+    private readonly headcounts: Pick<HeadcountRepository, 'purgeClearPhotos'>,
   ) {}
 
   async start(lecturerId: string, input: StartSessionInput): Promise<Session> {
@@ -45,7 +47,9 @@ export class SessionService {
 
   async end(session: Session): Promise<Session> {
     if (session.status === 'ended') return session;
-    return this.sessions.update(session.id, { status: 'ended', endedAt: this.clock.now() });
+    const ended = await this.sessions.update(session.id, { status: 'ended', endedAt: this.clock.now() });
+    await this.headcounts.purgeClearPhotos(session.id);
+    return ended;
   }
 
   currentQrToken(session: Session): QrTicket {

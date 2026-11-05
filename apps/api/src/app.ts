@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Container } from './container.js';
 import { AttendanceController } from './http/AttendanceController.js';
 import { type AppEnv, requireUser } from './http/auth.js';
+import { ChallengeController } from './http/ChallengeController.js';
 import { handleError } from './http/errors.js';
 import { SessionController } from './http/SessionController.js';
 
@@ -14,5 +15,6 @@ export function createApp(c: Container): Hono<AppEnv> {
   app.get('/config', (ctx) => ctx.json({ exportFormats: c.exports.formats() }));
   app.route('/sessions', new SessionController(c.sessions, c.attendance, c.exports).routes());
   app.route('/', new AttendanceController(c.attendance, c.sessions, c.tokens, c.clock).routes());
+  app.route('/', new ChallengeController(c.challenges, c.sessions, c.attendance).routes());
   return app;
 }

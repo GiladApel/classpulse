@@ -7,12 +7,14 @@ import LecturerHomePage from './pages/LecturerHomePage';
 import LoginPage from './pages/LoginPage';
 import OnboardingPage from './pages/OnboardingPage';
 import ProjectorPage from './pages/ProjectorPage';
+import RollCallPage from './pages/RollCallPage';
 
 const router = createBrowserRouter([
   { path: '/', element: <HomePage /> },
   { path: '/login', element: <LoginPage /> },
   { path: '/onboarding', element: <OnboardingPage /> },
   { path: '/c/:token', element: <RequireStudent><CheckInPage /></RequireStudent> },
+  { path: '/r/:token', element: <RequireStudent><RollCallPage /></RequireStudent> },
   { path: '/dash', element: <RequireLecturer><LecturerHomePage /></RequireLecturer> },
   { path: '/dash/:id', element: <RequireLecturer><DashboardPage /></RequireLecturer> },
   { path: '/projector/:id', element: <RequireLecturer><ProjectorPage /></RequireLecturer> },

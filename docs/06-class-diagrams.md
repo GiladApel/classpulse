@@ -139,11 +139,13 @@ classDiagram
     +embed(texts) Promise~number[][]~
   }
   class ClaudeProvider {
+    «planned»
     -client: Anthropic
     -model: string
     +generateStructured~T~(req) Promise~T~
   }
   class N8nWebhookProvider {
+    «planned»
     -webhookUrl: string
     +generateStructured~T~(req) Promise~T~
   }
@@ -198,6 +200,10 @@ classDiagram
 ```
 
 Each AI service owns its prompt and JSON schema. All LLM output is schema-validated before use, so a malformed reply raises `LLMOutputError` and never reaches the domain.
+
+**Implemented so far:** `GeminiProvider` and `MockProvider`, chosen by `LLMProviderFactory` from `LLM_PROVIDER`. `ClaudeProvider` and `N8nWebhookProvider` are planned extension points; adding one is a new class plus one factory line (OCP).
+
+**`PeopleDetector`** asks Gemini for `box_2d = [ymin, xmin, ymax, xmax]` on a 0–1000 grid, which is Gemini's native detection format. It converts them to normalized `{x, y, w, h}`, clamps out-of-range values, and drops malformed or degenerate boxes. The count is the number of valid boxes, so the number shown always matches the boxes drawn.
 
 ## 3. `attendance/`: Chain of Responsibility + Strategy
 
@@ -324,29 +330,29 @@ classDiagram
   class Challenge {
     <<abstract>>
     #data: ChallengeData
-    +start(now: Date) void
-    +respond(r: ChallengeResponse, eligible: Set~string~, now: Date) void
-    +close(responses: ChallengeResponse[], checkedIn: string[]) Verdict[]
+    +state: ChallengeData
+    +isExpired(now: Date) boolean
+    +start(now: Date, durationSec: number) void
+    +accept(r: SubmittedResponse, ctx: AcceptContext) void
+    +close(responses, eligible: string[], now: Date, force: boolean) Map~string, Verdict~
     #assertState(expected: ChallengeStatus) void
-    #onStart()* void
-    #validateResponse(r: ChallengeResponse)* void
-    #evaluate(responses, checkedIn)* Verdict[]
+    #validatePayload(payload: ResponsePayload, now: Date)* void
+    #evaluate(responses: SubmittedResponse[])* Map~string, Verdict~
   }
   class RollCallChallenge {
     -tokens: QrTokenService
-    #onStart() void
-    #validateResponse(r) void
-    #evaluate(responses, checkedIn) Verdict[]
+    +currentToken() string
+    #validatePayload(payload) void
+    #evaluate(responses) Map~string, Verdict~
   }
   class VisualPingChallenge {
     -boxes: Box[]
     -hitTester: SeatHitTester
-    #onStart() void
-    #validateResponse(r) void
-    #evaluate(responses, checkedIn) Verdict[]
+    #validatePayload(payload) void
+    #evaluate(responses) Map~string, Verdict~
   }
   class ChallengeFactory {
-    +create(data: ChallengeData, headcount: Headcount)$ Challenge
+    +create(data: ChallengeData, deps)$ Challenge
   }
   class SeatHitTester {
     -padding: number
@@ -359,16 +365,37 @@ classDiagram
     -challenges: ChallengeRepository
     -responses: ChallengeResponseRepository
     -attendance: AttendanceService
+    -tokens: QrTokenService
     -clock: Clock
-    +snapHeadcount(sessionId, photo: Attachment) Promise~HeadcountResult~
-    +launch(sessionId, type: ChallengeType, headcountId) Promise~ChallengeData~
-    +submitResponse(challengeId, studentId, payload) Promise~void~
+    +snapHeadcount(session, photo: Attachment) Promise~HeadcountResult~
+    +launch(session, type: ChallengeType, headcountId) Promise~ChallengeData~
+    +submitResponse(challengeId, student, payload) Promise~void~
+    +rollcallToken(challenge) QrTicket
+    +close(challengeId, force) Promise~Map~
     +closeExpired() Promise~number~
   }
   class HeadcountResult {
     +headcount: Headcount
     +presentCount: number
     +mismatch: boolean
+    +detectionFailed: boolean
+  }
+  class HeadcountRepository {
+    <<interface>>
+    +create(data, files) Promise~Headcount~
+    +getBlurred(id) Promise~Buffer~
+    +purgeClearPhotos(sessionId) Promise~void~
+  }
+  class ChallengeRepository {
+    <<interface>>
+    +findActiveBySession(sessionId) Promise~ChallengeData~
+    +listActiveExpired(now) Promise~ChallengeData[]~
+  }
+  class ChallengeResponseRepository {
+    <<interface>>
+    +findByChallengeAndStudent(challengeId, studentNumber) Promise~ChallengeResponse~
+    +listByChallenge(challengeId) Promise~ChallengeResponse[]~
+    +setVerdict(id, verdict) Promise~void~
   }
 
   Challenge <|-- RollCallChallenge
@@ -379,6 +406,9 @@ classDiagram
   ChallengeManager o-- PeopleDetector
   ChallengeManager o-- ImageProcessor
   ChallengeManager o-- AttendanceService
+  ChallengeManager o-- HeadcountRepository
+  ChallengeManager o-- ChallengeRepository
+  ChallengeManager o-- ChallengeResponseRepository
   ChallengeManager ..> HeadcountResult
 ```
 
@@ -392,7 +422,11 @@ stateDiagram-v2
   resolved --> [*]
 ```
 
-**Classification rules in `SeatHitTester`** (coordinates are normalized to 0..1; each box is padded by `padding`, default 0.02):
+**Template Method.** `start`, `accept` and `close` fix the order of the guards: state, then expiry, then eligibility, then a single answer per student. Subclasses only supply `validatePayload` (a roll-call checks its own rotating token; a visual ping checks the tap coordinates) and `evaluate`. `close` then adds `no_response` for every eligible student who didn't answer.
+
+**Eligibility.** Only students checked in (and not removed) when the challenge *started* are challenged. Students who arrive later aren't penalised.
+
+**Classification rules in `SeatHitTester`** (coordinates are normalized to 0..1; each box is padded by `padding`, default 0.03):
 - A tap inside no box is labelled `empty_seat`.
 - When two or more taps fall in the same box, every one of them is labelled `collision`. The lecturer decides who is real.
 - If a tap lies in two overlapping boxes, the nearest box centre wins.

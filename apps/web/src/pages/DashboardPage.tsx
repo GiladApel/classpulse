@@ -2,6 +2,7 @@ import type { RecordModel } from 'pocketbase';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Button, Card, ErrorText, inputClass } from '../components/ui';
+import VerificationPanel from '../components/VerificationPanel';
 import { api, ApiError, type RecordDto } from '../lib/api';
 import { formatTime } from '../lib/device';
 import { pb } from '../lib/pb';
@@ -47,6 +48,8 @@ export default function DashboardPage() {
         setNotice('הגיליון עודכן ב-Google Sheets');
       }
     });
+
+  const confirmRecord = (r: RecordDto) => run(() => api.post(`/attendance/${r.id}/confirm`));
 
   const remove = (r: RecordDto) =>
     run(async () => {
@@ -116,6 +119,8 @@ export default function DashboardPage() {
 
       <ErrorText>{error}</ErrorText>
 
+      {session && <VerificationPanel sessionId={id} active={active} presentCount={present} />}
+
       <Card>
         <h2 className="mb-3 font-semibold">אישור ידני</h2>
         <form onSubmit={approve} className="grid gap-2 md:grid-cols-[1fr_1fr_1.5fr_auto]">
@@ -139,7 +144,7 @@ export default function DashboardPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {records.map((r, i) => (
-              <tr key={r.id} className={r.status === 'removed' ? 'text-slate-400 line-through' : ''}>
+              <tr key={r.id} className={r.status === 'removed' ? 'text-slate-400 line-through' : r.status === 'flagged' ? 'bg-amber-50' : ''}>
                 <td className="px-3 py-2 tabular-nums">{i + 1}</td>
                 <td className="px-3 py-2 font-medium">{r.studentName}</td>
                 <td className="px-3 py-2 tabular-nums" dir="ltr">
@@ -158,8 +163,22 @@ export default function DashboardPage() {
                     '—'
                   )}
                 </td>
-                <td className="px-3 py-2">{STATUS_LABEL[r.status]}</td>
-                <td className="px-3 py-2 text-end">
+                <td className="px-3 py-2">
+                  {r.status === 'flagged' ? (
+                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-amber-900" title={r.note}>
+                      {STATUS_LABEL.flagged}
+                    </span>
+                  ) : (
+                    STATUS_LABEL[r.status]
+                  )}
+                  {r.status === 'flagged' && r.note && <div className="mt-0.5 text-xs text-amber-800">{r.note}</div>}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-end">
+                  {r.status === 'flagged' && (
+                    <button onClick={() => confirmRecord(r)} className="me-3 text-xs text-emerald-700 hover:underline">
+                      השאר
+                    </button>
+                  )}
                   {r.status !== 'removed' && (
                     <button onClick={() => remove(r)} className="text-xs text-red-600 hover:underline">
                       הסרה

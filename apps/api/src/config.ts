@@ -1,3 +1,5 @@
+import type { AiConfig } from './ai/LLMProviderFactory.js';
+
 export interface Config {
   port: number;
   pbUrl: string;
@@ -6,6 +8,7 @@ export interface Config {
   qrWindowSec: number;
   googleServiceAccountFile?: string;
   googleSheetsId?: string;
+  ai: AiConfig;
 }
 
 function required(name: string): string {
@@ -23,5 +26,10 @@ export function loadConfig(): Config {
     qrWindowSec: Number(process.env.QR_WINDOW_SEC ?? 10),
     googleServiceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE || undefined,
     googleSheetsId: process.env.GOOGLE_SHEETS_ID || undefined,
+    ai: {
+      provider: process.env.LLM_PROVIDER === 'gemini' ? 'gemini' : 'mock',
+      geminiApiKey: process.env.GEMINI_API_KEY || undefined,
+      geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    },
   };
 }

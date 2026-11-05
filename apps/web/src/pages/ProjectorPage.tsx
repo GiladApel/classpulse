@@ -3,13 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { api, ApiError } from '../lib/api';
 import { useAttendance } from '../lib/useAttendance';
+import { isRunning, useCountdown, useLatestChallenge } from '../lib/useChallenge';
 
 interface QrTicket {
   token: string;
   refreshInMs: number;
 }
 
-/** Full-screen rotating QR. Fetches a new server-signed token at each window boundary. */
+/** Full-screen rotating QR. Fetches a new server-signed token at each window boundary; switches to the roll-call QR while one runs. */
 export default function ProjectorPage() {
   const { id = '' } = useParams();
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -18,26 +19,33 @@ export default function ProjectorPage() {
   const [cycle, setCycle] = useState({ key: 0, ms: 10_000 });
   const [url, setUrl] = useState('');
   const { present } = useAttendance(id);
+  const challenge = useLatestChallenge(id);
+  const left = useCountdown(challenge?.expires_at);
+  const running = isRunning(challenge, left);
+  const rollcallId = running && challenge.type === 'rollcall' ? challenge.id : '';
+  const visualPing = running && challenge.type === 'visual_ping';
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     let stopped = false;
+    const path = rollcallId ? `/challenges/${rollcallId}/qr` : `/sessions/${id}/qr`;
+    const prefix = rollcallId ? '/r/' : '/c/';
 
     const tick = async () => {
       try {
-        const { token, refreshInMs } = await api.get<QrTicket>(`/sessions/${id}/qr`);
+        const { token, refreshInMs } = await api.get<QrTicket>(path);
         if (stopped) return;
         setOffline(false);
-        const checkInUrl = `${location.origin}/c/${token}`;
-        setUrl(checkInUrl);
-        if (canvas.current) {
-          await QRCode.toCanvas(canvas.current, checkInUrl, { width: 640, margin: 1, errorCorrectionLevel: 'M' });
-        }
+        const target = `${location.origin}${prefix}${token}`;
+        setUrl(target);
+        if (canvas.current) await QRCode.toCanvas(canvas.current, target, { width: 640, margin: 1, errorCorrectionLevel: 'M' });
         setCycle((c) => ({ key: c.key + 1, ms: refreshInMs }));
         timer = setTimeout(tick, refreshInMs + 50);
       } catch (e) {
+        if (stopped) return;
         if (e instanceof ApiError && e.code === 'SESSION_ENDED') return setEnded(true);
-        setOffline(true);
+        // A roll-call that just expired answers 409 until the countdown flips us back to the session QR.
+        if (!(e instanceof ApiError && e.status === 409)) setOffline(true);
         timer = setTimeout(tick, 2000);
       }
     };
@@ -46,23 +54,26 @@ export default function ProjectorPage() {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [id]);
+  }, [id, rollcallId]);
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-slate-950 p-6 text-white">
+    <main className={`flex min-h-dvh flex-col items-center justify-center gap-6 p-6 text-white transition-colors ${rollcallId ? 'bg-rose-950' : 'bg-slate-950'}`}>
       {ended ? (
         <h1 className="text-5xl font-bold">השיעור הסתיים · {present} נוכחים</h1>
+      ) : visualPing ? (
+        <div className="flex flex-col items-center gap-6 text-center">
+          <div className="text-8xl">📱</div>
+          <h1 className="text-5xl font-bold">בדיקת נוכחות</h1>
+          <p className="text-3xl">הקישו בטלפון על המקום שבו אתם יושבים</p>
+          <p className="text-7xl font-bold tabular-nums text-amber-300">{left}</p>
+        </div>
       ) : (
         <>
-          <h1 className="text-4xl font-bold">סרקו עם מצלמת הטלפון</h1>
+          <h1 className="text-4xl font-bold">{rollcallId ? `בדיקת נוכחות! סרקו שוב · ${left}` : 'סרקו עם מצלמת הטלפון'}</h1>
           <div className="rounded-3xl bg-white p-5">
             <canvas ref={canvas} className="block h-[min(70vh,640px)] w-[min(70vh,640px)]" />
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
-              <div
-                key={cycle.key}
-                className="h-full bg-indigo-600"
-                style={{ animation: `shrink ${cycle.ms}ms linear forwards` }}
-              />
+              <div key={cycle.key} className="h-full bg-indigo-600" style={{ animation: `shrink ${cycle.ms}ms linear forwards` }} />
             </div>
           </div>
           <p className="text-3xl tabular-nums">

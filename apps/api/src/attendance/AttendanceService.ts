@@ -82,6 +82,24 @@ export class AttendanceService {
     return this.repo.update(recordId, { status: 'removed', note: reason });
   }
 
+  /** Marks a record for lecturer review (e.g. failed challenge). Removed records stay removed. */
+  async flag(recordId: string, reason: string): Promise<AttendanceRecord> {
+    const record = await this.mustGet(recordId);
+    if (record.status === 'removed') return record;
+    return this.repo.update(recordId, { status: 'flagged', note: reason });
+  }
+
+  /** Lecturer reviewed a flagged record and keeps it. */
+  async confirm(recordId: string): Promise<AttendanceRecord> {
+    const record = await this.mustGet(recordId);
+    if (record.status !== 'flagged') return record;
+    return this.repo.update(recordId, { status: 'present', note: '' });
+  }
+
+  async presentCount(sessionId: string): Promise<number> {
+    return (await this.repo.listBySession(sessionId)).filter((r) => r.status !== 'removed').length;
+  }
+
   async get(recordId: string): Promise<AttendanceRecord> {
     return this.mustGet(recordId);
   }

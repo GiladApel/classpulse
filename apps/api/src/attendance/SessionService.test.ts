@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FixedClock } from '../infra/Clock.js';
 import { InMemoryRepository } from '../infra/InMemoryRepository.js';
+import { InMemoryHeadcountRepository } from '../infra/memory/InMemoryChallengeRepositories.js';
 import { InMemoryCourseRepository } from '../infra/memory/InMemoryCourseRepository.js';
 import { CLASSROOM, T0 } from '../test/fixtures.js';
 import { QrTokenService } from './QrTokenService.js';
@@ -11,13 +12,26 @@ describe('SessionService', () => {
   let clock: FixedClock;
   let tokens: QrTokenService;
   let svc: SessionService;
+  let headcounts: InMemoryHeadcountRepository;
   const input = { courseId: 'c1', title: 'הרצאה 5', location: CLASSROOM, geofenceMode: 'lenient' as const, geofenceRadiusM: 50 };
 
   beforeEach(() => {
     clock = new FixedClock(T0);
     tokens = new QrTokenService(clock);
     const courses = new InMemoryCourseRepository([{ id: 'c1', code: 'I2SE', name: 'הנדסת תוכנה', lecturerId: 'lect1' }]);
-    svc = new SessionService(new InMemoryRepository<Session>(), courses, tokens, clock);
+    headcounts = new InMemoryHeadcountRepository();
+    svc = new SessionService(new InMemoryRepository<Session>(), courses, tokens, clock, headcounts);
+  });
+
+  it('end purges the clear class photos but keeps the blurred ones', async () => {
+    const s = await svc.start('lect1', input);
+    const hc = await headcounts.create(
+      { sessionId: s.id, peopleCount: 3, confidence: 1, boxes: [], checkinsAtSnap: 3, createdAt: T0 },
+      { photo: Buffer.from('clear'), blurred: Buffer.from('blur') },
+    );
+    await svc.end(s);
+    expect(headcounts.items.get(hc.id)?.photo).toBeNull();
+    expect(await headcounts.getBlurred(hc.id)).toEqual(Buffer.from('blur'));
   });
 
   it('start creates an active session with location and a fresh secret', async () => {

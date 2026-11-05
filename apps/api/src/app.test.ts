@@ -1,21 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
-import type { Session } from './attendance/types.js';
-import { buildContainer } from './container.js';
-import { FixedClock } from './infra/Clock.js';
-import { CsvExporter } from './infra/export/CsvExporter.js';
-import { InMemoryRepository } from './infra/InMemoryRepository.js';
-import { InMemoryAttendanceRepository } from './infra/memory/InMemoryAttendanceRepository.js';
-import { InMemoryCourseRepository } from './infra/memory/InMemoryCourseRepository.js';
-import type { UserIdentity } from './infra/pb/pbClient.js';
-import { CLASSROOM, north, T0 } from './test/fixtures.js';
-
-const USERS: Record<string, UserIdentity> = {
-  lect: { id: 'lect1', name: 'ד״ר לוי', email: 'l@x', role: 'lecturer', studentNumber: '' },
-  dana: { id: 'u1', name: 'דנה כהן', email: 'd@x', role: 'student', studentNumber: '111111111' },
-  avi: { id: 'u2', name: 'אבי', email: 'a@x', role: 'student', studentNumber: '222222222' },
-  fresh: { id: 'u3', name: 'חדש', email: 'n@x', role: 'student', studentNumber: '' },
-};
+import type { FixedClock } from './infra/Clock.js';
+import { CLASSROOM, north } from './test/fixtures.js';
+import { makeTestPorts, type USERS } from './test/testContainer.js';
 
 describe('HTTP: attendance end-to-end (in-memory adapters)', () => {
   let clock: FixedClock;
@@ -37,18 +24,9 @@ describe('HTTP: attendance end-to-end (in-memory adapters)', () => {
   const qr = async (id: string) => (await call('lect', 'GET', `/sessions/${id}/qr`)).body.token as string;
 
   beforeEach(() => {
-    clock = new FixedClock(T0);
-    app = createApp(
-      buildContainer({
-        clock,
-        attendanceRepo: new InMemoryAttendanceRepository(),
-        sessionRepo: new InMemoryRepository<Session>(),
-        courseRepo: new InMemoryCourseRepository([{ id: 'c1', code: 'I2SE', name: 'הנדסת תוכנה', lecturerId: 'lect1' }]),
-        exporters: new Map([['csv', new CsvExporter()]]),
-        resolveUser: async (t) => USERS[t] ?? null,
-        qrWindowSec: 10,
-      }),
-    );
+    const t = makeTestPorts();
+    clock = t.clock;
+    app = createApp(t.container);
   });
 
   it('health is public, everything else needs auth', async () => {

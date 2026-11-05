@@ -74,6 +74,15 @@ npm run test:int -w apps/api  # integration tests against the running PocketBase
 
 **Google sign-in for students:** in the PocketBase admin, open *users → Options → OAuth2 → Google* and enter the client ID and secret from Google Cloud. Add `https://<pb-host>/api/oauth2-redirect` as an authorized redirect URI.
 
+### Anti-fraud flow (M4)
+1. On the dashboard, **📷 צילום כיתה** (class photo): take or upload a photo of the room. AI (Gemini, or the mock) returns the people count and person boxes; the server blurs a copy. The dashboard shows "~N in the photo · M registered" and warns when check-ins exceed the count.
+2. **בדיקה ויזואלית** (visual check, 45 s): every checked-in phone shows the *blurred* photo and the student taps where they sit. The lecturer watches a live heatmap on the clear photo.
+3. **Roll-call** (30 s): the projector turns red with a new rotating QR, and students in the room re-scan it.
+4. When time runs out, each student gets a verdict: `ok`, `empty_seat`, `collision` or `no_response`. Every non-ok record is flagged in the table, and the lecturer chooses **keep** or **remove**.
+5. Privacy: no face recognition, and only the blurred photo ever reaches students. The clear photo is deleted when the session ends.
+
+Real AI: set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY=…` in `.env`. Without them the mock detector is used, which finds 3 people.
+
 ### Attendance flow (M3)
 1. The lecturer signs in at `/dash`, then clicks **Start session**. The browser location becomes the classroom centre.
 2. **Projector** (`/projector/:id`) shows a QR code with a new HMAC token every 10 s. Each token is valid for ≤20 s.

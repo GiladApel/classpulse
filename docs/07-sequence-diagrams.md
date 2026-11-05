@@ -81,7 +81,7 @@ sequenceDiagram
   L->>API: POST /challenges {type: visual_ping, headcountId}
   API->>CM: launch(sessionId, visual_ping, headcountId)
   CM->>CM: ChallengeFactory.create() -> VisualPingChallenge
-  CM->>CM: challenge.start(now)  [pending -> active]
+  CM->>CM: challenge.start(now, 45)  [pending -> active]
   CM->>PB: create challenges {active, blurred_image, expires_at = now + 45 s}
   PB--)S: realtime "create" (listRule: checked-in students only)
   PB--)L: realtime "create" -> clear photo + heatmap layer
@@ -90,7 +90,7 @@ sequenceDiagram
     S->>S: show blurred photo + countdown, student taps seat
     S->>API: POST /challenges/:id/responses {x, y}
     API->>CM: submitResponse(challengeId, studentId, tap)
-    CM->>CM: challenge.respond(r, eligible, now)
+    CM->>CM: challenge.accept(r, {eligible, alreadyAnswered, now})
     alt not active / not checked in / already answered
       CM-->>API: ChallengeError
       API-->>S: 409
@@ -130,7 +130,7 @@ sequenceDiagram
   PB--)P: realtime -> projector switches to roll-call QR
   S->>API: POST /challenges/:id/responses {token}
   API->>CM: submitResponse(...)
-  CM->>CM: validateResponse: token valid for this challenge?
+  CM->>CM: RollCallChallenge.validatePayload: token valid for this challenge?
   CM->>PB: create challenge_responses {rollcall_token_ok: true}
   CM->>CM: closeExpired(): evaluate() -> missing = no_response
   CM->>PB: flag missing students

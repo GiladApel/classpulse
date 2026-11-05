@@ -13,10 +13,11 @@ export class ApiError extends Error {
 }
 
 async function request(path: string, method: string, body?: unknown): Promise<Response> {
+  const isForm = body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${pb.authStore.token}` },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: { ...(isForm ? {} : { 'Content-Type': 'application/json' }), Authorization: `Bearer ${pb.authStore.token}` },
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
@@ -29,6 +30,7 @@ export const api = {
   get: async <T>(path: string) => (await request(path, 'GET')).json() as Promise<T>,
   post: async <T>(path: string, body?: unknown) => (await request(path, 'POST', body ?? {})).json() as Promise<T>,
   del: async <T>(path: string) => (await request(path, 'DELETE')).json() as Promise<T>,
+  upload: async <T>(path: string, form: FormData) => (await request(path, 'POST', form)).json() as Promise<T>,
   /** Downloads a file response, or returns the JSON body when the server answers with a link. */
   async download(path: string): Promise<{ url?: string }> {
     const res = await request(path, 'GET');
@@ -44,6 +46,7 @@ export const api = {
 
 export interface RecordDto {
   id: string;
+  sessionId?: string;
   studentNumber: string;
   studentName: string;
   checkedInAt: string;

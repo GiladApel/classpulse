@@ -1,5 +1,6 @@
 // Creates (or reuses) a lecturer account and a course. Usage:
 //   npm run seed -w apps/api -- <lecturer-email> <lecturer-password> "<lecturer name>" <course-code> "<course name>"
+import type { RecordModel } from 'pocketbase';
 import { createSuperuserClient } from '../src/infra/pb/pbClient.js';
 
 try {
@@ -27,8 +28,9 @@ const lecturer = existing
   : await users.create({ email, password, passwordConfirm: password, name, role: 'lecturer', verified: true });
 
 const courses = pb.collection('courses');
-const course =
-  (await courses.getFirstListItem(pb.filter('code = {:c} && lecturer = {:l}', { c: code, l: lecturer.id })).catch(() => null)) ??
-  (await courses.create({ code, name: courseName, lecturer: lecturer.id }));
+const existingCourse = await courses
+  .getFirstListItem(pb.filter('code = {:c} && lecturer = {:l}', { c: code, l: lecturer.id }))
+  .catch(() => null);
+const course = existingCourse ?? (await courses.create<RecordModel>({ code, name: courseName, lecturer: lecturer.id }));
 
 console.log(`Lecturer ${lecturer.email} (${lecturer.id}) → course ${course.code} (${course.id})`);
