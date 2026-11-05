@@ -7,9 +7,14 @@ export interface TokenClaims {
   window: number;
 }
 
+const TOKEN_MESSAGES = {
+  TOKEN_EXPIRED: 'הקוד פג תוקף — סרקו שוב את הקוד שעל הלוח',
+  TOKEN_INVALID: 'קוד לא תקין',
+} as const;
+
 export class TokenError extends DomainError {
-  constructor(code: 'TOKEN_INVALID' | 'TOKEN_EXPIRED') {
-    super(code, code);
+  constructor(code: keyof typeof TOKEN_MESSAGES) {
+    super(code, TOKEN_MESSAGES[code]);
   }
 }
 

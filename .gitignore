@@ -5,3 +5,7 @@ pocketbase/pb_data/
 *.log
 *.tsbuildinfo
 secrets/
+loadtest/.fixture.json
+test-results/
+playwright-report/
+coverage/

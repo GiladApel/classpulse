@@ -7,10 +7,12 @@
     "build": "tsc -p .",
     "start": "node dist/index.js",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "seed": "tsx scripts/seed.ts",
     "setup:oauth": "tsx scripts/setup-google-oauth.ts",
     "test:int": "vitest run -c vitest.int.config.ts",
-    "typecheck": "tsc -p tsconfig.test.json"
+    "typecheck": "tsc -p tsconfig.test.json",
+    "loadtest": "tsx scripts/loadtest.ts"
   },
   "dependencies": {
     "@google/genai": "^2.32.0",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.1.0",
     "eventsource": "^5.1.4",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",

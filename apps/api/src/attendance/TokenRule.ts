@@ -11,9 +11,7 @@ export class TokenRule implements CheckInRule {
       return pass();
     } catch (e) {
       if (!(e instanceof TokenError)) throw e;
-      return e.code === 'TOKEN_EXPIRED'
-        ? reject('TOKEN_EXPIRED', 'הקוד פג תוקף — סרקו שוב את הקוד שעל הלוח')
-        : reject('TOKEN_INVALID', 'קוד לא תקין');
+      return reject(e.code, e.message);
     }
   }
 }

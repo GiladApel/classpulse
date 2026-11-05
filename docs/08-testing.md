@@ -10,7 +10,7 @@
 | Load | k6 | 80 check-ins within 30 s; 80 realtime subscribers | Milestone 3 and before the demo |
 | Manual / field | Real phones in a classroom | QR from the back row, GPS, blur, the whole demo script | Dry run one week before the demo |
 
-**Coverage target:** ≥80% of lines in `attendance/`, `challenge/`, `engagement/` and `content/` (NFR-07). AI vendor adapters (`GeminiProvider`, `ClaudeProvider`) are covered by contract tests, not unit tests.
+**Coverage target:** ≥80% of lines in `attendance/`, `challenge/`, `engagement/` and `content/` (NFR-07). Measured with `npm run coverage -w apps/api` (the threshold fails the run below 80%): **99.1% of lines**, 96.6% of statements, 88.5% of branches (2026-11-05). AI vendor adapters (`GeminiProvider`, `ClaudeProvider`) are covered by contract tests, not unit tests.
 
 ## 2. Test design per class
 
@@ -67,8 +67,10 @@ Coverage key: **U** = unit test, **C** = contract test, **I** = integration test
 | Access rules (M6) | unpublished summary lecturer-only; published summary readable by every course participant (even one who missed that lecture), not by outsiders; text extract and fingerprint hidden; students see only their own submissions and can download their own file; `similar_pairs` unreadable through PocketBase, even by the lecturer | I | VS-05, HW-03, 04, NFR-04 |
 
 ## 3. E2E scenarios (Playwright, `LLM_PROVIDER=mock`)
+Implemented in `e2e/` (`npm run e2e`): scenarios 1, 2, 3, 4 and 6 run on Edge with iPhone 13 and Pixel 7 emulation for the phones and a desktop window for the lecturer. The suite starts its own API (mock provider, 3 s QR windows so expiry takes seconds, not minutes) and Vite instance next to the real PocketBase, and creates and deletes its own lecturer, course and students. Scenarios 5 and 7 need the real model, so they run as Puppeteer scripts with Gemini.
+
 1. **Happy check-in:** the lecturer starts a session, a student opens the token URL, the student sees ✅, and the dashboard row appears within 1 s.
-2. **Expired token:** opening a 25-second-old token URL shows the expiry message.
+2. **Expired token:** opening a token older than two QR windows shows the expiry message; a malformed token shows "invalid code" (this caught the raw `TOKEN_INVALID` code leaking to students).
 3. **Strict geofence:** a mocked location 300 m away is rejected; in lenient mode it is accepted and flagged.
 4. **Visual Ping:** 3 student contexts check in; the lecturer uploads a fixture photo; the mock returns 2 boxes; 2 students tap inside the boxes and 1 taps an empty area; after expiry exactly 1 record is flagged as `empty_seat`.
 5. **Backchannel + poll** (implemented as a Puppeteer script during M5, real Gemini): 4 phones check in; 2 press "I'm lost" → dashboard shows 2 of 4; 3 posts (2 anonymous) and upvotes appear live; AI groups them into themes; AI drafts 3 questions from slide text; the lecturer opens one; 4 phones vote; the projector shows live bars, then the revealed answer; a template poll replaces it. Every page is also reloaded mid-flow to check that initial loads (not just realtime events) show the data.
@@ -76,8 +78,9 @@ Coverage key: **U** = unit test, **C** = contract test, **I** = integration test
 7. **Summary + homework** (implemented as a Puppeteer script during M6, real Gemini): 5 phones check in, 2 press "I'm lost"; the lecturer uploads an 88 s Hebrew lecture video, sees the summary with the spike in the right chapter and publishes it; a student opens it from "My courses"; the lecturer creates an assignment; 5 students submit from their phones (one is a renamed copy); reviews arrive live; percentiles appear; the class analysis flags exactly the copied pair; no other student's name appears in a student's view.
 
 ## 4. Load test (k6)
-- **Script:** 80 virtual users, each with its own auth token, POST `/checkins` spread over 30 s, while 80 SSE subscribers listen to `attendance_records`.
-- **Pass criteria:** p95 < 500 ms, 0 errors, all 80 realtime events received (NFR-02).
+- **Script:** `loadtest/run.sh <baseUrl>`. `apps/api/scripts/loadtest.ts prepare` creates a lecturer, 80 students (each with its own auth token) and an active session. `listen` opens 80 PocketBase SSE subscriptions, one per student, each waiting for its own `attendance_records` event. `loadtest/checkin.js` (k6) starts each student at a random moment within 30 s; the student fetches the QR the projector currently shows, then POSTs `/checkins`. `cleanup` deletes the course and the accounts.
+- **Pass criteria:** p95 < 500 ms, 0 errors, all 80 realtime events received (NFR-02). Latency is read server-side from the nginx log (`SSH_HOST=do-server`), so it does not depend on where the test runs from.
+- **Result (production server, 2026-11-05):** 80/80 check-ins, 0 errors; server-side p50 52 ms, **p95 183 ms**, max 282 ms; 80/80 realtime events, p95 235 ms including the network. See T1 in the tools report.
 
 ## 5. Test doubles
 | Double | Replaces | Purpose |

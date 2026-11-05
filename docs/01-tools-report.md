@@ -20,9 +20,9 @@
 ## 2. Field tests
 | # | Tool / question | Method | Result | Status |
 |---|-----------------|--------|--------|--------|
-| T1 | PocketBase realtime fan-out | k6: 80 virtual users subscribe, then 80 check-ins in 30 s | p95 latency, dropped events | ⏳ |
+| T1 | PocketBase realtime fan-out | Production server (1 vCPU, 1 GB RAM, shared with other apps). k6: 80 students check in at random moments over 30 s, each first fetching the live QR, while 80 PocketBase SSE subscribers (one per student) wait for their own record | **80/80 check-ins, 0 errors.** Server-side check-in latency (nginx `$request_time`): **p50 52 ms, p95 183 ms, max 282 ms.** **80/80 realtime events**, delivered p50 149 ms / p95 235 ms after the record was written (measured on the client, so the network is included). The whole stack used ~60 MB of RAM at rest | ✅ |
 | T2 | Gemini headcount accuracy | 8 real classroom photos vs manual count; also bounding-box quality | **1 photo so far:** 24 counted (stable over 3 runs) vs ~25–26 by eye; misses only people cut off at the frame edge. Boxes tight on back-row faces (~40 px) | 🔶 1/8 |
-| T3 | Gemini video summary | One real 75–90 min lecture | **Pilot:** an 88 s Hebrew lecture (Gemini TTS + ffmpeg mp4) through the Files API: 12–17 s end to end; 4 chapters whose timestamps (0:00 / 0:11 / 0:35 / 0:55) match the audio; 5 sensible review questions. The full-length lecture is still to be measured | 🔶 pilot |
+| T3 | Gemini video summary | A real 5–10 min lecture clip. A full 75–90 min lecture does not fit the free-tier Gemini quota; the pipeline itself has no length limit (2 GB upload in 50 MB chunks, Files API), so full lectures work subject to API quota | **Pilot:** an 88 s Hebrew lecture (Gemini TTS + ffmpeg mp4) through the Files API: 12–17 s end to end; 4 chapters whose timestamps (0:00 / 0:11 / 0:35 / 0:55) match the audio; 5 sensible review questions. The 5–10 min clip is still to be run | 🔶 pilot |
 | T4 | QR readability | 10 s rotating QR on the classroom projector, scanned from the back row with 3 phones | success rate, time to scan | ⏳ |
 | T5 | Indoor geolocation | 5 phones in the classroom vs the lecturer's position | median and max error (m), used to choose the default radius | ⏳ |
 | T6 | Blur strength | sharp σ = 15/25/35 on a class photo | lowest σ where faces are unidentifiable but seats are visible | ⏳ |

@@ -68,3 +68,17 @@ flowchart TB
 3. **Observer via PocketBase realtime.** PocketBase is the subject. Each client subscribes to the collections it displays, and an API write automatically notifies them. No custom websocket server is needed.
 4. **Composition root.** `container.ts` builds every object once and injects its dependencies. Swapping Gemini for Mock or Claude changes only configuration (`LLM_PROVIDER`).
 5. **Secrets stay server-side:** QR secrets, LLM keys and Google service-account credentials.
+
+## 4. Deployment
+```
+phone / projector ──HTTPS──► Cloudflare ──tunnel──► do-server 127.0.0.1:8092
+                                                    └─ nginx (web container)
+                                                        ├─ /        static PWA (apps/web/dist)
+                                                        ├─ /api/  → api container  (Hono, node:24-alpine)
+                                                        └─ /pb/   → pocketbase container (SQLite in ./pb_data)
+```
+- One public hostname, so the browser sees a single origin: no CORS, and the Vite dev proxy (`/api`) behaves the same in production. The web build sets `VITE_PB_URL=/pb`.
+- Only Cloudflare reaches the server; nothing listens on a public port. HTTPS (needed for the camera and geolocation) terminates at Cloudflare.
+- The PocketBase admin UI and superuser login are refused for requests that came through Cloudflare, so the admin is used only through an SSH tunnel.
+- `deploy/deploy.sh` builds locally, ships the build and migrations, and runs `docker compose up`. On the first run it creates the server `.env` with a fresh superuser password; secrets are piped over SSH and never printed.
+- Memory limits (PocketBase 160 MB, API 320 MB, nginx 48 MB) protect the other apps on the 1 GB server. The API is single-instance by design (in-memory job queue and locks).

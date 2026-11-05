@@ -59,6 +59,8 @@ docs/         design artifacts (see below)
 8. [Testing strategy](docs/08-testing.md)
 9. Conclusion *(after demo)*
 
+[Demo script](docs/demo-script.md): the 10-minute run sheet, fallbacks, and the field tests to run during the dry run.
+
 ## Run locally
 
 ```bash
@@ -71,6 +73,16 @@ npm run dev:web               # http://127.0.0.1:5173  (Vite proxies /api → 87
 npm test                      # unit + HTTP tests (in-memory, no PocketBase needed)
 npm run test:int -w apps/api  # integration tests against the running PocketBase
 ```
+
+E2E and load tests:
+```bash
+npm run e2e                                   # Playwright (docs/08 §3); needs the local PocketBase, starts its own API + Vite
+SSH_HOST=do-server PB_ADMIN_URL=http://127.0.0.1:18092/pb loadtest/run.sh https://<host> 80   # k6 + 80 SSE listeners (docs/08 §4)
+```
+
+## Deploy
+
+`deploy/deploy.sh` (Git Bash) builds the API and the web app, copies them with the migrations to `do-server:/opt/classpulse`, and runs the stack in `deploy/docker-compose.yml`: PocketBase, the API and nginx on `127.0.0.1:8092`. Point a Cloudflare tunnel hostname at that port. In the Google OAuth client, add the redirect URI `https://<host>/pb/api/oauth2-redirect`. Use the PocketBase admin through an SSH tunnel (`ssh -L 18092:127.0.0.1:8092 do-server`, then http://127.0.0.1:18092/pb/_/), since it is blocked through Cloudflare.
 
 **Google sign-in for students:** in the PocketBase admin, open *users → Options → OAuth2 → Google* and enter the client ID and secret from Google Cloud. Add `https://<pb-host>/api/oauth2-redirect` as an authorized redirect URI.
 

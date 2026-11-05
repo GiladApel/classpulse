@@ -1,0 +1,39 @@
+# Production stack on do-server (/opt/classpulse). One public hostname via the Cloudflare tunnel → 127.0.0.1:8092.
+name: classpulse
+services:
+  pocketbase:
+    build: { context: ., dockerfile: pocketbase.Dockerfile }
+    image: classpulse-pb
+    restart: unless-stopped
+    mem_limit: 160m
+    volumes:
+      - ./pb_data:/pb/pb_data
+      - ./pb_migrations:/pb/pb_migrations:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/api/health"]
+      interval: 10s
+      retries: 6
+
+  api:
+    build: { context: ./src, dockerfile: apps/api/Dockerfile }
+    image: classpulse-api
+    restart: unless-stopped
+    mem_limit: 320m
+    env_file: .env
+    environment:
+      PB_URL: http://pocketbase:8090
+      GOOGLE_SERVICE_ACCOUNT_FILE: /run/secrets/google-sa.json
+    volumes:
+      - ./secrets/google-sa.json:/run/secrets/google-sa.json:ro
+    depends_on:
+      pocketbase: { condition: service_healthy }
+
+  web:
+    image: nginx:alpine
+    restart: unless-stopped
+    mem_limit: 48m
+    ports: ["127.0.0.1:8092:80"]
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [api, pocketbase]

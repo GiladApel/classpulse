@@ -4,5 +4,5 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { proxy: { '/api': { target: 'http://127.0.0.1:8787', rewrite: (p) => p.replace(/^\/api/, '') } } },
+  server: { proxy: { '/api': { target: process.env.API_PROXY ?? 'http://127.0.0.1:8787', rewrite: (p) => p.replace(/^\/api/, '') } } },
 });
