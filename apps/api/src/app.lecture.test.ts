@@ -29,23 +29,18 @@ describe('HTTP: lecture page content after the lecture', () => {
     app = createApp(makeTestPorts().container);
   });
 
-  it('practice: lecturer adds after the end; a participant who missed it answers once; an outsider cannot', async () => {
+  it('practice: the lecturer publishes and deletes open questions after the end; students cannot', async () => {
     const s1 = await lecture('dana');
-    await lecture('avi'); // avi is in the course but missed s1; rina never attended
 
-    expect((await request('dana', 'POST', `/sessions/${s1}/practice`, { question: 'q', options: ['a', 'b'], correctIndex: 0 })).status).toBe(403);
-    const q = await request('lect', 'POST', `/sessions/${s1}/practice`, { question: 'מה מבטיח DIP?', options: ['תלות בממשקים', 'ירושה'], correctIndex: 0, source: 'ai' });
-    expect(q.status).toBe(201);
-    expect(q.body).toMatchObject({ correctIndex: 0, source: 'ai' });
+    expect((await request('dana', 'POST', `/sessions/${s1}/practice`, { question: 'q' })).status).toBe(403);
+    expect((await request('lect', 'POST', `/sessions/${s1}/practice`, { question: 'x'.repeat(301) })).status).toBe(400);
+    expect((await request('lect', 'POST', `/sessions/${s1}/practice`, { question: 'q', source: 'other' })).status).toBe(400);
+    const q = await request('lect', 'POST', `/sessions/${s1}/practice`, { question: 'במה שונה State מ-Strategy?', source: 'ai' });
+    expect(q).toEqual({ status: 201, body: { id: q.body.id, sessionId: s1, question: 'במה שונה State מ-Strategy?', source: 'ai' } });
 
-    expect(await request('avi', 'POST', `/practice/${q.body.id}/answers`, { optionIndex: 1 })).toEqual({ status: 201, body: { correct: false, correctIndex: 0 } });
-    expect((await request('avi', 'POST', `/practice/${q.body.id}/answers`, { optionIndex: 0 })).body.code).toBe('ALREADY_ANSWERED');
-    expect((await request('rina', 'POST', `/practice/${q.body.id}/answers`, { optionIndex: 0 })).body.code).toBe('NOT_IN_COURSE');
-
-    expect((await request('lect', 'GET', `/sessions/${s1}/practice`)).body.questions).toEqual([q.body]);
-    expect((await request('avi', 'GET', `/sessions/${s1}/practice`)).status).toBe(403);
+    expect((await request('dana', 'DELETE', `/practice/${q.body.id}`)).status).toBe(403);
     expect((await request('lect', 'DELETE', `/practice/${q.body.id}`)).status).toBe(200);
-    expect((await request('avi', 'POST', `/practice/${q.body.id}/answers`, { optionIndex: 0 })).status).toBe(404);
+    expect((await request('lect', 'DELETE', `/practice/${q.body.id}`)).status).toBe(404);
   });
 
   it('practice drafts from the slide deck: PDF or image only, lecturer of the session only', async () => {
@@ -59,7 +54,6 @@ describe('HTTP: lecture page content after the lecture', () => {
     const drafts = await request('lect', 'POST', `/sessions/${s1}/practice/drafts`, pdf);
     expect(drafts.status).toBe(200);
     expect(drafts.body.drafts).toHaveLength(8);
-    expect((await request('lect', 'GET', `/sessions/${s1}/practice`)).body.questions).toEqual([]);
     expect((await request('dana', 'POST', `/sessions/${s1}/practice/drafts`, pdf)).status).toBe(403);
     expect((await request('lect', 'POST', `/sessions/${s1}/practice/drafts`, new FormData())).status).toBe(400);
     const pptx = deck(new File(['x'], 'l.pptx', { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));

@@ -80,8 +80,8 @@
 | ID | Requirement |
 |----|-------------|
 | FR-LP-01 | Every lecture has a page for every course participant, including students who missed it: published summary, materials, practice questions, the closed polls with results, and the questions with answers. Posting and upvoting stay limited to students checked in to that lecture. |
-| FR-LP-02 | During or after the lecture, the lecturer adds multiple-choice practice questions, written by hand or drafted by the AI from the lecture's slide deck (PDF or image, ≤50 MB): up to 8 drafts, of which the lecturer adds the ones they select. A student answers each once and then sees the correct answer; the correct answer is never readable before that. |
-| FR-LP-03 | During or after the lecture, the lecturer attaches files (≤50 MB) and links. Files are downloadable only by course participants. |
+| FR-LP-02 | During or after the lecture, the lecturer publishes open review questions (no answer options), written by hand or drafted by the AI from the lecture's slide deck (PDF or image, ≤50 MB): up to 8 drafts, of which the lecturer publishes the ones they select. Students read them on the lecture page; there is nothing to submit. |
+| FR-LP-03 | During or after the lecture, the lecturer attaches files or images (≤50 MB; one button opens the file picker and uploads at once) and links. Files are downloadable only by course participants. |
 | FR-LP-04 | The lecturer can write an answer under a student's question, during or after the lecture; it marks the question answered. |
 
 ### F8: Lecture feedback

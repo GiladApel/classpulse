@@ -2,7 +2,7 @@ import type { RecordModel } from 'pocketbase';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { pb } from '../lib/pb';
-import { currentPoll, type PollRecord, type PostRecord, tally, useLiveRecords, useTick } from '../lib/useLiveRecords';
+import { type PollRecord, type PostRecord, tally, useLiveRecords } from '../lib/useLiveRecords';
 import PollBars from './PollBars';
 import { Button, Card, ErrorText, inputClass } from './ui';
 
@@ -22,7 +22,7 @@ const message = (e: unknown) => (e instanceof ApiError ? e.message : 'שגיאה
 
 export default function EngagementPanel({ sessionId, active }: { sessionId: string; active: boolean }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid items-start gap-4 lg:grid-cols-2">
       <div className="flex flex-col gap-4">
         {active && <ConfusionCard sessionId={sessionId} />}
         <PollManager sessionId={sessionId} active={active} />
@@ -68,9 +68,9 @@ function ConfusionCard({ sessionId }: { sessionId: string }) {
 }
 
 function PollManager({ sessionId, active }: { sessionId: string; active: boolean }) {
-  useTick(5000);
   const polls = useLiveRecords<PollRecord>('polls', pb.filter('session = {:s}', { s: sessionId }));
-  const shown = currentPoll(polls, 3600);
+  // Only the open poll; once closed its results live on the projector and the lecture page.
+  const shown = polls.find((p) => p.status === 'open');
   const votes = useLiveRecords<RecordModel & { option_index: number }>('poll_votes', pb.filter('poll = {:p}', { p: shown?.id ?? '' }), '', !!shown);
   // correct_index is hidden from PB reads; remember it from the API response of the poll we launched.
   const [answers, setAnswers] = useState<Record<string, number | null>>({});
@@ -112,8 +112,6 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
 
   const close = (id: string) => run('close', () => api.post(`/polls/${id}/close`));
 
-  const counts = shown ? (shown.status === 'closed' && shown.results ? shown.results.counts : tally(shown.options, votes)) : [];
-  const correct = shown ? (shown.status === 'closed' ? shown.answer_index : (answers[shown.id] ?? -1)) : -1;
 
   return (
     <Card>
@@ -123,17 +121,13 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
         <div className="mb-4 rounded-xl border border-slate-200 p-3">
           <div className="mb-2 flex items-start justify-between gap-2">
             <p className="font-medium">{shown.question}</p>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${shown.status === 'open' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600'}`}>
-              {shown.status === 'open' ? `פתוח · ${votes.length} הצבעות` : 'נסגר'}
-            </span>
+            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">פתוח · {votes.length} הצבעות</span>
           </div>
-          {/* While open, the lecturer sees the answer marked; students and the projector see it only after close. */}
-          <PollBars options={shown.options} counts={counts} correctIndex={correct ?? -1} />
-          {shown.status === 'open' && (
-            <Button className="mt-3 w-full" onClick={() => close(shown.id)} disabled={busy === 'close'}>
-              סגירה וחשיפת התשובה
-            </Button>
-          )}
+          {/* The lecturer sees the answer marked; students and the projector see it only after close. */}
+          <PollBars options={shown.options} counts={tally(shown.options, votes)} correctIndex={answers[shown.id] ?? -1} />
+          <Button className="mt-3 w-full" onClick={() => close(shown.id)} disabled={busy === 'close'}>
+            סגירה וחשיפת התשובה
+          </Button>
         </div>
       )}
 

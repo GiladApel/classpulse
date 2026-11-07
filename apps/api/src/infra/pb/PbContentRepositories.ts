@@ -5,7 +5,6 @@ import type {
   FileInput,
   InsightsRepository,
   MaterialRepository,
-  PracticeAnswerRepository,
   PracticeQuestionRepository,
   RecordingRepository,
   SubmissionRepository,
@@ -15,7 +14,6 @@ import type {
   AssignmentInsights,
   LectureSummary,
   Material,
-  PracticeAnswer,
   PracticeQuestion,
   Recording,
   Review,
@@ -216,10 +214,6 @@ export class PbPracticeQuestionRepository extends PbRepository<PracticeQuestion>
     super(pb, 'practice_questions');
   }
 
-  async listBySession(sessionId: string) {
-    return (await this.col.getFullList({ filter: this.pb.filter('session = {:s}', { s: sessionId }), sort: 'created_at' })).map((r) => this.toEntity(r));
-  }
-
   async delete(id: string) {
     await this.col.delete(id);
   }
@@ -229,8 +223,6 @@ export class PbPracticeQuestionRepository extends PbRepository<PracticeQuestion>
       id: r.id,
       sessionId: r.session,
       question: r.question,
-      options: r.options as string[],
-      correctIndex: r.correct_index,
       source: r.source,
       createdAt: toDate(r.created_at)!,
     };
@@ -240,45 +232,8 @@ export class PbPracticeQuestionRepository extends PbRepository<PracticeQuestion>
     return compact({
       session: d.sessionId,
       question: d.question,
-      options: d.options,
-      correct_index: d.correctIndex,
       source: d.source,
       created_at: d.createdAt?.toISOString(),
-    });
-  }
-}
-
-export class PbPracticeAnswerRepository extends PbRepository<PracticeAnswer> implements PracticeAnswerRepository {
-  constructor(pb: PocketBase) {
-    super(pb, 'practice_answers');
-  }
-
-  find(questionId: string, studentNumber: string) {
-    return this.first('question = {:q} && student_number = {:n}', { q: questionId, n: studentNumber });
-  }
-
-  protected toEntity(r: RecordModel): PracticeAnswer {
-    return {
-      id: r.id,
-      questionId: r.question,
-      studentId: r.student || undefined,
-      studentNumber: r.student_number,
-      optionIndex: r.option_index,
-      correct: r.correct,
-      correctIndex: r.correct_index,
-      answeredAt: toDate(r.answered_at)!,
-    };
-  }
-
-  protected toRecord(d: Partial<Omit<PracticeAnswer, 'id'>>) {
-    return compact({
-      question: d.questionId,
-      student: d.studentId,
-      student_number: d.studentNumber,
-      option_index: d.optionIndex,
-      correct: d.correct,
-      correct_index: d.correctIndex,
-      answered_at: d.answeredAt?.toISOString(),
     });
   }
 }

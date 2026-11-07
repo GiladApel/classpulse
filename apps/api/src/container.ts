@@ -4,6 +4,7 @@ import { LectureSummarizer } from './ai/LectureSummarizer.js';
 import type { LLMProvider } from './ai/LLMProvider.js';
 import { LLMProviderFactory } from './ai/LLMProviderFactory.js';
 import { McqGenerator } from './ai/McqGenerator.js';
+import { PracticeQuestionGenerator } from './ai/PracticeQuestionGenerator.js';
 import { PeopleDetector } from './ai/PeopleDetector.js';
 import { AttendanceExportService } from './attendance/AttendanceExportService.js';
 import { AttendanceService } from './attendance/AttendanceService.js';
@@ -25,7 +26,6 @@ import type {
   AssignmentRepository,
   InsightsRepository,
   MaterialRepository,
-  PracticeAnswerRepository,
   PracticeQuestionRepository,
   RecordingRepository,
   SubmissionRepository,
@@ -59,7 +59,6 @@ import {
   PbAssignmentRepository,
   PbInsightsRepository,
   PbMaterialRepository,
-  PbPracticeAnswerRepository,
   PbPracticeQuestionRepository,
   PbRecordingRepository,
   PbSubmissionRepository,
@@ -115,7 +114,6 @@ export interface Ports {
   submissionRepo: SubmissionRepository;
   insightsRepo: InsightsRepository;
   practiceRepo: PracticeQuestionRepository;
-  practiceAnswerRepo: PracticeAnswerRepository;
   materialRepo: MaterialRepository;
   uploads: UploadStore;
   exporters: Map<ExportFormat, SpreadsheetExporter>;
@@ -139,7 +137,6 @@ export function buildContainer(p: Ports): Container {
   const attendance = new AttendanceService(rules, p.attendanceRepo, p.clock);
   const confusion = new ConfusionMeter(p.lostRepo, attendance, p.clock);
   const queue = new BackgroundQueue();
-  const mcq = new McqGenerator(p.llm);
   return {
     clock: p.clock,
     tokens,
@@ -160,7 +157,7 @@ export function buildContainer(p: Ports): Container {
     confusion,
     feed: new FeedService(p.postRepo, p.postVoteRepo, attendance, new FeedClusterer(p.llm), p.clock),
     feedback: new FeedbackService(p.feedbackRepo, attendance, p.clock),
-    polls: new PollService(p.pollRepo, p.pollVoteRepo, attendance, mcq, p.clock),
+    polls: new PollService(p.pollRepo, p.pollVoteRepo, attendance, new McqGenerator(p.llm), p.clock),
     recordings: new RecordingPipeline(p.recordingRepo, p.uploads, new LectureSummarizer(p.llm), confusion, attendance, queue, p.clock),
     homework: new HomeworkAnalysisService(
       p.assignmentRepo,
@@ -172,7 +169,7 @@ export function buildContainer(p: Ports): Container {
       queue,
       p.clock,
     ),
-    practice: new PracticeService(p.practiceRepo, p.practiceAnswerRepo, attendance, mcq, p.clock),
+    practice: new PracticeService(p.practiceRepo, new PracticeQuestionGenerator(p.llm), p.clock),
     materials: new MaterialService(p.materialRepo, p.clock),
     queue,
     resolveUser: p.resolveUser,
@@ -207,7 +204,6 @@ export async function buildProductionContainer(cfg: Config): Promise<Container> 
     submissionRepo: new PbSubmissionRepository(pb),
     insightsRepo: new PbInsightsRepository(pb),
     practiceRepo: new PbPracticeQuestionRepository(pb),
-    practiceAnswerRepo: new PbPracticeAnswerRepository(pb),
     materialRepo: new PbMaterialRepository(pb),
     uploads: new UploadStore(),
     exporters,

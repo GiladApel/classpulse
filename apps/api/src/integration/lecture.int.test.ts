@@ -49,21 +49,15 @@ describe('Integration: lecture page access against real PocketBase', () => {
     await h.call(h.lecturer, 'POST', `/polls/${open.id}/close`);
   });
 
-  it('practice: correct_index hidden until the student answers; answers are private', async () => {
+  it('practice: open questions are read by every course participant, not by outsiders, and written only through the API', async () => {
     await h.call(h.lecturer, 'POST', `/sessions/${s1}/end`);
-    const q = (await h.call(h.lecturer, 'POST', `/sessions/${s1}/practice`, { question: 'DIP?', options: ['ממשקים', 'ירושה'], correctIndex: 0 })).body;
+    const q = (await h.call(h.lecturer, 'POST', `/sessions/${s1}/practice`, { question: 'למה DIP מקל על בדיקות?' })).body;
 
     const [seen] = await list(missed, 'practice_questions');
-    expect(seen.id).toBe(q.id);
-    expect(seen.correct_index).toBeUndefined();
+    expect(seen).toMatchObject({ id: q.id, question: 'למה DIP מקל על בדיקות?', source: 'manual' });
+    expect(seen.options).toBeUndefined();
     expect(await list(outsider, 'practice_questions')).toEqual([]);
-
-    expect((await h.call(missed, 'POST', `/practice/${q.id}/answers`, { optionIndex: 1 })).body).toEqual({ correct: false, correctIndex: 0 });
-    const mine = await missed.pb.collection('practice_answers').getFullList({ filter: `question = "${q.id}"` });
-    expect(mine).toHaveLength(1);
-    expect(mine[0]).toMatchObject({ option_index: 1, correct: false, correct_index: 0 });
-    expect(await attended.pb.collection('practice_answers').getFullList({ filter: `question = "${q.id}"` })).toEqual([]);
-    await expect(missed.pb.collection('practice_answers').create({ question: q.id, student_number: '1', option_index: 0, answered_at: new Date().toISOString() })).rejects.toMatchObject({
+    await expect(missed.pb.collection('practice_questions').create({ session: s1, question: 'x', source: 'manual', created_at: new Date().toISOString() })).rejects.toMatchObject({
       status: 403,
     });
   });

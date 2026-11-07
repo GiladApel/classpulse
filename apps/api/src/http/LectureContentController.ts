@@ -4,17 +4,13 @@ import { MAX_MATERIAL_BYTES, type MaterialService } from '../content/MaterialSer
 import type { PracticeService } from '../content/PracticeService.js';
 import type { Material, PracticeQuestion } from '../content/types.js';
 import { type AppEnv, requireLecturer } from './auth.js';
-import { participant } from './EngagementController.js';
 import { ValidationError } from './errors.js';
-import { jsonBody, num, oneOf, str } from './validate.js';
+import { jsonBody, oneOf, str } from './validate.js';
 
-/** For the lecturer: includes the correct answer, which a student only gets in their own answer record. */
 export const practiceDto = (q: PracticeQuestion) => ({
   id: q.id,
   sessionId: q.sessionId,
   question: q.question,
-  options: q.options,
-  correctIndex: q.correctIndex,
   source: q.source,
 });
 
@@ -28,7 +24,7 @@ export const materialDto = (m: Material) => ({
   addedAt: m.addedAt.toISOString(),
 });
 
-/** What the lecturer adds to a lecture page (practice questions, materials) and what students do with it. */
+/** What the lecturer adds to a lecture page: open practice questions and materials. Students read them from PocketBase. */
 export class LectureContentController {
   constructor(
     private readonly practice: PracticeService,
@@ -42,12 +38,8 @@ export class LectureContentController {
     app.post('/sessions/:id/practice', requireLecturer, async (c) => {
       const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
       const b = await jsonBody(c.req);
-      if (!Array.isArray(b.options) || !b.options.every((o) => typeof o === 'string' && o.length <= 120)) {
-        throw new ValidationError('options must be an array of strings (≤120 chars)');
-      }
       const source = b.source === undefined ? 'manual' : oneOf(b, 'source', ['manual', 'ai'] as const);
-      const draft = { question: str(b, 'question', { max: 300 }), options: b.options as string[], correctIndex: num(b, 'correctIndex', 0, 5) };
-      return c.json(practiceDto(await this.practice.add(session, draft, source)), 201);
+      return c.json(practiceDto(await this.practice.add(session, str(b, 'question', { max: 300 }), source)), 201);
     });
 
     // Multipart "deck": the lecture's slides as a PDF (or one image). Returns drafts only; the lecturer adds the ones they want.
@@ -60,24 +52,11 @@ export class LectureContentController {
       return c.json({ drafts: await this.practice.draftFromLecture({ mimeType: deck.type, data: Buffer.from(await deck.arrayBuffer()) }) });
     });
 
-    app.get('/sessions/:id/practice', requireLecturer, async (c) => {
-      const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
-      return c.json({ questions: (await this.practice.list(session.id)).map(practiceDto) });
-    });
-
     app.delete('/practice/:id', requireLecturer, async (c) => {
       const q = await this.practice.get(c.req.param('id'));
       await this.sessions.getOwned(q.sessionId, c.get('user').id);
       await this.practice.remove(q.id);
       return c.json({ ok: true });
-    });
-
-    app.post('/practice/:id/answers', async (c) => {
-      const q = await this.practice.get(c.req.param('id'));
-      const session = await this.sessions.get(q.sessionId);
-      const b = await jsonBody(c.req);
-      const a = await this.practice.answer(session, q.id, participant(c.get('user')), num(b, 'optionIndex', 0, 5));
-      return c.json({ correct: a.correct, correctIndex: a.correctIndex }, 201);
     });
 
     // Multipart {file, title?} for a file, JSON {url, title?} for a link.

@@ -6,8 +6,7 @@ import PollBars from '../components/PollBars';
 import { Feed } from '../components/StudentLivePanel';
 import SummaryView from '../components/SummaryView';
 import { Card, ErrorText } from '../components/ui';
-import { api, ApiError } from '../lib/api';
-import type { MaterialRecord, PracticeAnswerRecord, PracticeRecord, RecordingRecord } from '../lib/content';
+import type { MaterialRecord, PracticeRecord, RecordingRecord } from '../lib/content';
 import { parseDate } from '../lib/device';
 import { pb } from '../lib/pb';
 import { type PollRecord, useLiveRecords } from '../lib/useLiveRecords';
@@ -78,12 +77,12 @@ export default function LecturePage() {
       {practice.length > 0 && (
         <Card>
           <h2 className="mb-1 font-semibold">שאלות לתרגול</h2>
-          <p className="mb-3 text-xs text-slate-500">ניסיון אחד לכל שאלה — אחריו תראו את התשובה הנכונה.</p>
-          <div className="flex flex-col gap-4">
+          <p className="mb-3 text-xs text-slate-500">שאלות לחזרה על החומר — נסו לענות לעצמכם.</p>
+          <ol className="flex list-decimal flex-col gap-2 ps-5">
             {practice.map((q) => (
-              <PracticeCard key={q.id} question={q} userId={userId} />
+              <li key={q.id}>{q.question}</li>
             ))}
-          </div>
+          </ol>
         </Card>
       )}
 
@@ -128,48 +127,5 @@ function MaterialLink({ material: m }: { material: MaterialRecord }) {
       {icon} {m.title}
       {m.filename !== m.title && <span className="text-xs text-slate-400">({m.filename})</span>}
     </button>
-  );
-}
-
-function PracticeCard({ question: q, userId }: { question: PracticeRecord; userId: string }) {
-  const mine = useLiveRecords<PracticeAnswerRecord>('practice_answers', pb.filter('question = {:q} && student = {:u}', { q: q.id, u: userId }))[0];
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const answer = async (i: number) => {
-    setError('');
-    setBusy(true);
-    try {
-      await api.post(`/practice/${q.id}/answers`, { optionIndex: i });
-    } catch (e) {
-      setError(e instanceof ApiError && e.status < 500 ? e.message : 'שגיאת רשת — נסו שוב');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="rounded-xl border border-slate-200 p-3">
-      <p className="mb-2 font-medium">{q.question}</p>
-      <div className="flex flex-col gap-2">
-        {q.options.map((o, i) => {
-          const tone = !mine
-            ? 'border-slate-200 enabled:hover:border-indigo-400 enabled:hover:bg-indigo-50'
-            : i === mine.correct_index
-              ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
-              : i === mine.option_index
-                ? 'border-red-300 bg-red-50 text-red-800'
-                : 'border-slate-200 text-slate-400';
-          return (
-            <button key={i} disabled={!!mine || busy} onClick={() => answer(i)} className={`rounded-lg border px-3 py-2 text-start ${tone}`}>
-              {o}
-              {mine && i === mine.correct_index && ' ✓'}
-            </button>
-          );
-        })}
-      </div>
-      {mine && <p className={`mt-2 text-sm font-medium ${mine.correct ? 'text-emerald-700' : 'text-red-700'}`}>{mine.correct ? 'נכון!' : 'לא נכון — התשובה הנכונה מסומנת בירוק.'}</p>}
-      <ErrorText>{error}</ErrorText>
-    </div>
   );
 }

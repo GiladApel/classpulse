@@ -39,8 +39,8 @@ flowchart LR
 | UC9 | As a **lecturer**, I upload last week's recording and get chapters, review questions and the moments students got lost. | VS-01..05 |
 | UC10 | As a **student**, I upload my homework and get rubric-based feedback and see where I stand versus the class. | HW-02, 03 |
 | UC11 | As a **lecturer**, I see the class's common mistakes and suspicious similarity pairs. | HW-01, 04, BC-04 |
-| UC12 | As a **student**, I open a lecture's page (even one I missed) to get the materials, practise and read the answers to the class's questions. | LP-01..03 |
-| UC13 | As a **lecturer**, after the lecture I answer open questions, add practice questions and upload the slides. | LP-02..04 |
+| UC12 | As a **student**, I open a lecture's page (even one I missed) to get the materials and review questions and read the answers to the class's questions. | LP-01..03 |
+| UC13 | As a **lecturer**, after the lecture I answer open questions, publish review questions and upload the slides. | LP-02..04 |
 | UC14 | As a **student**, when the lecture ends I tell the lecturer anonymously how it went, in one tap, so the next lecture can improve. | FB-01..03 |
 
 ## Detailed use cases
@@ -160,20 +160,18 @@ flowchart LR
 - **Main flow:**
   1. The student opens the course and picks a lecture (or follows "lecture page" after checking in).
   2. The page shows the published summary, materials, practice questions, the class polls with results, and the questions with the lecturer's answers.
-  3. The student answers a practice question and immediately sees whether it was right and which answer is correct.
-- **Alternate flows:**
-  - 1a. The student missed this lecture: the page is read-only for questions (no posting or upvoting); everything else works.
-  - 3a. The student already answered: the result is shown and the options are locked.
+  3. The student reads the numbered review questions and answers them for themselves.
+- **Alternate flow:** 1a. The student missed this lecture: the page is read-only for questions (no posting or upvoting); everything else works.
 
 ### UC13: Add content after the lecture (lecturer)
 - **Actor:** Lecturer. **Secondary:** LLM Provider.
 - **Main flow:**
   1. On the lecture dashboard (also after "End lecture"), the lecturer writes an answer under an open question.
-  2. The lecturer writes a practice question with 2–4 options and marks the correct one, or uploads the slide deck (PDF), gets 8 AI drafts, unticks the ones they don't want and adds the rest (or opens one to edit first).
-  3. The lecturer uploads the slides or adds a link.
+  2. The lecturer writes an open review question and publishes it, or uploads the slide deck (PDF), gets 8 AI drafts, unticks the ones they don't want and publishes the rest (or moves one into the text box to edit first).
+  3. The lecturer taps "Upload file or image", picks a file and it uploads at once, or adds a link.
   4. Students in the course see each addition on the lecture page at once (realtime).
 - **Alternate flows:**
-  - 2a. No correct answer marked: rejected with "mark the correct answer".
+  - 2a. An empty question: the publish button stays disabled.
   - 2b. The deck is not a PDF or an image (e.g. .pptx), or is over 50 MB: rejected; the screen says to save PowerPoint as PDF.
   - 3a. A file over 50 MB or a non-http(s) link: rejected.
 

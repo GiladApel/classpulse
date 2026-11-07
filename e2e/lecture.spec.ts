@@ -36,19 +36,18 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
   await lp.getByRole('button', { name: 'כתיבת תשובה' }).click();
   await lp.getByLabel('תשובה', { exact: true }).fill('Strategy בוחר אלגוריתם; State משנה התנהגות לפי מצב.');
   await lp.getByRole('button', { name: 'שמירת תשובה' }).click();
-  await lp.getByLabel('שאלה לתרגול').fill('איזו תבנית מתאימה להחלפת אלגוריתם בזמן ריצה?');
-  await lp.getByPlaceholder('תשובה 1', { exact: true }).fill('Strategy');
-  await lp.getByPlaceholder('תשובה 2', { exact: true }).fill('Singleton');
-  await lp.getByLabel('תשובה 1 נכונה').check();
-  await lp.getByRole('button', { name: 'הוספת שאלה' }).click();
-  await expect(lp.getByText('✓Strategy · Singleton')).toBeVisible();
-  // Practice drafts from the slide deck: 8 come back checked; drop one and add the rest.
+  await lp.getByLabel('שאלה לתרגול').fill('מתי נעדיף Strategy על פני if/else?');
+  await lp.getByRole('button', { name: 'פרסום שאלה' }).click();
+  await expect(lp.getByText('1. מתי נעדיף Strategy על פני if/else?')).toBeVisible();
+  // Open questions drafted from the slide deck: 8 come back checked; drop one and publish the rest.
   await lp.getByLabel('קובץ ההרצאה').setInputFiles({ name: 'lecture.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
   await expect(lp.getByRole('checkbox')).toHaveCount(8);
   await lp.getByRole('checkbox').first().uncheck();
-  await lp.getByRole('button', { name: 'הוספת המסומנות (7)' }).click();
-  await expect(lp.getByRole('button', { name: 'מחיקה' })).toHaveCount(8); // 1 manual + 7 from the deck
-  await expect(lp.getByText('מה תפקידו של ה-Subject בתבנית Observer?')).toHaveCount(0);
+  await lp.getByRole('button', { name: 'פרסום המסומנות (7)' }).click();
+  await expect(lp.getByRole('checkbox')).toHaveCount(0);
+  // One button opens the file picker and uploads right away, titled by the file name.
+  await lp.getByLabel('קובץ', { exact: true }).setInputFiles({ name: 'slides.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
+  await expect(lp.getByText('📄 slides.pdf')).toBeVisible();
   await lp.getByLabel('קישור').fill('https://refactoring.guru/design-patterns/strategy');
   await lp.getByRole('button', { name: 'הוספת קישור' }).click();
 
@@ -61,7 +60,8 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
   await expect(ip.getByRole('link', { name: /refactoring\.guru/ })).toBeVisible();
   await expect(ip.getByPlaceholder('שאלה, הערה או הצעה למרצה…')).toHaveCount(0); // he missed it: read-only
 
-  await ip.getByRole('button', { name: 'Singleton' }).click();
-  await expect(ip.getByText('לא נכון — התשובה הנכונה מסומנת בירוק.')).toBeVisible();
-  await expect(ip.getByRole('button', { name: 'Strategy ✓' })).toBeDisabled();
+  await expect(ip.getByRole('listitem').filter({ hasText: 'מתי נעדיף Strategy על פני if/else?' })).toBeVisible();
+  await expect(ip.getByText('במה שונה State מ-Strategy, למרות שהמבנה שלהן כמעט זהה?')).toBeVisible();
+  await expect(ip.getByText('הסבירו מה תפקידו של ה-Subject בתבנית Observer')).toHaveCount(0); // unticked
+  await expect(ip.getByRole('button', { name: /slides\.pdf/ })).toBeVisible();
 });

@@ -128,27 +128,13 @@ export interface AssignmentInsights {
   builtAt: Date;
 }
 
-/** A multiple-choice question the lecturer adds to a lecture page for self-study; the answer is revealed per student. */
+/** An open review question the lecturer publishes on a lecture page; students read it, there is nothing to submit. */
 export interface PracticeQuestion {
   id: string;
   sessionId: string;
   question: string;
-  options: string[];
-  correctIndex: number;
   source: 'manual' | 'ai';
   createdAt: Date;
-}
-
-/** One attempt per student; carries the correct answer so the student can read it once they have answered. */
-export interface PracticeAnswer {
-  id: string;
-  questionId: string;
-  studentId?: string;
-  studentNumber: string;
-  optionIndex: number;
-  correct: boolean;
-  correctIndex: number;
-  answeredAt: Date;
 }
 
 export type MaterialKind = 'file' | 'link';

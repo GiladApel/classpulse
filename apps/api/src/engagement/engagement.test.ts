@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FeedClusterer } from '../ai/FeedClusterer.js';
-import { LECTURE_QUESTIONS, McqGenerator } from '../ai/McqGenerator.js';
+import { McqGenerator } from '../ai/McqGenerator.js';
 import { MockProvider } from '../ai/MockProvider.js';
 import { FixedClock } from '../infra/Clock.js';
 import {
@@ -191,14 +191,5 @@ describe('McqGenerator', () => {
   it('throws when nothing usable comes back', async () => {
     const llm = new MockProvider({ generate_mcq: { questions: [{ question: 'x', options: [], correctIndex: 0 }] } });
     await expect(new McqGenerator(llm).fromSlide({ mimeType: 'image/png', data: Buffer.from([1]) })).rejects.toThrow('no valid questions');
-  });
-
-  it('drafts up to 8 practice questions from a whole deck', async () => {
-    const many = Array.from({ length: 10 }, (_, i) => ({ question: `q${i}`, options: ['a', 'b'], correctIndex: 0 }));
-    const llm = new MockProvider({ generate_practice: { questions: many } });
-    const deck = { mimeType: 'application/pdf', data: Buffer.from('%PDF') };
-    expect(await new McqGenerator(llm).fromLecture(deck)).toHaveLength(LECTURE_QUESTIONS);
-    expect(llm.calls[0]).toMatchObject({ task: 'generate_practice', files: [deck] });
-    expect(llm.calls[0].prompt).toContain(`exactly ${LECTURE_QUESTIONS}`);
   });
 });

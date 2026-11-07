@@ -1,62 +1,56 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { McqGenerator } from '../ai/McqGenerator.js';
 import { MockProvider } from '../ai/MockProvider.js';
-import type { Participant } from '../engagement/types.js';
+import { LECTURE_QUESTIONS, PracticeQuestionGenerator } from '../ai/PracticeQuestionGenerator.js';
 import { FixedClock } from '../infra/Clock.js';
-import { InMemoryMaterialRepository, InMemoryPracticeAnswerRepository, InMemoryPracticeQuestionRepository } from '../infra/memory/InMemoryContentRepositories.js';
+import { InMemoryMaterialRepository, InMemoryPracticeQuestionRepository } from '../infra/memory/InMemoryContentRepositories.js';
 import { DomainError } from '../shared/errors.js';
 import { makeSession, T0 } from '../test/fixtures.js';
 import { MaterialService, MAX_MATERIAL_BYTES } from './MaterialService.js';
 import { PracticeService } from './PracticeService.js';
 
 const code = (p: Promise<unknown>) => p.then(() => 'ok', (e: DomainError) => e.code);
-const dana: Participant = { id: 'u1', studentNumber: '111', name: 'דנה' };
-const missed: Participant = { id: 'u2', studentNumber: '222', name: 'אבי' }; // in the course, missed this lecture
-const outsider: Participant = { id: 'u9', studentNumber: '999', name: 'זר' };
-
-/** 111 and 222 attended some session of course1; 999 never did. */
-const attendance = {
-  async requireCourseParticipant(courseId: string, studentNumber: string) {
-    if (courseId !== 'course1' || !['111', '222'].includes(studentNumber)) throw new DomainError('NOT_IN_COURSE', 'not in course');
-  },
-};
 
 describe('PracticeService', () => {
   const session = makeSession({ status: 'ended' });
   let practice: PracticeService;
+  let llm: MockProvider;
 
   beforeEach(() => {
-    practice = new PracticeService(new InMemoryPracticeQuestionRepository(), new InMemoryPracticeAnswerRepository(), attendance, new McqGenerator(new MockProvider()), new FixedClock(T0));
+    llm = new MockProvider();
+    practice = new PracticeService(new InMemoryPracticeQuestionRepository(), new PracticeQuestionGenerator(llm), new FixedClock(T0));
   });
 
-  const add = () => practice.add(session, { question: ' מה מבטיח LSP? ', options: ['SRP', ' החלפה בתת-מחלקה ', 'DIP'], correctIndex: 1 }, 'manual');
-
-  it('is added after the lecture ended, trimmed, and needs a correct answer', async () => {
-    expect(await add()).toMatchObject({ question: 'מה מבטיח LSP?', options: ['SRP', 'החלפה בתת-מחלקה', 'DIP'], correctIndex: 1, sessionId: session.id });
-    expect(await code(practice.add(session, { question: 'q', options: ['a', 'b'], correctIndex: null }, 'ai'))).toBe('INVALID_POLL');
-    expect(await code(practice.add(session, { question: 'q', options: ['a'], correctIndex: 0 }, 'manual'))).toBe('INVALID_POLL');
+  it('an open question is added after the lecture ended, trimmed; an empty one is rejected', async () => {
+    expect(await practice.add(session, '  במה שונה State מ-Strategy? ', 'manual')).toMatchObject({ question: 'במה שונה State מ-Strategy?', sessionId: session.id, source: 'manual' });
+    expect(await code(practice.add(session, '   ', 'ai'))).toBe('INVALID_QUESTION');
   });
 
-  it('any course participant answers once and then learns the correct answer; outsiders cannot', async () => {
-    const q = await add();
-    expect(await practice.answer(session, q.id, missed, 0)).toMatchObject({ correct: false, correctIndex: 1, optionIndex: 0 });
-    expect(await practice.answer(session, q.id, dana, 1)).toMatchObject({ correct: true, correctIndex: 1 });
-    expect(await code(practice.answer(session, q.id, dana, 0))).toBe('ALREADY_ANSWERED');
-    expect(await code(practice.answer(session, q.id, outsider, 1))).toBe('NOT_IN_COURSE');
-    expect(await code(practice.answer(session, q.id, { ...dana, studentNumber: '222' }, 7))).toBe('INVALID_OPTION');
-  });
-
-  it('concurrent duplicate answers from one student count once', async () => {
-    const q = await add();
-    const results = await Promise.allSettled([practice.answer(session, q.id, dana, 1), practice.answer(session, q.id, dana, 0)]);
-    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
-  });
-
-  it('a question from another lecture is not found; removed questions are gone', async () => {
-    const q = await add();
-    expect(await code(practice.answer(makeSession({ id: 'other' }), q.id, dana, 1))).toBe('NOT_FOUND');
+  it('drafts from the deck are not saved; removed questions are gone', async () => {
+    const deck = { mimeType: 'application/pdf', data: Buffer.from('%PDF') };
+    expect(await practice.draftFromLecture(deck)).toHaveLength(8);
+    expect(llm.calls[0]).toMatchObject({ task: 'generate_practice', files: [deck] });
+    const q = await practice.add(session, 'q', 'ai');
     await practice.remove(q.id);
     expect(await code(practice.get(q.id))).toBe('NOT_FOUND');
+    expect(await code(practice.remove(q.id))).toBe('NOT_FOUND');
+  });
+});
+
+describe('PracticeQuestionGenerator', () => {
+  const deck = { mimeType: 'application/pdf', data: Buffer.from('%PDF') };
+
+  it('keeps up to 8 trimmed, distinct questions and drops empty, too long or non-text ones', async () => {
+    const many = ['  q0 ', 'q0', '', 'x'.repeat(301), 7, ...Array.from({ length: 10 }, (_, i) => `q${i + 1}`)];
+    const llm = new MockProvider({ generate_practice: { questions: many } });
+    const out = await new PracticeQuestionGenerator(llm).fromLecture(deck);
+    expect(out).toEqual(['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']);
+    expect(out).toHaveLength(LECTURE_QUESTIONS);
+    expect(llm.calls[0].prompt).toContain(`exactly ${LECTURE_QUESTIONS}`);
+  });
+
+  it('throws when nothing usable comes back', async () => {
+    const llm = new MockProvider({ generate_practice: { questions: [' ', null] } });
+    await expect(new PracticeQuestionGenerator(llm).fromLecture(deck)).rejects.toThrow('no valid questions');
   });
 });
 

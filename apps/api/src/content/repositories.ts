@@ -1,5 +1,5 @@
 import type { Repository } from '../infra/Repository.js';
-import type { Assignment, AssignmentInsights, Material, PracticeAnswer, PracticeQuestion, Recording, Submission } from './types.js';
+import type { Assignment, AssignmentInsights, Material, PracticeQuestion, Recording, Submission } from './types.js';
 
 export type FileInput = { data: Buffer; filename: string; mimeType: string };
 
@@ -27,14 +27,7 @@ export interface InsightsRepository {
 }
 
 export interface PracticeQuestionRepository extends Repository<PracticeQuestion> {
-  listBySession(sessionId: string): Promise<PracticeQuestion[]>;
   delete(id: string): Promise<void>;
-}
-
-export interface PracticeAnswerRepository {
-  /** Throws on a duplicate (question, studentNumber). */
-  create(data: Omit<PracticeAnswer, 'id'>): Promise<PracticeAnswer>;
-  find(questionId: string, studentNumber: string): Promise<PracticeAnswer | null>;
 }
 
 export interface MaterialRepository extends Repository<Material> {
