@@ -11,7 +11,8 @@ flowchart LR
   S --- UC10[UC10 Get homework review]
   S --- UC12[UC12 Review a lecture]
   S --- UC14[UC14 Give lecture feedback]
-  S --- UC15[UC15 Join from Zoom]
+  S --- UC15[UC15 Join a live lesson remotely]
+  S --- UC20[UC20 Enter a live lesson from home]
   L([Lecturer]) --- UC2[UC2 Run session]
   L --- UC3[UC3 Manage attendance & export]
   L --- UC4[UC4 Snap headcount & launch challenge]
@@ -20,6 +21,8 @@ flowchart LR
   L --- UC11[UC11 Review class homework insights]
   L --- UC13[UC13 Add content after the lecture]
   L --- UC17[UC17 Create a course]
+  L --- UC18[UC18 Upload the roster]
+  L --- UC19[UC19 Set the weekly timetable]
   A([Admin]) --- UC16[UC16 Make a user a lecturer]
   UC13 --- AI
   UC4 --- AI([LLM Provider])
@@ -45,9 +48,12 @@ flowchart LR
 | UC12 | As a **student**, I open a lecture's page (even one I missed) to get the materials and review questions and read the answers to the class's questions. | LP-01..03 |
 | UC13 | As a **lecturer**, after the lecture I answer open questions, publish review questions and upload the slides. | LP-02..04 |
 | UC14 | As a **student**, when the lecture ends I tell the lecturer anonymously how it went, in one tap, so the next lecture can improve. | FB-01..03 |
-| UC15 | As a **student** watching on Zoom, I open the link the lecturer posted in the chat and I'm recorded as attending from Zoom, so I can join the questions and polls too. | ATT-10, 11 |
+| UC15 | As a **student** who is not in the room, I tap "Join remotely" on the live lesson and I'm recorded as attending remotely, so I can join the questions and polls too. | ATT-10, 11 |
 | UC16 | As the **admin**, I find a registered user and make them a lecturer, without touching the server. | AD-01 |
-| UC17 | As a **lecturer**, I create my course myself and share each lecture's page with the class. | AD-02, 03 |
+| UC17 | As a **lecturer**, I create my course myself. | AD-02 |
+| UC18 | As a **lecturer**, I upload the course list I already have (Excel or CSV) once, so my students see the course without any link. | EN-01..04 |
+| UC19 | As a **lecturer**, I set the course's weekly days and hours, so everyone sees it in their timetable and I can start the lesson in one tap. | TT-01..03 |
+| UC20 | As a **student**, I open the app and see the lesson that is live now and my week, and I enter the lesson in one tap. | EN-03, TT-02..04 |
 
 ## Detailed use cases
 
@@ -192,18 +198,18 @@ flowchart LR
   - 2a. The student taps "not now": nothing is sent.
   - 3a. The student already answered, or 24 hours have passed: the form is not shown.
 
-### UC15: Join from Zoom (student)
-- **Actor:** Student watching the lecture on Zoom.
-- **Preconditions:** the lecture is active; the lecturer copied the Zoom link from the dashboard and posted it in the Zoom chat.
+### UC15: Join a live lesson remotely (student)
+- **Actor:** Student who is a course member but not in the room.
+- **Preconditions:** the lesson is live.
 - **Main flow:**
-  1. The student opens the link (`/z/:token`); the app is signed in.
-  2. The API checks the link's signature and that the lecture is active, then creates a record with method `zoom`.
-  3. The student sees "recorded as attending from Zoom" and the live panel (questions, polls, "I'm lost"). The dashboard shows the student under "From Zoom".
+  1. The student opens the lesson (from "Live now" on the home screen, UC20) and its attendance tab offers "In class: scan the code" or "Not in class: join remotely".
+  2. The student taps "Join remotely". The API checks that they are a course member and that the lesson is live, then creates a record with the remote method.
+  3. The app opens the forum tab (questions, polls, "I'm lost"). The lecturer sees the student under "Remote".
 - **Alternate flows:**
-  - 1a. First visit: Google sign-in and student ID, then continue at step 2.
-  - 2a. The lecture has ended or the link was altered: rejected with a message.
-  - 2b. The student already checked in from the classroom (or opened the link before): the existing record is shown; there is still one record.
-- **Postcondition:** the student is a course participant, so later they can open every lecture page of the course (UC12). Challenges are not sent to them.
+  - 2a. Not a course member: rejected ("you are not enrolled in this course").
+  - 2b. The lesson has ended: rejected.
+  - 2c. The student already checked in (in class or remotely): the existing record is kept; there is still one record.
+- **Postcondition:** challenges are not sent to the student.
 
 ### UC16: Make a user a lecturer (admin)
 - **Actor:** Admin (an email listed in the server's `ADMIN_EMAILS`).
@@ -215,9 +221,34 @@ flowchart LR
   - 1a. Not an admin: the page says it is for admins only.
   - 3a. "Back to student" reverses it. The admin cannot change their own role.
 
-### UC17: Create a course and share a lecture page (lecturer)
+### UC17: Create a course (lecturer)
+- **Actor:** Lecturer.
+- **Main flow:** on the lecturer home, the lecturer enters a course code and name and taps "New course". The course page opens on its students tab (UC18).
+- **Alternate flow:** the lecturer already has a course with that code: rejected.
+
+### UC18: Upload the roster (lecturer)
 - **Actor:** Lecturer.
 - **Main flow:**
-  1. On the lecturer home, the lecturer enters a course code and name under "New course"; the course appears in the start-lecture form.
-  2. On a lecture's dashboard, the lecturer taps "Copy lecture-page link" and posts it to the course group.
-- **Alternate flow:** 1a. The lecturer already has a course with that code: rejected.
+  1. On the course page, students tab, the lecturer taps "Upload Excel or CSV" and picks the file the faculty gave them (or pastes a list).
+  2. The system reads one student per row (ID and name in any column order), adds new students and updates names, and shows "added N, updated M" with any skipped lines.
+  3. The table lists the roster; once a student signs up, their sign-up name appears next to the roster name.
+- **Alternate flows:**
+  - 2a. No row has a student ID: rejected ("no student IDs found").
+  - 2b. An ID that lost its leading zero in Excel is restored to 9 digits.
+  - 3a. A student who checked in but is not on the roster is listed under "checked in but not on the roster" with "Add".
+
+### UC19: Set the weekly timetable (lecturer)
+- **Actor:** Lecturer.
+- **Main flow:**
+  1. On the course page, timetable tab, the lecturer adds weekly meetings (day, from, to, room) and optional term dates, and saves.
+  2. Enrolled students and the lecturer see the meetings in their weekly timetable.
+  3. During a meeting the lecturer's home shows "Start the lesson now"; one tap opens the lesson with the usual defaults.
+- **Alternate flows:** 1a. Two meetings overlap on the same day, or a meeting ends before it starts: rejected.
+
+### UC20: Enter a live lesson from home (student)
+- **Actor:** Student enrolled in the course.
+- **Main flow:**
+  1. The student opens the app. The home screen shows "Lesson live now" for each live lesson of their courses, the weekly timetable and their courses.
+  2. The student taps the live lesson; it opens on its attendance tab.
+  3. In class, they scan the QR (UC1); otherwise they join remotely (UC15). Either way they land on the forum tab.
+- **Alternate flow:** 1a. No live lesson: the timetable shows the next meetings; each course opens its lessons, including past ones (UC12).
