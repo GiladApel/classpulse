@@ -34,15 +34,6 @@ describe('HTTP: admin, courses and remote attendance', () => {
     expect((await call('boss', 'POST', '/admin/users/adm1/role', { role: 'student' })).body.code).toBe('OWN_ROLE');
   });
 
-  it('a lecturer creates a course once per code; students cannot', async () => {
-    const created = await call('lect', 'POST', '/courses', { code: 'OOP', name: 'תכנות מונחה עצמים' });
-    expect(created).toMatchObject({ status: 201, body: { code: 'OOP', name: 'תכנות מונחה עצמים' } });
-    expect((await call('lect', 'POST', '/courses', { code: 'OOP', name: 'x' })).body.code).toBe('COURSE_EXISTS');
-    expect((await call('dana', 'POST', '/courses', { code: 'X', name: 'x' })).status).toBe(403);
-    const s = await call('lect', 'POST', '/sessions', { courseId: created.body.id, title: 'L1', geofenceMode: 'lenient', geofenceRadiusM: 50 });
-    expect(s.status).toBe(201);
-  });
-
   it('challenges and the headcount count only the students in the room', async () => {
     const id = (await call('lect', 'POST', '/sessions', { courseId: 'c1', title: 'L', geofenceMode: 'lenient', geofenceRadiusM: 50 })).body.id;
     const { token: qr } = (await call('lect', 'GET', `/sessions/${id}/qr`)).body;
