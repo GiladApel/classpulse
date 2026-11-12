@@ -8,7 +8,7 @@ flowchart LR
   S --- UC5[UC5 Answer challenge]
   S --- UC6[UC6 Signal lost / post question]
   S --- UC7[UC7 Vote in poll]
-  S --- UC10[UC10 Get homework review]
+  S --- UC10[UC10 Check a homework solution]
   S --- UC12[UC12 Review a lecture]
   S --- UC14[UC14 Give lecture feedback]
   S --- UC20[UC20 Enter a live lesson from home]
@@ -17,7 +17,7 @@ flowchart LR
   L --- UC4[UC4 Snap headcount & launch challenge]
   L --- UC8[UC8 Create poll]
   L --- UC9[UC9 Summarize lecture]
-  L --- UC11[UC11 Review class homework insights]
+  L --- UC11[UC11 Publish homework and follow the class]
   L --- UC13[UC13 Add content after the lecture]
   L --- UC17[UC17 Create a course]
   L --- UC18[UC18 Upload the roster]
@@ -42,8 +42,8 @@ flowchart LR
 | UC7 | As a **student**, the poll appears on my phone and I vote with one tap. | PL-03 |
 | UC8 | As a **lecturer**, I generate a question from my current slide and launch it in seconds. | PL-01..04 |
 | UC9 | As a **lecturer**, I upload last week's recording and get chapters, review questions and the moments students got lost. | VS-01..05 |
-| UC10 | As a **student**, I upload my homework and get rubric-based feedback and see where I stand versus the class. | HW-02, 03 |
-| UC11 | As a **lecturer**, I see the class's common mistakes and suspicious similarity pairs. | HW-01, 04, BC-04 |
+| UC10 | As a **student**, before handing in my homework I upload my solution and get feedback on every section, up to 3 times, and see where I stand in the class. | HW-02..07 |
+| UC11 | As a **lecturer**, I publish the homework PDF in the lesson and follow how the class is doing: each student's report, common mistakes and suspiciously similar solutions. | HW-01, 07, 08, BC-04 |
 | UC12 | As a **student**, I open a lecture's page (even one I missed) to get the materials and review questions and read the answers to the class's questions. | LP-01..03 |
 | UC13 | As a **lecturer**, after the lecture I answer open questions, publish review questions and upload the slides. | LP-02..04 |
 | UC14 | As a **student**, when the lecture ends I tell the lecturer anonymously how it went, in one tap, so the next lecture can improve. | FB-01..03 |
@@ -150,20 +150,30 @@ flowchart LR
   - **1a. No recording:** the lecturer uploads a transcript (vtt/srt/txt, e.g. from Zoom or Teams) instead.
   - **3a. Processing fails** (e.g. the provider is overloaded): the status becomes `failed` with a message, the temp file is deleted, and the lecturer can upload again or upload a transcript.
 
-### UC10: Homework review (student)
-- **Actor:** Student.
+### UC10: Check a homework solution (student)
+- **Actor:** Student who is a course member.
+- **Preconditions:** the homework's guide is ready.
 - **Main flow:**
-  1. The student uploads a file.
-  2. The system extracts the text and the LLM reviews it against the rubric.
-  3. The student sees scores, strengths and fixes.
-  4. Percentiles appear once at least 5 submissions exist.
+  1. The student opens the homework from the lesson's (or the course's) homework tab, reads the PDF and what each section requires.
+  2. The student taps "Get feedback" and uploads one PDF or photos of a handwritten solution.
+  3. The AI reviews it against the guide in the background; the server computes the question and total scores.
+  4. The student sees the report (score, what meets, what is missing, direction for each section; the sections not answered on top), how many checks are left and, from 3 checked students, their place in the class chart.
+- **Alternate flows:**
+  - 2a. Not a course member: rejected.
+  - 2b. Wrong file type, more than 10 photos or over 20 MB: rejected with a message.
+  - 3a. The check fails (the model or the server): the student is told it did not count and can try again; the previous result stays.
+  - 4a. The third check was used: the button is disabled and the last result is final.
 
-### UC11: Class insights (lecturer)
-- **Actor:** Lecturer.
+### UC11: Publish homework and follow the class (lecturer)
+- **Actor:** Lecturer. **Secondary:** LLM Provider.
 - **Main flow:**
-  1. The lecturer clicks "Analyze class".
-  2. The system computes the distribution, groups common mistakes, and finds pairs with near-identical structure (fingerprint similarity ≥ 0.5, robust to renamed identifiers).
-  3. The lecturer reviews the flagged pairs manually.
+  1. In the lesson's homework tab the lecturer enters a title, an optional due date and the homework PDF, and publishes.
+  2. The AI reads the PDF and builds the review guide; the homework shows "open for checking" and its questions and sections.
+  3. The lecturer follows the students' checks (name, checks used, score), opens any student's report and the chart with names.
+  4. The lecturer taps "Analyze class" for the common mistakes and the pairs of very similar solutions, and reviews those by hand.
+- **Alternate flows:**
+  - 2a. The AI cannot find questions in the PDF: the homework shows "failed" with "Try again".
+  - 3a. The lecturer deletes the homework: its file, guide and the students' checks are removed.
 
 ### UC12: Review a lecture (student)
 - **Actor:** Student who attended at least one lecture of the course.
