@@ -92,5 +92,21 @@ export const DEFAULT_FIXTURES: Record<string, unknown> = {
     ],
     instructions: 'בדקו שהנימוק מבוסס על עקרונות SOLID ולא רק על הגדרות.',
   },
+  // Scores the first section of the guide high, the rest lower, and leaves the last one unanswered.
+  review_homework_solution: (req: StructuredRequest) => {
+    const ids = [...req.prompt.matchAll(/"id":"([^"]+)"/g)].map((m) => m[1]);
+    return {
+      sections: ids.map((id, i) => ({
+        id,
+        evidence: 'ציטוט מהפתרון',
+        answered: i < ids.length - 1,
+        score: i === 0 ? 85 : 60,
+        meets: 'ההסבר נכון בעיקרו',
+        missing: 'חסרה דוגמה קונקרטית',
+        direction: 'חשבו על מקרה שבו האלגוריתם מתחלף בזמן ריצה',
+      })),
+      mistakes: ['חסרה דוגמה'],
+    };
+  },
   aggregate_mistakes: { mistakes: [{ title: 'חסרות בדיקות יחידה', description: 'כתבו בדיקה לכל מחלקה בדומיין לפני ההגשה.', count: 1 }] },
 };
