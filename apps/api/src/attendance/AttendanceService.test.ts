@@ -91,7 +91,7 @@ describe('AttendanceService', () => {
     await expect(svc([]).remove('nope', 'x')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  describe('joinRemote (Zoom link)', () => {
+  describe('joinRemote', () => {
     const remote = () => {
       const rules = [new DuplicateStudentRule(repo), new SessionActiveRule()];
       return new AttendanceService([new DuplicateStudentRule(repo)], repo, clock, rules);

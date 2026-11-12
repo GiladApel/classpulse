@@ -56,22 +56,6 @@ export class AttendanceController {
       return c.json({ record: recordDto(record), alreadyCheckedIn, sessionTitle: session.title }, alreadyCheckedIn ? 200 : 201);
     });
 
-    app.post('/zoom-checkins', async (c) => {
-      const user = c.get('user');
-      if (!user.studentNumber) throw new ConflictError('ONBOARDING_REQUIRED', 'Student ID missing');
-      const token = str(await jsonBody(c.req), 'token', { max: 128 });
-      const session = await this.sessions.get(this.tokens.parseZoom(token));
-      this.tokens.verifyZoom(token, session.qrSecret);
-      const { record, alreadyCheckedIn } = await this.attendance.joinRemote({
-        session,
-        studentId: user.id,
-        studentNumber: user.studentNumber,
-        studentName: user.name,
-        now: this.clock.now(),
-      });
-      return c.json({ record: recordDto(record), alreadyCheckedIn, sessionTitle: session.title }, alreadyCheckedIn ? 200 : 201);
-    });
-
     app.delete('/attendance/:id', requireLecturer, async (c) => {
       const record = await this.attendance.get(c.req.param('id'));
       await this.sessions.getOwned(record.sessionId, c.get('user').id);

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
 import { makeTestPorts, USERS } from './test/testContainer.js';
 
-describe('HTTP: admin, courses and the Zoom link', () => {
+describe('HTTP: admin, courses and remote attendance', () => {
   let app: ReturnType<typeof createApp>;
   let t: ReturnType<typeof makeTestPorts>;
 
@@ -43,31 +43,12 @@ describe('HTTP: admin, courses and the Zoom link', () => {
     expect(s.status).toBe(201);
   });
 
-  it('zoom link: lecturer only; students join without location even in strict mode; it stops at the end', async () => {
-    const id = await start();
-    expect((await call('dana', 'GET', `/sessions/${id}/zoom-link`)).status).toBe(403);
-    const { token } = (await call('lect', 'GET', `/sessions/${id}/zoom-link`)).body;
-
-    const joined = await call('dana', 'POST', '/zoom-checkins', { token });
-    expect(joined).toMatchObject({ status: 201, body: { alreadyCheckedIn: false, sessionTitle: 'L', record: { method: 'zoom', status: 'present' } } });
-    expect((await call('dana', 'POST', '/zoom-checkins', { token })).body.alreadyCheckedIn).toBe(true);
-    expect((await call('avi', 'POST', '/zoom-checkins', { token: token.slice(0, -1) + (token.endsWith('A') ? 'B' : 'A') })).body.code).toBe('TOKEN_INVALID');
-    expect((await call('fresh', 'POST', '/zoom-checkins', { token })).body.code).toBe('ONBOARDING_REQUIRED');
-
-    // A Zoom student takes part online.
-    expect((await call('dana', 'POST', `/sessions/${id}/posts`, { text: 'שאלה מזום', anonymous: false })).status).toBe(201);
-
-    await call('lect', 'POST', `/sessions/${id}/end`);
-    expect((await call('avi', 'POST', '/zoom-checkins', { token })).body.code).toBe('SESSION_ENDED');
-    expect((await call('lect', 'GET', `/sessions/${id}/zoom-link`)).body.code).toBe('SESSION_ENDED');
-  });
-
   it('challenges and the headcount count only the students in the room', async () => {
     const id = (await call('lect', 'POST', '/sessions', { courseId: 'c1', title: 'L', geofenceMode: 'lenient', geofenceRadiusM: 50 })).body.id;
     const { token: qr } = (await call('lect', 'GET', `/sessions/${id}/qr`)).body;
     await call('dana', 'POST', '/checkins', { token: qr, deviceId: 'dev-d' });
-    const { token } = (await call('lect', 'GET', `/sessions/${id}/zoom-link`)).body;
-    await call('avi', 'POST', '/zoom-checkins', { token });
+    await t.container.courses.enroll((await t.container.sessions.getCourse('c1'))!, '222222222', 'אבי');
+    await call('avi', 'POST', `/sessions/${id}/join-remote`);
 
     const form = new FormData();
     form.set('photo', new File([new Uint8Array([1])], 'c.jpg', { type: 'image/jpeg' }));
@@ -91,6 +72,8 @@ describe('HTTP: admin, courses and the Zoom link', () => {
     const joined = await call('dana', 'POST', `/sessions/${id}/join-remote`);
     expect(joined).toMatchObject({ status: 201, body: { alreadyCheckedIn: false, record: { method: 'zoom', status: 'present' } } });
     expect((await call('dana', 'POST', `/sessions/${id}/join-remote`)).status).toBe(200);
+    expect((await call('dana', 'POST', `/sessions/${id}/posts`, { text: 'שאלה מרחוק', anonymous: false })).status).toBe(201);
+    expect((await app.request(`/sessions/${id}/zoom-link`, { headers: { Authorization: 'Bearer lect' } })).status).toBe(404);
     expect((await call('dana', 'POST', '/sessions/nope/join-remote')).status).toBe(404);
 
     await call('lect', 'POST', `/sessions/${id}/end`);

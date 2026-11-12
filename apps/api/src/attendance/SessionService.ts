@@ -57,12 +57,6 @@ export class SessionService {
     return { token: this.tokens.issue(session.id, session.qrSecret), refreshInMs: this.tokens.msUntilNextWindow() };
   }
 
-  /** The link the lecturer pastes into Zoom; it works only while the lecture is active. */
-  zoomToken(session: Session): string {
-    if (session.status !== 'active') throw new DomainError('SESSION_ENDED', 'Session has ended');
-    return this.tokens.issueZoom(session.id, session.qrSecret);
-  }
-
   async get(sessionId: string): Promise<Session> {
     const session = await this.sessions.get(sessionId);
     if (!session) throw new NotFoundError('Session');

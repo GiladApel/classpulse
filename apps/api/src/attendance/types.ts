@@ -1,5 +1,6 @@
 export type GeofenceMode = 'lenient' | 'strict';
 export type SessionStatus = 'active' | 'ended';
+/** `zoom` = joined the live lesson remotely (the stored value predates the in-app button). */
 export type CheckInMethod = 'qr' | 'manual' | 'zoom';
 export type AttendanceStatus = 'present' | 'flagged' | 'removed';
 

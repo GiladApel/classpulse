@@ -19,7 +19,6 @@ export class TokenError extends DomainError {
 }
 
 const TOKEN_RE = /^([a-z0-9]{1,32})\.([a-z0-9]{1,12})\.([A-Za-z0-9_-]{22})$/;
-const ZOOM_RE = /^([a-z0-9]{1,32})\.([A-Za-z0-9_-]{22})$/;
 
 /** Token = sessionId.window(base36).HMAC; accepted in its own window and the next (acceptedWindows = 2). */
 export class QrTokenService {
@@ -58,27 +57,6 @@ export class QrTokenService {
     if (age < 0) throw new TokenError('TOKEN_INVALID');
     if (age >= this.acceptedWindows) throw new TokenError('TOKEN_EXPIRED');
     return claims;
-  }
-
-  /** Zoom link token = sessionId.HMAC: static for the whole lecture, so it can be pasted once into the Zoom chat. */
-  issueZoom(sessionId: string, secret: string): string {
-    return `${sessionId}.${this.signZoom(sessionId, secret)}`;
-  }
-
-  parseZoom(token: string): string {
-    const m = ZOOM_RE.exec(token);
-    if (!m) throw new TokenError('TOKEN_INVALID');
-    return m[1];
-  }
-
-  verifyZoom(token: string, secret: string): void {
-    const sessionId = this.parseZoom(token);
-    const given = Buffer.from(token.slice(token.lastIndexOf('.') + 1));
-    if (!timingSafeEqual(given, Buffer.from(this.signZoom(sessionId, secret)))) throw new TokenError('TOKEN_INVALID');
-  }
-
-  private signZoom(sessionId: string, secret: string): string {
-    return createHmac('sha256', secret).update(`${sessionId}.zoom`).digest('base64url').slice(0, 22);
   }
 
   private sign(sessionId: string, window: number, secret: string): string {

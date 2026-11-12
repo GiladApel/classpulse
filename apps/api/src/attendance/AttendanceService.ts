@@ -24,7 +24,7 @@ export class AttendanceService {
     return this.admit([...this.baseRules, GeofencePolicyFactory.for(ctx.session.geofenceMode)], ctx, 'qr');
   }
 
-  /** Joining from the Zoom link: there is no rotating QR, location or device to check, only the remote rules. */
+  /** Joining a live lesson remotely from the app: there is no rotating QR, location or device to check, only the remote rules. */
   async joinRemote(ctx: Omit<CheckInContext, 'token' | 'deviceId' | 'location'>): Promise<CheckInOutcome> {
     return this.admit(this.remoteRules, { ...ctx, token: '', deviceId: '' }, 'zoom');
   }
@@ -109,7 +109,7 @@ export class AttendanceService {
     return (await this.repo.listBySession(sessionId)).filter((r) => r.status !== 'removed').length;
   }
 
-  /** Students physically in the room (not joined from Zoom): what a class photo is compared with. */
+  /** Students physically in the room (not joined remotely): what a class photo is compared with. */
   async inRoomCount(sessionId: string): Promise<number> {
     return (await this.repo.listBySession(sessionId)).filter((r) => r.status !== 'removed' && r.method !== 'zoom').length;
   }

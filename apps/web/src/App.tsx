@@ -21,7 +21,6 @@ const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/onboarding', element: <OnboardingPage /> },
   { path: '/c/:token', element: <RequireStudent><CheckInPage /></RequireStudent> },
-  { path: '/z/:token', element: <RequireStudent><CheckInPage remote /></RequireStudent> },
   { path: '/r/:token', element: <RequireStudent><RollCallPage /></RequireStudent> },
   { path: '/course/:id', element: <RequireStudent><CoursePage /></RequireStudent> },
   { path: '/a/:id', element: <RequireStudent><AssignmentPage /></RequireStudent> },

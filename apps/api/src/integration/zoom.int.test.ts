@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createHarness, type Harness, type TestUser } from './harness.js';
 
-describe('Integration: Zoom attendance and admin roles against real PocketBase', () => {
+describe('Integration: remote attendance and admin roles against real PocketBase', () => {
   let h: Harness;
   let s1: string;
   let inRoom: TestUser;
@@ -12,15 +12,15 @@ describe('Integration: Zoom attendance and admin roles against real PocketBase',
     s1 = (await h.startSession()).id;
     [inRoom, onZoom] = [await h.makeUser('student', h.studentNo()), await h.makeUser('student', h.studentNo())];
     await h.checkIn(s1, inRoom);
-    const { token } = (await h.call(h.lecturer, 'GET', `/sessions/${s1}/zoom-link`)).body;
-    expect((await h.call(onZoom, 'POST', '/zoom-checkins', { token })).status).toBe(201);
+    await h.container.courses.enroll((await h.container.sessions.getCourse(h.course.id))!, onZoom.record.student_id, 'remote');
+    expect((await h.call(onZoom, 'POST', `/sessions/${s1}/join-remote`)).status).toBe(201);
   });
 
   afterAll(async () => {
     await h?.cleanup();
   });
 
-  it('the zoom record is stored with method zoom and read by the student and the lecturer', async () => {
+  it('the remote record is stored with method zoom and read by the student and the lecturer', async () => {
     const [mine] = await onZoom.pb.collection('attendance_records').getFullList({ filter: `session = "${s1}"` });
     expect(mine).toMatchObject({ method: 'zoom', status: 'present', device_id: '' });
     const all = await h.lecturer.pb.collection('attendance_records').getFullList({ filter: `session = "${s1}"`, sort: 'checked_in_at' });

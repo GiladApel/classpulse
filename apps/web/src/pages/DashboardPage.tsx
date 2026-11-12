@@ -13,7 +13,7 @@ import { pb } from '../lib/pb';
 import { useAttendance } from '../lib/useAttendance';
 
 const STATUS_LABEL = { present: 'נוכח', flagged: 'לבדיקה', removed: 'הוסר' } as const;
-const METHOD_LABEL = { qr: 'QR', manual: 'ידני', zoom: 'זום' } as const;
+const METHOD_LABEL = { qr: 'QR', manual: 'ידני', zoom: 'מרחוק' } as const;
 const live = (r: RecordDto) => r.status !== 'removed';
 
 export default function DashboardPage() {
@@ -25,7 +25,6 @@ export default function DashboardPage() {
   const { records, present } = useAttendance(id);
   const inRoom = records.filter((r) => r.method !== 'zoom');
   const fromZoom = records.filter((r) => r.method === 'zoom');
-  const [copied, setCopied] = useState('');
 
   useEffect(() => {
     pb.collection('sessions').getOne(id, { expand: 'course' }).then(setSession, () => setError('השיעור לא נמצא'));
@@ -83,12 +82,6 @@ export default function DashboardPage() {
 
   const active = session?.status === 'active';
 
-  const copy = (what: 'zoom' | 'lecture') =>
-    run(async () => {
-      const path = what === 'zoom' ? `/z/${(await api.get<{ token: string }>(`/sessions/${id}/zoom-link`)).token}` : `/lecture/${id}`;
-      await navigator.clipboard.writeText(location.origin + path);
-      setCopied(what);
-    });
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-5 p-4 md:p-8">
@@ -122,7 +115,7 @@ export default function DashboardPage() {
           <span className="text-5xl font-bold tabular-nums text-indigo-700">{present}</span>
           <span className="text-slate-600">נוכחים</span>
           <span className="text-xs text-slate-500">
-            {inRoom.filter(live).length} בכיתה · {fromZoom.filter(live).length} מזום
+            {inRoom.filter(live).length} בכיתה · {fromZoom.filter(live).length} מרחוק
           </span>
         </Card>
         <Card className="md:col-span-2">
@@ -136,22 +129,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <h2 className="mb-1 font-semibold">קישורים לשיתוף</h2>
-        <p className="mb-3 text-xs text-slate-500">
-          קישור הזום רושם את מי שנכנס דרכו כנוכח מזום (בלי בדיקת מיקום) ועובד רק כל עוד השיעור פעיל. דף השיעור פתוח לכל סטודנטי הקורס — גם למי שלא היה.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {active && (
-            <Button variant="secondary" onClick={() => copy('zoom')}>
-              {copied === 'zoom' ? '✓ הועתק — הדביקו בצ׳אט של הזום' : '📋 העתקת קישור לזום'}
-            </Button>
-          )}
-          <Button variant="secondary" onClick={() => copy('lecture')}>
-            {copied === 'lecture' ? '✓ הועתק' : '📋 העתקת קישור לדף השיעור'}
-          </Button>
-        </div>
-      </Card>
 
       <ErrorText>{error}</ErrorText>
 
@@ -182,7 +159,7 @@ export default function DashboardPage() {
         onConfirm={confirmRecord}
         onRemove={remove}
       />
-      {fromZoom.length > 0 && <AttendanceTable title={`מזום (${fromZoom.filter(live).length})`} records={fromZoom} empty="" onConfirm={confirmRecord} onRemove={remove} />}
+      {fromZoom.length > 0 && <AttendanceTable title={`מרחוק (${fromZoom.filter(live).length})`} records={fromZoom} empty="" onConfirm={confirmRecord} onRemove={remove} />}
     </main>
   );
 }
