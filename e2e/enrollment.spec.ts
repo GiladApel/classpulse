@@ -7,7 +7,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => klass?.cleanup());
 
-test('10 · a new lecturer sets up a course; enrolled students see it and join the live lesson, in class or remotely', async ({ browser }) => {
+test('10 · a new lecturer sets up a course; an enrolled student finds the live lesson at home and checks in', async ({ browser }) => {
   const [yael, noa, omer] = klass.students;
 
   // The admin makes Omer a lecturer.
@@ -49,18 +49,17 @@ test('10 · a new lecturer sets up a course; enrolled students see it and join t
   await lp.waitForURL(/\/lesson\/\w+/);
   const sessionId = lessonId(lp);
 
-  // Yael is at home: "live now" → join remotely → the forum.
+  // Yael's home shows the live lesson; it opens on attendance, which asks her to scan the code in the room.
   await expect(yp.getByText('שיעור פעיל עכשיו')).toBeVisible({ timeout: 10_000 });
   await yp.getByRole('link', { name: /כניסה לשיעור/ }).click();
-  await yp.getByRole('button', { name: 'הצטרפות מרחוק' }).click();
+  await expect(yp.getByText('סרקו עם מצלמת הטלפון את הקוד שמוקרן על הלוח בכיתה.')).toBeVisible();
+  await checkIn(yp, await qrToken(lp, sessionId));
   await expect(yp.getByRole('button', { name: '🤯 הלכתי לאיבוד' })).toBeVisible();
 
   // Noa is in the room but not on the roster: she checks in, and the lecturer adds her with one tap.
   const np = await phone(browser, noa, 1);
   await checkIn(np, await qrToken(lp, sessionId));
-  await expect(lp.getByRole('heading', { name: 'בכיתה (1)' })).toBeVisible();
-  await expect(lp.getByRole('heading', { name: 'מרחוק (1)' })).toBeVisible();
-  await expect(lp.getByText('1 בכיתה · 1 מרחוק')).toBeVisible();
+  await expect(lp.getByRole('heading', { name: 'רשימת נוכחות (2)' })).toBeVisible();
   await lp.getByRole('button', { name: 'לא ברשימה · הוספה' }).click();
   await expect(lp.getByRole('button', { name: 'לא ברשימה · הוספה' })).toHaveCount(0);
 
