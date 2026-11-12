@@ -1,5 +1,6 @@
 import type { RecordModel } from 'pocketbase';
 import { api, ApiError } from './api';
+import { pb } from './pb';
 
 export interface LectureSummary {
   tldr: string;
@@ -27,25 +28,34 @@ export interface Timeline {
   spikes: { t: number; count: number; chapter: string | null }[];
 }
 
-export interface RubricCriterion {
-  id: string;
-  criterion: string;
-  weight: number;
-  description: string;
+export interface GuideOutline {
+  questions: { id: string; title: string; sections: { id: string; asked: string; requirements: string[] }[] }[];
 }
 
 export type AssignmentRecord = RecordModel & {
   course: string;
+  session: string;
   title: string;
-  description: string;
-  rubric: RubricCriterion[];
   due_at: string;
   created_at: string;
+  file: string;
+  outline: GuideOutline | null;
+  guide_status: 'generating' | 'ready' | 'failed';
+  guide_error: string;
 };
 
-export interface Review {
-  summary: string;
-  criteria: { id: string; score: number; strengths: string[]; fixes: string[] }[];
+export interface SectionMark {
+  id: string;
+  answered: boolean;
+  score: number;
+  meets: string;
+  missing: string;
+  direction: string;
+}
+
+export interface HomeworkReport {
+  marks: SectionMark[];
+  questions: { id: string; score: number }[];
   mistakes: string[];
 }
 
@@ -54,20 +64,33 @@ export interface SubmissionDto {
   assignmentId: string;
   studentNumber: string;
   studentName: string;
-  filename: string;
   status: 'processing' | 'done' | 'failed';
   error: string;
-  review: Review | null;
+  checkCount: number;
+  report: HomeworkReport | null;
   total: number | null;
   late: boolean;
   submittedAt: string;
+  reviewedAt: string | null;
 }
 
 export interface SubmissionView {
   submission: SubmissionDto;
-  percentiles: { total: number; criteria: Record<string, number> } | null;
-  classSize: number;
+  outline: GuideOutline | null;
+  place: number | null;
+  checked: number;
+  checksLeft: number;
   commonMistakes: { title: string; description: string; count: number }[];
+}
+
+export const MAX_CHECKS = 3;
+
+/** The homework PDF is protected; the tab opens first because mobile Safari blocks window.open after an await. */
+export async function openHomeworkPdf(a: AssignmentRecord) {
+  const tab = window.open('about:blank', '_blank');
+  const url = pb.files.getURL(a, a.file, { token: await pb.files.getToken() });
+  if (tab) tab.location.href = url;
+  else location.href = url;
 }
 
 export const formatSec = (s: number) => {

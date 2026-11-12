@@ -1,17 +1,18 @@
 import type { RecordModel } from 'pocketbase';
 import { type ChangeEvent, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
-import ReviewView from '../components/ReviewView';
+import { useParams } from 'react-router';
+import AppShell from '../components/AppShell';
+import HomeworkReport from '../components/HomeworkReport';
 import { Card, ErrorText } from '../components/ui';
 import { api, ApiError } from '../lib/api';
-import type { AssignmentRecord, SubmissionView } from '../lib/content';
+import { type AssignmentRecord, MAX_CHECKS, openHomeworkPdf, type SubmissionView } from '../lib/content';
 import { parseDate } from '../lib/device';
 import { pb } from '../lib/pb';
 import { useLiveRecords } from '../lib/useLiveRecords';
 
-const ACCEPT = '.pdf,.txt,.md,.java,.py,.ts,.tsx,.js,.jsx,.c,.h,.cpp,.hpp,.cs,.go,.rs,.kt,.swift,.sql,.html,.css,.json,.xml,.yml,.yaml,.sh';
+const pickButton = 'inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-medium';
 
-/** Student: read the assignment, upload, and watch the AI review arrive. */
+/** Student: read the homework, check a solution before handing it in (up to 3 times), see the report and where I stand. */
 export default function AssignmentPage() {
   const { id = '' } = useParams();
   const userId = pb.authStore.record?.id ?? '';
@@ -19,84 +20,97 @@ export default function AssignmentPage() {
   const [view, setView] = useState<SubmissionView | null>(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const mine = useLiveRecords<RecordModel & { status: string }>('submissions', pb.filter('assignment = {:a} && student = {:u}', { a: id, u: userId }))[0];
+  const live = useLiveRecords<AssignmentRecord>('assignments', pb.filter('id = {:a}', { a: id }))[0];
+  const mine = useLiveRecords<RecordModel & { status: string; check_count: number }>('submissions', pb.filter('assignment = {:a} && student = {:u}', { a: id, u: userId }))[0];
 
   useEffect(() => {
     pb.collection('assignments').getOne<AssignmentRecord>(id).then(setAssignment, () => setError('המטלה לא נמצאה או שאינכם רשומים לקורס'));
   }, [id]);
+  const hw = live ?? assignment;
 
-  // The API adds percentiles and class-wide mistakes, which PocketBase alone cannot compute.
+  // The API adds the outline, the place in the class and the class-wide mistakes.
   useEffect(() => {
     if (!mine) return setView(null);
     api.get<SubmissionView>(`/submissions/${mine.id}`).then(setView, () => {});
-  }, [mine?.id, mine?.status]);
+  }, [mine?.id, mine?.status, mine?.check_count]);
 
-  const submit = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const check = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = [...(e.target.files ?? [])];
     e.target.value = '';
-    if (!file) return;
+    if (files.length === 0) return;
     setError('');
     setSending(true);
     try {
       const form = new FormData();
-      form.set('file', file);
-      await api.upload(`/assignments/${id}/submissions`, form);
+      for (const f of files) form.append('files', f);
+      await api.upload(`/assignments/${id}/checks`, form);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'ההגשה נכשלה');
+      setError(err instanceof ApiError ? err.message : 'הבדיקה לא התחילה');
     } finally {
       setSending(false);
     }
   };
 
-  const due = assignment?.due_at ? parseDate(assignment.due_at) : null;
+  const due = hw?.due_at ? parseDate(hw.due_at) : null;
+  const used = mine?.check_count ?? 0;
+  const left = MAX_CHECKS - used;
+  const busy = sending || mine?.status === 'processing';
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
-      {assignment && (
-        <Link to={`/course/${assignment.course}?tab=homework`} className="text-sm text-indigo-600 hover:underline">
-          → לקורס
-        </Link>
-      )}
+    <AppShell back={hw ? (hw.session ? `/lesson/${hw.session}?tab=homework` : `/course/${hw.course}?tab=homework`) : '/'}>
       <ErrorText>{error}</ErrorText>
-      {assignment && (
+      {hw && (
         <>
-          <Card>
-            <h1 className="text-xl font-bold">{assignment.title}</h1>
+          <Card className="flex flex-col gap-2">
+            <h1 className="text-xl font-bold">{hw.title}</h1>
             {due && <p className={`text-sm ${due < new Date() ? 'text-red-600' : 'text-slate-500'}`}>להגשה עד {due.toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}</p>}
-            {assignment.description && <p className="mt-2 whitespace-pre-wrap text-slate-700">{assignment.description}</p>}
-            <h2 className="mt-4 mb-1 text-sm font-semibold text-slate-600">מחוון</h2>
-            <ul className="text-sm text-slate-700">
-              {assignment.rubric.map((c) => (
-                <li key={c.id}>
-                  • {c.criterion} <span className="text-slate-400">(משקל {c.weight})</span>
-                  {c.description && <span className="text-slate-500"> — {c.description}</span>}
-                </li>
-              ))}
-            </ul>
+            <button onClick={() => openHomeworkPdf(hw)} className="self-start text-indigo-700 hover:underline">
+              📄 פתיחת המטלה (PDF)
+            </button>
+            {hw.guide_status === 'generating' && <p className="text-sm text-slate-500">ה-AI עוד קורא את המטלה; הבדיקה תיפתח בעוד רגע.</p>}
+            {hw.guide_status === 'failed' && <p className="text-sm text-amber-700">המטלה עוד לא מוכנה לבדיקה. המרצה צריך/ה לנסות שוב.</p>}
+            {hw.outline && (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-slate-600">מה בודקים בכל סעיף</summary>
+                <ol className="mt-2 flex flex-col gap-2">
+                  {hw.outline.questions.map((q, qi) => (
+                    <li key={q.id}>
+                      <b>
+                        {qi + 1}. {q.title}
+                      </b>
+                      <ul className="ms-4 list-disc text-slate-700">
+                        {q.sections.map((s) => (
+                          <li key={s.id}>
+                            {s.asked}
+                            {s.requirements.length > 0 && <span className="text-slate-500"> — {s.requirements.join(' · ')}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
           </Card>
 
-          <Card>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold">{mine ? 'ההגשה שלי' : 'הגשה'}</h2>
-              <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 font-medium ${mine ? 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'} ${sending || mine?.status === 'processing' ? 'pointer-events-none opacity-50' : ''}`}>
-                📄 {mine ? 'הגשה מחדש' : 'העלאת קובץ'}
-                <input type="file" accept={ACCEPT} className="hidden" onChange={submit} />
+          <Card className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="font-semibold">משוב לפני הגשה</h2>
+                <p className="text-sm text-slate-500">
+                  נותרו {left} מתוך {MAX_CHECKS} בדיקות · PDF אחד או עד 10 תמונות של פתרון בכתב יד. הקובץ לא נשמר.
+                </p>
+              </div>
+              <label className={`${pickButton} bg-indigo-600 text-white hover:bg-indigo-700 ${busy || left <= 0 || hw.guide_status !== 'ready' ? 'pointer-events-none opacity-50' : ''}`}>
+                {busy ? 'בודק…' : used === 0 ? '✨ קבלת משוב' : '✨ בדיקה נוספת'}
+                <input type="file" multiple accept="application/pdf,image/jpeg,image/png,image/webp" aria-label="קובץ הפתרון" className="hidden" onChange={check} />
               </label>
             </div>
-            {!mine && <p className="text-sm text-slate-500">PDF או קובץ קוד/טקסט, עד 10MB. ה-AI יחזיר ציון לכל קריטריון והצעות לשיפור תוך כחצי דקה.</p>}
-            {sending && <p className="text-sm text-slate-600">מעלה…</p>}
-            {view && (
-              <>
-                <p className="mb-3 text-xs text-slate-500">
-                  {view.submission.filename} · {parseDate(view.submission.submittedAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })}
-                  {view.submission.late && <span className="ms-2 text-red-600">באיחור</span>}
-                </p>
-                <ReviewView view={view} rubric={assignment.rubric} />
-              </>
-            )}
+            {left <= 0 && <p className="text-sm text-slate-600">זו הייתה הבדיקה האחרונה — התוצאה שלה היא הסופית.</p>}
+            {view && <HomeworkReport view={view} />}
           </Card>
         </>
       )}
-    </main>
+    </AppShell>
   );
 }
