@@ -335,18 +335,15 @@ classDiagram
   }
   class AttendanceService {
     -baseRules: CheckInRule[]
-    -remoteRules: CheckInRule[]
     -repo: AttendanceRepository
     -clock: Clock
     +checkIn(ctx: CheckInContext) Promise~CheckInOutcome~
-    +joinRemote(ctx) Promise~CheckInOutcome~
     +manualApprove(session, studentNumber, studentName, note) Promise~AttendanceRecord~
     +remove(recordId, reason) Promise~AttendanceRecord~
     +get(recordId) Promise~AttendanceRecord~
     +listForSession(sessionId) Promise~AttendanceRecord[]~
     +flag(recordId, reason) Promise~void~ «M4»
     +presentCount(sessionId) Promise~number~ «M4»
-    +inRoomCount(sessionId) Promise~number~
   }
   class SessionService {
     -sessions: SessionRepository
@@ -401,7 +398,7 @@ classDiagram
   StrictGeofencePolicy ..> GeoMath
   TokenRule o-- QrTokenService
   SessionService o-- QrTokenService
-  AttendanceService o-- "*" CheckInRule : baseRules, remoteRules
+  AttendanceService o-- "*" CheckInRule : baseRules
   CourseService o-- RosterParser
   CourseService ..> AttendanceRepository : attendedCourse
   AttendanceService ..> GeofencePolicyFactory : appends policy per session
@@ -414,8 +411,6 @@ classDiagram
 **Idempotency.** `DuplicateStudentRule` returns `reject` with code `ALREADY_CHECKED_IN`. `AttendanceService` maps that code to "return the existing record" (UC1 4b). Two concurrent scans by the same student are caught by the DB unique index `(session, student_number)`, and the loser also receives the existing record.
 
 **Geofence and GPS accuracy.** `GeoMath.isInside` credits the accuracy the phone reports, capped at 100 m. A fix that is noisy but honest still passes, while a fix with 2 km accuracy cannot pass anywhere. A session with no location (the lecturer denied access) disables the geofence.
-
-**Remote joining.** A course member who is not in the room taps "Join remotely" (`POST /sessions/:id/join-remote`). The controller checks `CourseService.requireMember`, then `joinRemote` runs a shorter chain, `remoteRules` = DuplicateStudent then SessionActive, and writes the remote method (stored as `zoom`). There is no QR window, location or device to check, and no link to share. A student has one record per lesson whichever way came first. `ChallengeManager` counts only the room: the headcount compares the photo with `inRoomCount`, and challenge eligibility skips remote records. The `challenges` view rule likewise excludes them, so remote students never receive the event.
 
 **Course membership.** A member is a student on the roster (`Enrollment`, keyed by student ID) or one who attended any session of the course, so walk-ins and courses without a roster keep working. The same "enrolled or attended" condition is written into the PocketBase view rules of everything a member reads after a lesson. `RosterParser` reads pasted lists, CSV/TSV (UTF-8 or Windows-1255) and Excel; IDs that lost their leading zeros in Excel are padded back to 9 digits. An import adds and renames, never removes. `setTimetable` replaces the course's weekly slots as a whole and rejects overlaps on the same day.
 
