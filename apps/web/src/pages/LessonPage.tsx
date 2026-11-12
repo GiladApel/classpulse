@@ -1,6 +1,6 @@
 import type { RecordModel } from 'pocketbase';
 import { type ReactNode, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useParams } from 'react-router';
 import AppShell from '../components/AppShell';
 import AssignmentManager from '../components/AssignmentManager';
 import ChallengeOverlay from '../components/ChallengeOverlay';
@@ -10,7 +10,7 @@ import MaterialsTab from '../components/lesson/MaterialsTab';
 import StudentAssignments from '../components/StudentAssignments';
 import { Button, ErrorText, type TabItem, Tabs } from '../components/ui';
 import { api, ApiError } from '../lib/api';
-import { parseDate } from '../lib/device';
+import { formatTime, parseDate } from '../lib/device';
 import { pb, useSessionActive, useUser } from '../lib/pb';
 import type { CourseRecord, SessionRecord } from '../lib/timetable';
 import { useLiveRecords } from '../lib/useLiveRecords';
@@ -18,6 +18,13 @@ import { useTab } from '../lib/useTab';
 
 const TABS = ['attendance', 'forum', 'materials', 'homework'] as const;
 export type LessonTab = (typeof TABS)[number];
+
+/** Passed by the QR check-in page so the lesson opens with a confirmation. */
+export interface CheckInBanner {
+  already: boolean;
+  at: string;
+  geoFlag: boolean;
+}
 
 export interface MyRecord extends RecordModel {
   method: 'qr' | 'manual' | 'zoom';
@@ -35,6 +42,7 @@ export default function LessonPage() {
   const user = useUser()!;
   const [session, setSession] = useState<SessionRecord | null>(null);
   const [error, setError] = useState('');
+  const [banner, setBanner] = useState<CheckInBanner | undefined>((useLocation().state as { checkIn?: CheckInBanner } | null)?.checkIn);
   const active = useSessionActive(id);
   const course = session?.expand?.course as CourseRecord | undefined;
   const lecturer = !!course && course.lecturer === user.id;
@@ -100,6 +108,17 @@ export default function LessonPage() {
         )}
       </header>
       <ErrorText>{error}</ErrorText>
+      {banner && (
+        <div role="status" className="flex items-start justify-between gap-3 rounded-2xl bg-emerald-50 p-3 text-emerald-900 ring-1 ring-emerald-200">
+          <span>
+            <b>{banner.already ? '✓ כבר נרשמת' : '✓ הנוכחות נרשמה'}</b> · {formatTime(banner.at)}
+            {banner.geoFlag && <span className="block text-sm text-amber-800">לא הצלחנו לאמת לפי המיקום שאתם בכיתה — המרצה יראה סימון ליד שמכם.</span>}
+          </span>
+          <button onClick={() => setBanner(undefined)} aria-label="סגירה" className="px-1 text-emerald-700">
+            ✕
+          </button>
+        </div>
+      )}
       {session && (
         <>
           <Tabs tabs={tabs} value={tab} onChange={setTab} />

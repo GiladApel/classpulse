@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useParams } from 'react-router';
-import ChallengeOverlay from '../components/ChallengeOverlay';
-import StudentLivePanel from '../components/StudentLivePanel';
+import { Navigate, useParams } from 'react-router';
 import { Card, Screen } from '../components/ui';
 import { api, ApiError, type RecordDto } from '../lib/api';
-import { formatTime, getDeviceId, getLocation } from '../lib/device';
-import { useSessionActive } from '../lib/pb';
+import { getDeviceId, getLocation } from '../lib/device';
+import type { CheckInBanner } from './LessonPage';
 
 type State =
   | { kind: 'locating' | 'sending' }
@@ -19,7 +17,7 @@ interface CheckInResponse {
   sessionTitle: string;
 }
 
-/** Zero taps: opening the scanned URL checks in immediately. */
+/** Zero taps: opening the scanned URL checks in immediately, then opens the lesson. */
 export default function CheckInPage() {
   const { token = '' } = useParams();
   const [state, setState] = useState<State>({ kind: 'locating' });
@@ -41,52 +39,28 @@ export default function CheckInPage() {
     })();
   }, [token]);
 
-  const active = useSessionActive(state.kind === 'done' ? state.record.sessionId : undefined);
-
   if (state.kind === 'onboarding') return <Navigate to={`/onboarding?next=/c/${token}`} replace />;
-  const zoom = state.kind === 'done' && state.record.method === 'zoom';
+  if (state.kind === 'done' && state.record.sessionId) {
+    const checkIn: CheckInBanner = { already: state.already, at: state.record.checkedInAt, geoFlag: state.record.geoFlag };
+    return <Navigate to={`/lesson/${state.record.sessionId}?tab=forum`} replace state={{ checkIn }} />;
+  }
 
   return (
     <Screen>
       <Card className="flex flex-col items-center gap-3 py-10 text-center">
-        {(state.kind === 'locating' || state.kind === 'sending') && (
-          <>
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
-            <p className="text-lg text-slate-700">{state.kind === 'locating' ? 'מאתר מיקום…' : 'רושם נוכחות…'}</p>
-          </>
-        )}
-        {state.kind === 'done' && (
-          <>
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-5xl text-emerald-600">✓</div>
-            <h1 className="text-2xl font-bold">{state.already ? 'כבר נרשמת' : zoom ? 'נרשמת כנוכח/ת מרחוק' : 'הנוכחות נרשמה'}</h1>
-            <p className="text-slate-600">
-              {state.title} · {formatTime(state.record.checkedInAt)}
-            </p>
-            {state.record.geoFlag && (
-              <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                לא הצלחנו לאמת שאתם בכיתה לפי המיקום — המרצה יראה סימון ליד שמכם.
-              </p>
-            )}
-            <p className="mt-2 text-xs text-slate-400">השאירו את הדף פתוח — {zoom ? 'סקרים ושאלות יופיעו כאן' : 'סקרים ובדיקות נוכחות יופיעו כאן'}.</p>
-            {state.record.sessionId && (
-              <Link to={`/lecture/${state.record.sessionId}`} className="text-sm text-indigo-600 hover:underline">
-                דף השיעור — חומרים, תרגול וסיכום ←
-              </Link>
-            )}
-            {state.record.sessionId && !zoom && <ChallengeOverlay sessionId={state.record.sessionId} />}
-          </>
-        )}
-        {state.kind === 'error' && (
+        {state.kind === 'error' ? (
           <>
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-red-100 text-5xl text-red-600">!</div>
             <h1 className="text-xl font-bold">הנוכחות לא נרשמה</h1>
             <p className="text-slate-700">{state.message}</p>
           </>
+        ) : (
+          <>
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+            <p className="text-lg text-slate-700">{state.kind === 'locating' ? 'מאתר מיקום…' : 'רושם נוכחות…'}</p>
+          </>
         )}
       </Card>
-      {state.kind === 'done' && state.record.sessionId && state.record.status !== 'removed' && (
-        <StudentLivePanel sessionId={state.record.sessionId} active={active} />
-      )}
     </Screen>
   );
 }
