@@ -112,7 +112,7 @@ export default function LessonPage() {
         <div role="status" className="flex items-start justify-between gap-3 rounded-2xl bg-emerald-50 p-3 text-emerald-900 ring-1 ring-emerald-200">
           <span>
             <b>{banner.already ? '✓ כבר נרשמת' : '✓ הנוכחות נרשמה'}</b> · {formatTime(banner.at)}
-            {banner.geoFlag && <span className="block text-sm text-amber-800">לא הצלחנו לאמת לפי המיקום שאתם בכיתה — המרצה יראה סימון ליד שמכם.</span>}
+            {banner.geoFlag && <span className="block text-sm text-amber-800">לא הצלחנו לאמת שאתם בכיתה לפי המיקום — המרצה יראה סימון ליד שמכם.</span>}
           </span>
           <button onClick={() => setBanner(undefined)} aria-label="סגירה" className="px-1 text-emerald-700">
             ✕

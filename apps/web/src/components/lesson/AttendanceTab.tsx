@@ -56,7 +56,7 @@ function StudentAttendance({ sessionId, active, record, onJoined }: Props) {
         <h2 className="text-xl font-bold">{remote ? 'נוכחות מרחוק נרשמה' : 'הנוכחות נרשמה'}</h2>
         <p className="text-slate-600">{formatTime(record.checked_in_at)}</p>
         {record.status === 'flagged' && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">המרצה יבדוק את הנוכחות שלך.</p>}
-        {record.geo_flag && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">לא הצלחנו לאמת לפי המיקום שאתם בכיתה — המרצה יראה סימון ליד שמכם.</p>}
+        {record.geo_flag && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">לא הצלחנו לאמת שאתם בכיתה לפי המיקום — המרצה יראה סימון ליד שמכם.</p>}
       </Card>
     );
   }
