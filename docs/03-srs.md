@@ -30,8 +30,8 @@
 | FR-ATT-07 | The dashboard shows check-ins in realtime: name, ID, time, distance, flags, status. |
 | FR-ATT-08 | The lecturer can manually approve a student (late arrival or phone problem) with a note, and can remove a record. |
 | FR-ATT-09 | The lecturer can export the session's attendance as `.xlsx` / `.csv` and sync it to a Google Sheet. |
-| FR-ATT-10 | While a session is active, the lecturer can copy a Zoom link for it. A student who opens the link is checked in as "from Zoom" with no QR, location or device check; it stops working when the lecture ends. A student has one record per lecture, whichever way they came first. |
-| FR-ATT-11 | The dashboard lists students in the classroom and students from Zoom separately, with a count of each. Zoom students take part in questions, polls, "I'm lost" and feedback; challenges (FR-AF-02..06) concern only the students in the room. |
+| FR-ATT-10 | While a lesson is live, a course member who is not in the room taps "Join remotely" on the lesson page and is recorded as attending remotely, with no QR, location or device check. It is refused for non-members and after the lesson ends. A student has one record per lesson, whichever way they came first. No link is sent and nothing is integrated with any video-meeting service. |
+| FR-ATT-11 | The lesson's attendance tab lists students in the classroom and remote students separately, with a count of each. Remote students take part in questions, polls, "I'm lost" and feedback; challenges (FR-AF-02..06) concern only the students in the room. |
 
 ### F2: Anti-fraud
 | ID | Requirement |
@@ -81,7 +81,7 @@
 ### F7: Lecture page
 | ID | Requirement |
 |----|-------------|
-| FR-LP-01 | Every lecture has a page for every course participant, including students who missed it: published summary, materials, practice questions, the closed polls with results, and the questions with answers. Posting and upvoting stay limited to students checked in to that lecture. |
+| FR-LP-01 | Every lecture has a page for every course member (on the roster, or attended any lesson of the course), including students who missed it: published summary, materials, practice questions, the closed polls with results, and the questions with answers. Posting and upvoting stay limited to students checked in to that lecture. |
 | FR-LP-02 | During or after the lecture, the lecturer publishes open review questions (no answer options), written by hand or drafted by the AI from the lecture's slide deck (PDF or image, ≤50 MB): up to 8 drafts, of which the lecturer publishes the ones they select. Students read them on the lecture page; there is nothing to submit. |
 | FR-LP-03 | During or after the lecture, the lecturer attaches files or images (≤50 MB; one button opens the file picker and uploads at once) and links. Files are downloadable only by course participants. |
 | FR-LP-04 | The lecturer can write an answer under a student's question, during or after the lecture; it marks the question answered. |
@@ -98,7 +98,18 @@
 |----|-------------|
 | FR-AD-01 | Admins are set by email in the server configuration. An admin searches registered users by name, email or student ID and makes a user a lecturer or a student again. An admin cannot change their own role. |
 | FR-AD-02 | A lecturer creates their own courses (code and name); a lecturer cannot have two courses with the same code. |
-| FR-AD-03 | The lecturer can copy a link to a lecture's page to share with the course (see FR-LP-01). |
+
+### F10: Enrollment and timetable
+| ID | Requirement |
+|----|-------------|
+| FR-EN-01 | The lecturer uploads the course roster as an Excel or CSV file, or pastes it: one student per row, student ID and name in any column order. A repeated upload adds new students and updates names; it never removes anyone. Rows without a valid ID, or repeated, are reported by line number. |
+| FR-EN-02 | The lecturer adds or removes a single student. The roster shows, next to each roster name, the name the student signed up with, or that they have not signed up yet. |
+| FR-EN-03 | A student signs up once (Google and student ID). Every course whose roster has their student ID appears on their home screen, with no link or code per lesson. A student sees only their own roster row. |
+| FR-EN-04 | A student not on the roster who checks in is accepted and marked "not on roster" in the lecturer's lists, with a one-tap "add". |
+| FR-TT-01 | The lecturer sets the course's weekly meetings (day, start, end, room; no two overlapping on the same day) and, optionally, the term dates. |
+| FR-TT-02 | Lecturers and students see a weekly timetable of their courses: the whole week on a computer, one day at a time on a phone. A course with a live lesson is marked. |
+| FR-TT-03 | The home screen shows every live lesson of the user's courses; a student enters it in one tap. The lecturer's home shows the meeting happening now with a one-tap start (lenient location check, title "Lecture N"). |
+| FR-TT-04 | Each lesson has one page with tabs: attendance, forum (questions and polls), materials, homework. Scanning the QR checks in and opens the lesson's forum tab. |
 
 ## 4. Non-functional requirements
 | ID | Requirement |
