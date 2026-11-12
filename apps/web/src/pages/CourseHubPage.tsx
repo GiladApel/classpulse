@@ -5,15 +5,16 @@ import AssignmentManager from '../components/AssignmentManager';
 import CourseLessons from '../components/CourseLessons';
 import RosterPanel from '../components/RosterPanel';
 import StudentAssignments from '../components/StudentAssignments';
+import TimetableEditor from '../components/TimetableEditor';
 import { ErrorText, type TabItem, Tabs } from '../components/ui';
 import { pb, useUser } from '../lib/pb';
 import type { CourseRecord } from '../lib/timetable';
 import { useTab } from '../lib/useTab';
 
-const TABS = ['lessons', 'homework', 'students'] as const;
+const TABS = ['lessons', 'homework', 'students', 'timetable'] as const;
 type Tab = (typeof TABS)[number];
 
-/** One page per course, for the lecturer and the students: its lessons and homework; the lecturer also manages the roster. */
+/** One page per course, for the lecturer and the students: its lessons and homework; the lecturer also manages the roster and the timetable. */
 export default function CourseHubPage() {
   const { id = '' } = useParams();
   const user = useUser()!;
@@ -29,7 +30,7 @@ export default function CourseHubPage() {
   const tabs: TabItem<Tab>[] = [
     { id: 'lessons', label: 'שיעורים' },
     { id: 'homework', label: 'שיעורי בית' },
-    ...(lecturer ? [{ id: 'students' as const, label: 'סטודנטים' }] : []),
+    ...(lecturer ? [{ id: 'students' as const, label: 'סטודנטים' }, { id: 'timetable' as const, label: 'מערכת שעות' }] : []),
   ];
 
   return (
@@ -42,6 +43,7 @@ export default function CourseHubPage() {
           {tab === 'lessons' && <CourseLessons courseId={id} lecturer={lecturer} />}
           {tab === 'homework' && (lecturer ? <AssignmentManager courseId={id} /> : <StudentAssignments courseId={id} />)}
           {tab === 'students' && lecturer && <RosterPanel courseId={id} />}
+          {tab === 'timetable' && lecturer && <TimetableEditor course={course} />}
         </>
       )}
     </AppShell>
