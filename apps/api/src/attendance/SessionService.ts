@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { HeadcountRepository } from '../challenge/repositories.js';
 import type { Clock } from '../infra/Clock.js';
-import { ConflictError, DomainError, ForbiddenError, NotFoundError } from '../shared/errors.js';
+import { DomainError, ForbiddenError, NotFoundError } from '../shared/errors.js';
 import type { QrTokenService } from './QrTokenService.js';
 import type { CourseRepository, SessionRepository } from './repositories.js';
 import type { Course, GeofenceMode, GeoPoint, Session } from './types.js';
@@ -27,11 +27,6 @@ export class SessionService {
     private readonly clock: Clock,
     private readonly headcounts: Pick<HeadcountRepository, 'purgeClearPhotos'>,
   ) {}
-
-  async createCourse(lecturerId: string, code: string, name: string): Promise<Course> {
-    if (await this.courses.findByLecturerAndCode(lecturerId, code)) throw new ConflictError('COURSE_EXISTS', 'כבר יש לך קורס עם הקוד הזה');
-    return this.courses.create({ code, name, lecturerId });
-  }
 
   async start(lecturerId: string, input: StartSessionInput): Promise<Session> {
     const course = await this.courses.get(input.courseId);

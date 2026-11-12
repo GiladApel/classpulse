@@ -10,10 +10,12 @@ import { PracticeQuestionGenerator } from './ai/PracticeQuestionGenerator.js';
 import { PeopleDetector } from './ai/PeopleDetector.js';
 import { AttendanceExportService } from './attendance/AttendanceExportService.js';
 import { AttendanceService } from './attendance/AttendanceService.js';
+import { CourseService } from './attendance/CourseService.js';
 import { DeviceBindingRule } from './attendance/DeviceBindingRule.js';
 import { DuplicateStudentRule } from './attendance/DuplicateStudentRule.js';
 import { QrTokenService } from './attendance/QrTokenService.js';
-import type { AttendanceRepository, CourseRepository, SessionRepository } from './attendance/repositories.js';
+import type { AttendanceRepository, CourseRepository, CourseSlotRepository, EnrollmentRepository, SessionRepository } from './attendance/repositories.js';
+import { RosterParser } from './attendance/RosterParser.js';
 import { SessionActiveRule } from './attendance/SessionActiveRule.js';
 import { SessionService } from './attendance/SessionService.js';
 import { TokenRule } from './attendance/TokenRule.js';
@@ -66,6 +68,7 @@ import {
   PbSubmissionRepository,
 } from './infra/pb/PbContentRepositories.js';
 import { PbCourseRepository } from './infra/pb/PbCourseRepository.js';
+import { PbCourseSlotRepository, PbEnrollmentRepository } from './infra/pb/PbEnrollmentRepositories.js';
 import {
   PbFeedPostRepository,
   PbLessonFeedbackRepository,
@@ -82,6 +85,7 @@ export interface Container {
   clock: Clock;
   tokens: QrTokenService;
   sessions: SessionService;
+  courses: CourseService;
   attendance: AttendanceService;
   exports: AttendanceExportService;
   challenges: ChallengeManager;
@@ -104,6 +108,8 @@ export interface Ports {
   attendanceRepo: AttendanceRepository;
   sessionRepo: SessionRepository;
   courseRepo: CourseRepository;
+  enrollmentRepo: EnrollmentRepository;
+  slotRepo: CourseSlotRepository;
   userRepo: UserRepository;
   adminEmails: string[];
   headcountRepo: HeadcountRepository;
@@ -148,6 +154,7 @@ export function buildContainer(p: Ports): Container {
     clock: p.clock,
     tokens,
     sessions: new SessionService(p.sessionRepo, p.courseRepo, tokens, p.clock, p.headcountRepo),
+    courses: new CourseService(p.courseRepo, p.enrollmentRepo, p.slotRepo, p.attendanceRepo, new RosterParser(), p.clock),
     attendance,
     exports: new AttendanceExportService(p.attendanceRepo, p.courseRepo, p.exporters),
     challenges: new ChallengeManager(
@@ -198,6 +205,8 @@ export async function buildProductionContainer(cfg: Config): Promise<Container> 
     attendanceRepo: new PbAttendanceRepository(pb),
     sessionRepo: new PbSessionRepository(pb),
     courseRepo: new PbCourseRepository(pb),
+    enrollmentRepo: new PbEnrollmentRepository(pb),
+    slotRepo: new PbCourseSlotRepository(pb),
     userRepo: new PbUserRepository(pb),
     adminEmails: cfg.adminEmails,
     headcountRepo: new PbHeadcountRepository(pb),

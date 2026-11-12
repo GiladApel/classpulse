@@ -23,6 +23,7 @@ import {
   InMemorySubmissionRepository,
 } from '../infra/memory/InMemoryContentRepositories.js';
 import { InMemoryCourseRepository } from '../infra/memory/InMemoryCourseRepository.js';
+import { InMemoryCourseSlotRepository, InMemoryEnrollmentRepository } from '../infra/memory/InMemoryEnrollmentRepositories.js';
 import { InMemoryUserRepository } from '../infra/memory/InMemoryUserRepository.js';
 import {
   InMemoryFeedPostRepository,
@@ -67,6 +68,8 @@ export function makeTestPorts(over: Partial<Ports> = {}) {
     attendanceRepo: new InMemoryAttendanceRepository(sessionRepo),
     sessionRepo,
     courseRepo: new InMemoryCourseRepository([{ id: 'c1', code: 'I2SE', name: 'הנדסת תוכנה', lecturerId: 'lect1' }]),
+    enrollmentRepo: new InMemoryEnrollmentRepository(),
+    slotRepo: new InMemoryCourseSlotRepository(),
     userRepo: new InMemoryUserRepository(Object.values(USERS).map((u) => ({ ...u }))),
     adminEmails: ['boss@x'],
     headcountRepo: new InMemoryHeadcountRepository(),
