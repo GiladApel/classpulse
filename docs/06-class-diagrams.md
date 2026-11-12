@@ -31,6 +31,19 @@ classDiagram
     +id: string
     +code: string
     +name: string
+    +termStart: Date
+    +termEnd: Date
+  }
+  class Enrollment {
+    +studentNumber: string
+    +name: string
+    +addedAt: Date
+  }
+  class CourseSlot {
+    +weekday: number
+    +starts: string
+    +ends: string
+    +room: string
   }
   class Session {
     +id: string
@@ -165,6 +178,8 @@ classDiagram
   Session "1" *-- "*" PracticeQuestion
   Session "1" *-- "*" Material
   Session "1" *-- "*" LessonFeedback
+  Course "1" *-- "*" Enrollment : roster
+  Course "1" *-- "*" CourseSlot : weekly timetable
 ```
 
 ## 2. `ai/`: Strategy + Adapter + Factory
@@ -317,9 +332,6 @@ classDiagram
     +issue(sessionId: string, secret: string) string
     +parse(token: string) TokenClaims
     +verify(token: string, secret: string) TokenClaims
-    +issueZoom(sessionId: string, secret: string) string
-    +parseZoom(token: string) string
-    +verifyZoom(token: string, secret: string) void
   }
   class AttendanceService {
     -baseRules: CheckInRule[]
@@ -341,13 +353,33 @@ classDiagram
     -courses: CourseRepository
     -tokens: QrTokenService
     -clock: Clock
-    +createCourse(lecturerId, code, name) Promise~Course~
     +start(lecturerId, input: StartSessionInput) Promise~Session~
     +end(session) Promise~Session~
     +currentQrToken(session) QrTicket
-    +zoomToken(session) string
     +get(sessionId) Promise~Session~
     +getOwned(sessionId, lecturerId) Promise~Session~
+    +getOwnedCourse(courseId, lecturerId) Promise~Course~
+  }
+  class CourseService {
+    -courses: CourseRepository
+    -enrollments: EnrollmentRepository
+    -slots: CourseSlotRepository
+    -attendance: AttendanceRepository
+    -parser: RosterParser
+    -clock: Clock
+    +create(lecturerId, code, name) Promise~Course~
+    +importRoster(course, text or file) Promise~RosterImport~
+    +enroll(course, studentNumber, name) Promise~Enrollment~
+    +unenroll(course, studentNumber) Promise~void~
+    +roster(courseId) Promise~Enrollment[]~
+    +setTimetable(course, slots: SlotInput[], term) Promise~CourseSlot[]~
+    +isMember(courseId, studentNumber) Promise~boolean~
+    +requireMember(courseId, studentNumber) Promise~void~
+  }
+  class RosterParser {
+    +fromText(text) RosterParseResult
+    +fromFile(data: Buffer) RosterParseResult
+    +fromRows(rows: string[][]) RosterParseResult
   }
   class AttendanceExportService {
     -repo: AttendanceRepository
@@ -370,6 +402,8 @@ classDiagram
   TokenRule o-- QrTokenService
   SessionService o-- QrTokenService
   AttendanceService o-- "*" CheckInRule : baseRules, remoteRules
+  CourseService o-- RosterParser
+  CourseService ..> AttendanceRepository : attendedCourse
   AttendanceService ..> GeofencePolicyFactory : appends policy per session
   CheckInRule ..> CheckInContext
   CheckInRule ..> RuleResult
@@ -381,7 +415,9 @@ classDiagram
 
 **Geofence and GPS accuracy.** `GeoMath.isInside` credits the accuracy the phone reports, capped at 100 m. A fix that is noisy but honest still passes, while a fix with 2 km accuracy cannot pass anywhere. A session with no location (the lecturer denied access) disables the geofence.
 
-**Zoom link.** `joinRemote` runs a shorter chain, `remoteRules` = DuplicateStudent then SessionActive, and writes method `zoom`. There is no QR window, location or device to check. The link token is `sessionId.HMAC(qrSecret, "sessionId.zoom")`: it is static for the whole lecture, so the lecturer pastes it once into the Zoom chat, and it dies with the session. A student has one record per lecture whichever way came first. `ChallengeManager` counts only the room: the headcount compares the photo with `inRoomCount`, and challenge eligibility skips `zoom` records. The `challenges` view rule likewise excludes them, so Zoom students never receive the event.
+**Remote joining.** A course member who is not in the room taps "Join remotely" (`POST /sessions/:id/join-remote`). The controller checks `CourseService.requireMember`, then `joinRemote` runs a shorter chain, `remoteRules` = DuplicateStudent then SessionActive, and writes the remote method (stored as `zoom`). There is no QR window, location or device to check, and no link to share. A student has one record per lesson whichever way came first. `ChallengeManager` counts only the room: the headcount compares the photo with `inRoomCount`, and challenge eligibility skips remote records. The `challenges` view rule likewise excludes them, so remote students never receive the event.
+
+**Course membership.** A member is a student on the roster (`Enrollment`, keyed by student ID) or one who attended any session of the course, so walk-ins and courses without a roster keep working. The same "enrolled or attended" condition is written into the PocketBase view rules of everything a member reads after a lesson. `RosterParser` reads pasted lists, CSV/TSV (UTF-8 or Windows-1255) and Excel; IDs that lost their leading zeros in Excel are padded back to 9 digits. An import adds and renames, never removes. `setTimetable` replaces the course's weekly slots as a whole and rejects overlaps on the same day.
 
 **Identity key.** Records are keyed by `studentNumber` (not by user id), so the lecturer can manually approve a student who never signed in.
 
@@ -536,7 +572,6 @@ classDiagram
   }
   class AttendanceService {
     +requireParticipant(sessionId, studentNumber) Promise~AttendanceRecord~
-    +requireCourseParticipant(courseId, studentNumber) Promise~void~
     +presentCount(sessionId) Promise~number~
   }
   class FeedbackService {
@@ -631,6 +666,7 @@ classDiagram
   HomeworkAnalysisService o-- HomeworkReviewer
   HomeworkAnalysisService o-- TextExtractor
   HomeworkAnalysisService o-- BackgroundQueue
+  HomeworkAnalysisService ..> CourseService : requireMember
   HomeworkAnalysisService ..> PercentileCalculator
   HomeworkAnalysisService ..> SimilarityAnalyzer
   HomeworkAnalysisService ..> Fingerprinter
@@ -695,11 +731,22 @@ classDiagram
   }
   class PbSessionRepository {
     expands course to resolve lecturerId
+    +countByCourse(courseId) Promise~number~
   }
   class PbCourseRepository {
     +get(id) Promise~Course | null~
     +create(data) Promise~Course~
+    +update(id, data) Promise~Course~
     +findByLecturerAndCode(lecturerId, code) Promise~Course | null~
+  }
+  class PbEnrollmentRepository {
+    +findByCourseAndStudent(courseId, studentNumber) Promise~Enrollment~
+    +listByCourse(courseId) Promise~Enrollment[]~
+    +delete(id) Promise~void~
+  }
+  class PbCourseSlotRepository {
+    +listByCourse(courseId) Promise~CourseSlot[]~
+    +replaceForCourse(courseId, slots) Promise~CourseSlot[]~
   }
   class PbHeadcountRepository {
     +purgeClearPhotos(sessionId) Promise~void~ «M4»
@@ -744,6 +791,7 @@ classDiagram
   Repository~T~ <|.. InMemoryRepository~T~
   PbRepository~T~ <|-- PbAttendanceRepository
   PbRepository~T~ <|-- PbSessionRepository
+  PbRepository~T~ <|-- PbEnrollmentRepository
   PbRepository~T~ <|-- PbHeadcountRepository
   PbRepository~T~ <|-- PbFeedPostRepository
   PbFeedPostRepository o-- KeyedLock
@@ -760,7 +808,7 @@ Queries are named methods on domain-specific repository interfaces, never raw Po
 
 **Why `KeyedLock`:** PocketBase's `votes+` modifier is a read-modify-write in Go, not an atomic SQL update. An integration test fired 12 concurrent upvotes from 6 students; all 6 valid votes were accepted but only 2 were counted. `PbFeedPostRepository` now serialises increments per post inside the API process. This is valid because the API runs as a single instance; scaling out would need a recount or a database-side counter.
 
-## 6b. `admin/`: user roles
+## 6b. `admin/` and course setup
 
 ```mermaid
 classDiagram
@@ -782,6 +830,10 @@ classDiagram
   }
   class AdminController {
     -admins: UserAdminService
+    +routes() Hono
+  }
+  class CourseController {
+    -courses: CourseService
     -sessions: SessionService
     +routes() Hono
   }
@@ -789,10 +841,11 @@ classDiagram
   UserRepository <|.. InMemoryUserRepository
   UserAdminService o-- UserRepository
   AdminController o-- UserAdminService
-  AdminController o-- SessionService : createCourse
+  CourseController o-- CourseService
+  CourseController o-- SessionService : getOwnedCourse
 ```
 
-Admins are not a role in the database: `ADMIN_EMAILS` (server configuration) lists them, so no user can make themselves an admin, and the `users` update rule already stops users from changing their own `role`. Only the API, through `PbUserRepository`, writes `role`. `AdminController` serves `GET /me` (is the caller an admin), `GET /admin/users`, `POST /admin/users/:id/role` (both behind `requireAdmin`) and `POST /courses` (behind `requireLecturer`, delegating to `SessionService.createCourse`). An admin cannot change their own role, so the last admin cannot lock themselves out of the lecturer screens.
+Admins are not a role in the database: `ADMIN_EMAILS` (server configuration) lists them, so no user can make themselves an admin, and the `users` update rule already stops users from changing their own `role`. Only the API, through `PbUserRepository`, writes `role`. `AdminController` serves `GET /me` (is the caller an admin), `GET /admin/users` and `POST /admin/users/:id/role` (both behind `requireAdmin`). The lecturer's course setup is `CourseController`, behind `requireLecturer` and course ownership: `POST /courses`, `POST /courses/:id/roster` (file or pasted text), `POST`/`DELETE /courses/:id/enrollments` and `PUT /courses/:id/timetable`. An admin cannot change their own role, so the last admin cannot lock themselves out of the lecturer screens.
 
 ## 7. SOLID mapping
 | Principle | Evidence |
