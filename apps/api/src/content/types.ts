@@ -99,6 +99,49 @@ export interface Submission {
   reviewedAt?: Date;
 }
 
+/** One section of a homework's review guide. `expected` holds the answer, so the guide never leaves the API. */
+export interface GuideSection {
+  id: string;
+  asked: string;
+  requirements: string[];
+  expected: string;
+  /** What, in this subject, would count as giving the answer away. */
+  givingAway: string;
+}
+
+export interface GuideQuestion {
+  id: string;
+  title: string;
+  sections: GuideSection[];
+}
+
+/** Made once per homework from its PDF and used unchanged for every check. */
+export interface ReviewGuide {
+  questions: GuideQuestion[];
+  instructions: string;
+}
+
+/** The guide without answers: what students and the lecturer see. */
+export interface GuideOutline {
+  questions: { id: string; title: string; sections: { id: string; asked: string; requirements: string[] }[] }[];
+}
+
+/** The reviewer's mark of one section. */
+export interface SectionMark {
+  id: string;
+  answered: boolean;
+  /** 0 if not answered, else 1–100. */
+  score: number;
+  meets: string;
+  missing: string;
+  direction: string;
+}
+
+export interface QuestionScore {
+  id: string;
+  score: number;
+}
+
 export interface CommonMistake {
   title: string;
   description: string;
