@@ -71,10 +71,14 @@
 ### F6: Homework review
 | ID | Requirement |
 |----|-------------|
-| FR-HW-01 | The lecturer can create an assignment with a weighted rubric. |
-| FR-HW-02 | A student can upload a submission (PDF, code or text) and receive an AI review per rubric criterion: score, strengths and concrete fixes. |
-| FR-HW-03 | The student sees their percentile per criterion and the class-wide common mistakes. Peers' raw work and identities are never shown. |
-| FR-HW-04 | The lecturer sees the score distribution, common mistakes and highly similar submission pairs for human review. |
+| FR-HW-01 | The lecturer publishes a homework in a lesson (or in the course) as a PDF, with a title and an optional due date. The AI turns it, once, into a review guide: its questions, their sections, the requirements of each section, the key points of a correct answer and what would count as giving it away. Every check of that homework uses the same guide. If reading the PDF fails, the lecturer can retry. |
+| FR-HW-02 | Course members see the homework PDF and, for each section, what is asked and required. The expected answers are never shown to anyone. |
+| FR-HW-03 | Before handing in, a student uploads a solution (one PDF, or up to 10 photos of a handwritten solution) and gets a report: for each section a score from 1 to 100 (0 if not answered), what meets the requirements, what is missing and which direction to take, plus a list of the sections not answered. The report never contains the answer, working code, a final result or a rewritten passage. |
+| FR-HW-04 | A question's score is the plain average of its sections; the total is the plain average of the questions, rounded, at least 1. The server computes them, not the model. |
+| FR-HW-05 | A student has 3 checks per homework. A check that fails for a technical reason does not count. Each check replaces the previous result; the third is final. |
+| FR-HW-06 | The student's solution file is never stored: only the scores, the report and a text fingerprint for copy detection are kept. |
+| FR-HW-07 | A class chart shows where each checked student stands, by total, by question or by section, with equal scores sharing a place. Students see it only from 3 checked students, anonymously, with their own place highlighted; the lecturer sees it with names. |
+| FR-HW-08 | The lecturer sees every student's latest report, the class-wide common mistakes (also shown to students, without names) and highly similar solutions for review by hand, and can delete a homework with its checks. Text in a solution that addresses the reviewer does not change any score. |
 
 ### F7: Lecture page
 | ID | Requirement |
