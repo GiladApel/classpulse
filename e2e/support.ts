@@ -27,6 +27,7 @@ export interface Person {
   id: string;
   email: string;
   name: string;
+  student_id: string;
 }
 
 /** Throwaway lecturer, course and students for one spec file; `cleanup()` deletes them (records cascade with the course). */
@@ -94,9 +95,14 @@ export async function phone(browser: Browser, who: Person, i: number, geolocatio
 export async function startSession(page: Page, mode: 'lenient' | 'strict' = 'lenient'): Promise<string> {
   await page.locator('select[name=geofenceMode]').selectOption(mode);
   await page.getByRole('button', { name: 'התחלת שיעור' }).click();
-  await page.waitForURL(/\/dash\/\w+$/);
-  return page.url().split('/').pop()!;
+  await page.waitForURL(/\/lesson\/\w+/);
+  return lessonId(page);
 }
+
+export const lessonId = (page: Page) => new URL(page.url()).pathname.split('/').pop()!;
+
+/** The lesson and course pages keep their content in tabs. */
+export const openTab = (page: Page, name: string) => page.getByRole('tab', { name: new RegExp(`^${name}`) }).click();
 
 /** The token the projector would show right now. */
 export const qrToken = (lecturer: Page, sessionId: string): Promise<string> =>

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { checkIn, lecturerPage, makeClass, phone, qrToken, startSession } from './support';
+import { checkIn, lecturerPage, makeClass, openTab, phone, qrToken, startSession } from './support';
 
 let klass: Awaited<ReturnType<typeof makeClass>>;
 test.beforeAll(async () => {
@@ -22,6 +22,7 @@ test('5b · "I\'m lost" with an optional note: the note lands in the feed anonym
   await expect(sp.getByLabel('רוצים לכתוב מה לא ברור?')).toBeHidden();
 
   // The lecturer sees the note in the feed, and nothing in it names the student.
+  await openTab(lp, 'פורום');
   const post = lp.locator('li', { hasText: note });
   await expect(post).toBeVisible({ timeout: 5_000 });
   await expect(post).not.toContainText(klass.students[0].name);

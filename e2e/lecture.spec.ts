@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { checkIn, lecturerPage, makeClass, phone, qrToken, startSession } from './support';
+import { checkIn, lecturerPage, makeClass, openTab, phone, qrToken, startSession } from './support';
 
 let klass: Awaited<ReturnType<typeof makeClass>>;
 test.beforeAll(async () => {
@@ -22,6 +22,7 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
   await sp.getByRole('button', { name: 'שליחה', exact: true }).click();
 
   // Live poll: only from a slide (camera or gallery); the AI drafts 3 and the lecturer opens one.
+  await openTab(lp, 'פורום');
   await lp.getByLabel('🖼️ העלאת תמונה').setInputFiles({ name: 'slide.png', mimeType: 'image/png', buffer: Buffer.from([137, 80, 78, 71]) });
   await lp.getByRole('button', { name: /איזה תבנית עיצוב/ }).click();
   await lp.getByRole('button', { name: 'פתיחת הסקר' }).click();
@@ -30,12 +31,13 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
 
   lp.once('dialog', (d) => d.accept());
   await lp.getByRole('button', { name: 'סיום שיעור' }).click();
-  await expect(lp.getByText('הסתיים')).toBeVisible();
+  await expect(lp.getByText('הסתיים', { exact: true })).toBeVisible();
 
   // After the end: a written answer, a practice question and a link.
   await lp.getByRole('button', { name: 'כתיבת תשובה' }).click();
   await lp.getByLabel('תשובה', { exact: true }).fill('Strategy בוחר אלגוריתם; State משנה התנהגות לפי מצב.');
   await lp.getByRole('button', { name: 'שמירת תשובה' }).click();
+  await openTab(lp, 'חומרים');
   await lp.getByLabel('שאלה לתרגול').fill('מתי נעדיף Strategy על פני if/else?');
   await lp.getByRole('button', { name: 'פרסום שאלה' }).click();
   await expect(lp.getByText('1. מתי נעדיף Strategy על פני if/else?')).toBeVisible();
@@ -54,14 +56,17 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
   // Ido finds the lecture from his course page.
   const ip = await phone(browser, ido, 1);
   await ip.goto(`/course/${klass.courseId}`);
-  await ip.getByRole('link', { name: /E2E · הרצאה|הרצאה/ }).first().click();
-  await expect(ip).toHaveURL(new RegExp(`/lecture/${sessionId}$`));
-  await expect(ip.getByText('Strategy בוחר אלגוריתם; State משנה התנהגות לפי מצב.')).toBeVisible();
+  // The earlier lesson is still running, so it is listed first; Ido opens the one he missed.
+  await ip.getByRole('link', { name: /הרצאה 2/ }).click();
+  await expect(ip).toHaveURL(new RegExp(`/lesson/${sessionId}`));
+  // A past lesson opens on its materials.
   await expect(ip.getByRole('link', { name: /refactoring\.guru/ })).toBeVisible();
-  await expect(ip.getByPlaceholder('שאלה, הערה או הצעה למרצה…')).toHaveCount(0); // he missed it: read-only
-
   await expect(ip.getByRole('listitem').filter({ hasText: 'מתי נעדיף Strategy על פני if/else?' })).toBeVisible();
   await expect(ip.getByText('במה שונה State מ-Strategy, למרות שהמבנה שלהן כמעט זהה?')).toBeVisible();
   await expect(ip.getByText('הסבירו מה תפקידו של ה-Subject בתבנית Observer')).toHaveCount(0); // unticked
   await expect(ip.getByRole('button', { name: /slides\.pdf/ })).toBeVisible();
+
+  await openTab(ip, 'פורום');
+  await expect(ip.getByText('Strategy בוחר אלגוריתם; State משנה התנהגות לפי מצב.')).toBeVisible();
+  await expect(ip.getByPlaceholder('שאלה, הערה או הצעה למרצה…')).toHaveCount(0); // he missed it: read-only
 });

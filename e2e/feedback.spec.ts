@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { checkIn, lecturerPage, makeClass, phone, qrToken, startSession } from './support';
+import { checkIn, lecturerPage, makeClass, openTab, phone, qrToken, startSession } from './support';
 
 let klass: Awaited<ReturnType<typeof makeClass>>;
 test.beforeAll(async () => {
@@ -20,6 +20,7 @@ test('feedback appears on open phones when the lecture ends; the lecturer sees i
 
   lp.once('dialog', (d) => d.accept());
   await lp.getByRole('button', { name: 'סיום שיעור' }).click();
+  await openTab(lp, 'פורום');
 
   // No reload: the phones learn about the end through realtime.
   for (const p of phones) {
