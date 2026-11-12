@@ -146,8 +146,7 @@ export function buildContainer(p: Ports): Container {
     new SessionActiveRule(),
     new DeviceBindingRule(p.attendanceRepo),
   ];
-  const remoteRules = [new DuplicateStudentRule(p.attendanceRepo), new SessionActiveRule()];
-  const attendance = new AttendanceService(rules, p.attendanceRepo, p.clock, remoteRules);
+  const attendance = new AttendanceService(rules, p.attendanceRepo, p.clock);
   const courses = new CourseService(p.courseRepo, p.enrollmentRepo, p.slotRepo, p.attendanceRepo, new RosterParser(), p.clock);
   const confusion = new ConfusionMeter(p.lostRepo, attendance, p.clock);
   const queue = new BackgroundQueue();

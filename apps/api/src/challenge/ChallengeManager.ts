@@ -56,7 +56,7 @@ export class ChallengeManager {
   async snapHeadcount(session: Session, photo: InlineAttachment): Promise<HeadcountResult> {
     const normalized = await this.images.normalize(photo.data);
     const [presentCount, detection, blurred] = await Promise.all([
-      this.attendance.inRoomCount(session.id),
+      this.attendance.presentCount(session.id),
       this.detector.detect({ mimeType: 'image/jpeg', data: normalized }).catch((e: unknown): Detection | null => {
         console.warn('People detection failed:', e instanceof Error ? e.message : e);
         return null;
@@ -177,9 +177,9 @@ export class ChallengeManager {
     return { challenge: ChallengeFactory.create(data, { tokens: this.tokens, headcount }) };
   }
 
-  /** Students in the room (not removed, not on Zoom) when the challenge started; late arrivals are not challenged. */
+  /** Students checked in (not removed) when the challenge started; late arrivals are not challenged. */
   private async eligibleRecords(data: ChallengeData): Promise<AttendanceRecord[]> {
     const records = await this.attendance.listForSession(data.sessionId);
-    return records.filter((r) => r.status !== 'removed' && r.method !== 'zoom' && r.checkedInAt.getTime() <= data.startedAt.getTime());
+    return records.filter((r) => r.status !== 'removed' && r.checkedInAt.getTime() <= data.startedAt.getTime());
   }
 }

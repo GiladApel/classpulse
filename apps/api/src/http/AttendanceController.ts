@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import type { AttendanceService } from '../attendance/AttendanceService.js';
-import type { CourseService } from '../attendance/CourseService.js';
 import type { QrTokenService } from '../attendance/QrTokenService.js';
 import type { SessionService } from '../attendance/SessionService.js';
 import type { Clock } from '../infra/Clock.js';
@@ -14,7 +13,6 @@ export class AttendanceController {
     private readonly attendance: AttendanceService,
     private readonly sessions: SessionService,
     private readonly tokens: QrTokenService,
-    private readonly courses: Pick<CourseService, 'requireMember'>,
     private readonly clock: Clock,
   ) {}
 
@@ -35,22 +33,6 @@ export class AttendanceController {
         deviceId: str(b, 'deviceId', { max: 64 }),
         token,
         location: geo(b, 'location'),
-        now: this.clock.now(),
-      });
-      return c.json({ record: recordDto(record), alreadyCheckedIn, sessionTitle: session.title }, alreadyCheckedIn ? 200 : 201);
-    });
-
-    // A course member who is not in the room joins the live lesson from the app (listed as remote).
-    app.post('/sessions/:id/join-remote', async (c) => {
-      const user = c.get('user');
-      if (!user.studentNumber) throw new ConflictError('ONBOARDING_REQUIRED', 'Student ID missing');
-      const session = await this.sessions.get(c.req.param('id'));
-      await this.courses.requireMember(session.courseId, user.studentNumber);
-      const { record, alreadyCheckedIn } = await this.attendance.joinRemote({
-        session,
-        studentId: user.id,
-        studentNumber: user.studentNumber,
-        studentName: user.name,
         now: this.clock.now(),
       });
       return c.json({ record: recordDto(record), alreadyCheckedIn, sessionTitle: session.title }, alreadyCheckedIn ? 200 : 201);

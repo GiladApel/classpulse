@@ -23,7 +23,7 @@ export function createApp(c: Container): Hono<AppEnv> {
   app.route('/', new AdminController(c.admins).routes());
   app.route('/', new CourseController(c.courses, c.sessions).routes());
   app.route('/sessions', new SessionController(c.sessions, c.attendance, c.exports).routes());
-  app.route('/', new AttendanceController(c.attendance, c.sessions, c.tokens, c.courses, c.clock).routes());
+  app.route('/', new AttendanceController(c.attendance, c.sessions, c.tokens, c.clock).routes());
   app.route('/', new ChallengeController(c.challenges, c.sessions, c.attendance).routes());
   app.route('/', new EngagementController(c.sessions, c.confusion, c.feed, c.feedback).routes());
   app.route('/', new PollController(c.polls, c.sessions).routes());

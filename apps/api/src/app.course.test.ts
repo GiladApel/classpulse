@@ -43,9 +43,7 @@ describe('HTTP: course setup (roster and weekly timetable)', () => {
     expect((await call('lect', 'POST', '/courses/nope/roster', { text: '333333333 x' })).status).toBe(404);
   });
 
-  it('one student is added and removed; an added student becomes a member who can join a live lesson remotely', async () => {
-    const id = (await call('lect', 'POST', '/sessions', { courseId: 'c1', geofenceMode: 'lenient', geofenceRadiusM: 50 })).body.id;
-    expect((await call('avi', 'POST', `/sessions/${id}/join-remote`)).body.code).toBe('NOT_IN_COURSE');
+  it('one student is added and removed', async () => {
 
     expect(await call('lect', 'POST', '/courses/c1/enrollments', { studentNumber: '222222222', name: 'אבי' })).toEqual({
       status: 201,
@@ -53,7 +51,6 @@ describe('HTTP: course setup (roster and weekly timetable)', () => {
     });
     expect((await call('lect', 'POST', '/courses/c1/enrollments', { studentNumber: '22' })).body.code).toBe('INVALID_STUDENT_NUMBER');
     expect((await call('dana', 'POST', '/courses/c1/enrollments', { studentNumber: '111111111' })).status).toBe(403);
-    expect((await call('avi', 'POST', `/sessions/${id}/join-remote`)).status).toBe(201);
 
     expect((await call('lect', 'DELETE', '/courses/c1/enrollments/222222222')).body).toEqual({ ok: true });
     expect((await call('lect', 'DELETE', '/courses/c1/enrollments/222222222')).status).toBe(404);

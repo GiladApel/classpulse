@@ -3,7 +3,7 @@ import { DomainError, NotFoundError } from '../shared/errors.js';
 import type { CheckInContext, CheckInRule } from './CheckInRule.js';
 import { GeofencePolicyFactory } from './GeofencePolicyFactory.js';
 import type { AttendanceRepository } from './repositories.js';
-import type { AttendanceRecord, CheckInMethod, Session } from './types.js';
+import type { AttendanceRecord, Session } from './types.js';
 
 export class CheckInRejected extends DomainError {}
 
@@ -17,20 +17,11 @@ export class AttendanceService {
     private readonly baseRules: CheckInRule[],
     private readonly repo: AttendanceRepository,
     private readonly clock: Clock,
-    private readonly remoteRules: CheckInRule[] = [],
   ) {}
 
-  async checkIn(ctx: CheckInContext): Promise<CheckInOutcome> {
-    return this.admit([...this.baseRules, GeofencePolicyFactory.for(ctx.session.geofenceMode)], ctx, 'qr');
-  }
-
-  /** Joining a live lesson remotely from the app: there is no rotating QR, location or device to check, only the remote rules. */
-  async joinRemote(ctx: Omit<CheckInContext, 'token' | 'deviceId' | 'location'>): Promise<CheckInOutcome> {
-    return this.admit(this.remoteRules, { ...ctx, token: '', deviceId: '' }, 'zoom');
-  }
-
   /** Chain of Responsibility: first reject stops; warns accumulate into flags. */
-  private async admit(rules: CheckInRule[], ctx: CheckInContext, method: CheckInMethod): Promise<CheckInOutcome> {
+  async checkIn(ctx: CheckInContext): Promise<CheckInOutcome> {
+    const rules = [...this.baseRules, GeofencePolicyFactory.for(ctx.session.geofenceMode)];
     let geoFlag = false;
     let distanceM: number | undefined;
 
@@ -54,7 +45,7 @@ export class AttendanceService {
         studentName: ctx.studentName,
         deviceId: ctx.deviceId,
         checkedInAt: this.clock.now(),
-        method,
+        method: 'qr',
         distanceM,
         geoFlag,
         status: 'present',
@@ -107,11 +98,6 @@ export class AttendanceService {
 
   async presentCount(sessionId: string): Promise<number> {
     return (await this.repo.listBySession(sessionId)).filter((r) => r.status !== 'removed').length;
-  }
-
-  /** Students physically in the room (not joined remotely): what a class photo is compared with. */
-  async inRoomCount(sessionId: string): Promise<number> {
-    return (await this.repo.listBySession(sessionId)).filter((r) => r.status !== 'removed' && r.method !== 'zoom').length;
   }
 
   /** Backchannel and polls are open to students checked in to the session (and not removed). */

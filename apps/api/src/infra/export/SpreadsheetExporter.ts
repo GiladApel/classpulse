@@ -22,7 +22,7 @@ const date = new Intl.DateTimeFormat('en-CA', { timeZone: TZ });
 
 export const HEADERS = ['מס׳ סטודנט', 'שם', 'שעת הגעה', 'אופן', 'סטטוס', 'מרחק (מ׳)', 'חריגת מיקום', 'הערה'];
 
-const METHOD = { qr: 'QR', manual: 'ידני', zoom: 'מרחוק' } as const;
+const METHOD = { qr: 'QR', manual: 'ידני' } as const;
 const STATUS = { present: 'נוכח', flagged: 'לבדיקה', removed: 'הוסר' } as const;
 
 export function toRows(records: AttendanceRecord[]): (string | number)[][] {
