@@ -30,8 +30,6 @@
 | FR-ATT-07 | The dashboard shows check-ins in realtime: name, ID, time, distance, flags, status. |
 | FR-ATT-08 | The lecturer can manually approve a student (late arrival or phone problem) with a note, and can remove a record. |
 | FR-ATT-09 | The lecturer can export the session's attendance as `.xlsx` / `.csv` and sync it to a Google Sheet. |
-| FR-ATT-10 | While a lesson is live, a course member who is not in the room taps "Join remotely" on the lesson page and is recorded as attending remotely, with no QR, location or device check. It is refused for non-members and after the lesson ends. A student has one record per lesson, whichever way they came first. No link is sent and nothing is integrated with any video-meeting service. |
-| FR-ATT-11 | The lesson's attendance tab lists students in the classroom and remote students separately, with a count of each. Remote students take part in questions, polls, "I'm lost" and feedback; challenges (FR-AF-02..06) concern only the students in the room. |
 
 ### F2: Anti-fraud
 | ID | Requirement |
