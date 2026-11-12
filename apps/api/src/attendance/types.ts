@@ -14,6 +14,27 @@ export interface Course {
   code: string;
   name: string;
   lecturerId: string;
+  termStart?: Date;
+  termEnd?: Date;
+}
+
+/** A row of the course roster uploaded by the lecturer, keyed by student ID. */
+export interface Enrollment {
+  id: string;
+  courseId: string;
+  studentNumber: string;
+  name: string;
+  addedAt: Date;
+}
+
+/** One weekly meeting of a course: weekday 0 = Sunday, times "HH:MM". */
+export interface CourseSlot {
+  id: string;
+  courseId: string;
+  weekday: number;
+  starts: string;
+  ends: string;
+  room: string;
 }
 
 export interface Session {
