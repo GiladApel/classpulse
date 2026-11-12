@@ -6,7 +6,7 @@ Deliverable D10. One lecturer laptop on the projector, the class on their own ph
 **The day before**
 - [ ] Production is up: `/api/health` and `/pb/api/health` return 200, and Google sign-in works on one iPhone and one Android phone.
 - [ ] Lecture summary: on an earlier session of the demo course, upload a 5–10 min lecture clip, check the chapters, then **Publish** it. Never process video live: it costs quota and takes minutes.
-- [ ] Homework: create an assignment with a 3-criterion rubric. 5 or more friends submit (one submits a renamed copy of another). Run **✨ ניתוח הכיתה** ("analyse class") once and check that exactly the copied pair is flagged.
+- [ ] Homework: in an earlier lesson's homework tab, publish a short homework PDF and check that its questions and sections appear. 3 or more friends check a PDF solution (one checks a copy of another's) so the class chart is visible. Run **✨ ניתוח הכיתה** ("analyse class") once and check that exactly the copied pair is flagged.
 - [ ] The cheater friend has checked in to the course before, and has the WhatsApp chat open to receive a photo of the QR.
 
 **10 minutes before**
@@ -25,7 +25,7 @@ Deliverable D10. One lecturer laptop on the projector, the class on their own ph
 | 5:00 | **🤯 I'm lost**: ask a few students to press it. Anonymous questions + upvotes. **✨ group into themes** | The meter shows how many, never who. Anonymity is enforced by PocketBase rules, not by the UI |
 | 6:00 | **Poll** **🖼️ upload image** of a slide: pick an AI draft → open → live bars on the projector → close and reveal | The correct answer stays hidden from phones until close (hidden field) |
 | 7:30 | **Lecture summary** (pre-processed): chapters + the "I'm lost" spike on the timeline | The spike is aligned to the chapter where students got lost. The recording itself is deleted after processing |
-| 8:30 | **Homework analysis**: score distribution, common mistakes, flagged pair | Fingerprints instead of embeddings: our field test showed embeddings could not tell a copy from honest work (T9) |
+| 8:30 | **Homework**: a student's per-section report, the class chart, common mistakes and the flagged pair | Fingerprints instead of embeddings: our field test showed embeddings could not tell a copy from honest work (T9) |
 | 9:15 | `docs/06` class diagram next to `ChallengeManager` in the code; test numbers | Strategy, Template Method, Chain of Responsibility and Repository map 1:1 to the code. 137 unit, 18 integration and 4 E2E tests, 99% domain line coverage, load test p95 183 ms |
 | 10:00 | End | |
 
