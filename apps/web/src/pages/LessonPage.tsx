@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import AppShell from '../components/AppShell';
 import AssignmentManager from '../components/AssignmentManager';
+import ForumTab from '../components/lesson/ForumTab';
 import MaterialsTab from '../components/lesson/MaterialsTab';
 import StudentAssignments from '../components/StudentAssignments';
 import { ErrorText, type TabItem, Tabs } from '../components/ui';
@@ -54,7 +55,7 @@ export default function LessonPage() {
 
   const panels: Record<LessonTab, ReactNode> = {
     attendance: null,
-    forum: null,
+    forum: <ForumTab sessionId={id} lecturer={lecturer} live={!!live} attended={!!record} goToAttendance={() => setTab('attendance')} />,
     materials: <MaterialsTab sessionId={id} lecturer={lecturer} />,
     homework: course && (lecturer ? <AssignmentManager courseId={course.id} /> : <StudentAssignments courseId={course.id} />),
   };
