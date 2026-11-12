@@ -4,6 +4,7 @@ import { makeTestPorts, USERS } from './test/testContainer.js';
 
 describe('HTTP: admin, courses and the Zoom link', () => {
   let app: ReturnType<typeof createApp>;
+  let t: ReturnType<typeof makeTestPorts>;
 
   const call = async (who: keyof typeof USERS, method: string, path: string, body?: object) => {
     const res = await app.request(path, {
@@ -16,7 +17,8 @@ describe('HTTP: admin, courses and the Zoom link', () => {
   const start = async () => (await call('lect', 'POST', '/sessions', { courseId: 'c1', title: 'L', geofenceMode: 'strict', geofenceRadiusM: 50 })).body.id as string;
 
   beforeEach(() => {
-    app = createApp(makeTestPorts().container);
+    t = makeTestPorts();
+    app = createApp(t.container);
   });
 
   it('only admins list users and change roles', async () => {
@@ -76,5 +78,23 @@ describe('HTTP: admin, courses and the Zoom link', () => {
     const { token: rc } = (await call('lect', 'GET', `/challenges/${ch.id}/qr`)).body;
     expect((await call('avi', 'POST', `/challenges/${ch.id}/responses`, { token: rc })).body.code).toBe('NOT_ELIGIBLE');
     expect((await call('lect', 'POST', `/challenges/${ch.id}/close`)).body.verdicts).toEqual({ 111111111: 'no_response' });
+  });
+
+  it('join remotely: course members only, while the lesson is live; one record whichever way came first', async () => {
+    const { container } = t;
+    const id = await start();
+    const course = (await container.sessions.getCourse('c1'))!;
+    await container.courses.enroll(course, '111111111', 'דנה כהן');
+
+    expect((await call('avi', 'POST', `/sessions/${id}/join-remote`)).body.code).toBe('NOT_IN_COURSE');
+    expect((await call('fresh', 'POST', `/sessions/${id}/join-remote`)).body.code).toBe('ONBOARDING_REQUIRED');
+    const joined = await call('dana', 'POST', `/sessions/${id}/join-remote`);
+    expect(joined).toMatchObject({ status: 201, body: { alreadyCheckedIn: false, record: { method: 'zoom', status: 'present' } } });
+    expect((await call('dana', 'POST', `/sessions/${id}/join-remote`)).status).toBe(200);
+    expect((await call('dana', 'POST', '/sessions/nope/join-remote')).status).toBe(404);
+
+    await call('lect', 'POST', `/sessions/${id}/end`);
+    await container.courses.enroll(course, '444444444', 'רינה');
+    expect((await call('rina', 'POST', `/sessions/${id}/join-remote`)).body.code).toBe('SESSION_ENDED');
   });
 });
