@@ -36,6 +36,12 @@ describe('RosterParser', () => {
     ]);
   });
 
+  it('reads a CSV file saved as UTF-8 or as Hebrew Windows-1255 without garbling the names', () => {
+    expect(parser.fromFile(Buffer.from('ת.ז.,שם\n111111111,דנה\n')).rows).toEqual([{ studentNumber: '111111111', name: 'דנה' }]);
+    const cp1255 = Buffer.concat([Buffer.from('111111111,'), Buffer.from([0xe3, 0xf0, 0xe4])]); // "דנה"
+    expect(parser.fromFile(cp1255).rows).toEqual([{ studentNumber: '111111111', name: 'דנה' }]);
+  });
+
   it('reads the first sheet of an Excel file, including IDs stored as numbers', () => {
     const sheet = XLSX.utils.aoa_to_sheet([
       ['מספר', 'שם מלא'],

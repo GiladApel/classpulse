@@ -22,6 +22,19 @@ export interface RosterParseResult {
 const ID_CELL = /^\d{5,9}$/;
 const MAX_NAME = 80;
 
+// .xlsx is a zip ("PK"), legacy .xls an OLE file. Anything else is text.
+const isSpreadsheet = (b: Buffer) =>
+  (b[0] === 0x50 && b[1] === 0x4b) || (b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0);
+
+/** Excel's "CSV UTF-8" is UTF-8; its plain "CSV" on a Hebrew Windows is Windows-1255. */
+function decodeText(b: Buffer): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(b);
+  } catch {
+    return new TextDecoder('windows-1255').decode(b);
+  }
+}
+
 /** Reads a course roster from a pasted list, CSV/TSV or an Excel sheet: one student per row, ID and name in any order. */
 export class RosterParser {
   fromText(text: string): RosterParseResult {
@@ -29,8 +42,9 @@ export class RosterParser {
     return this.fromRows(lines.map((line) => this.cells(line)));
   }
 
-  /** The first sheet of an .xlsx/.xls/.csv file. */
+  /** The first sheet of an .xlsx/.xls file, or a CSV/text file. */
   fromFile(data: Buffer): RosterParseResult {
+    if (!isSpreadsheet(data)) return this.fromText(decodeText(data));
     const book = XLSX.read(data, { type: 'buffer', raw: false });
     const sheet = book.Sheets[book.SheetNames[0]];
     if (!sheet) return { rows: [], skipped: [] };
