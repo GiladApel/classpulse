@@ -41,3 +41,32 @@ export function ErrorText({ children }: { children: ReactNode }) {
 export function Screen({ children }: { children: ReactNode }) {
   return <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-4 p-4">{children}</main>;
 }
+
+export interface TabItem<T extends string> {
+  id: T;
+  label: string;
+  /** Small marker after the label, e.g. a live dot or a count. */
+  badge?: ReactNode;
+}
+
+/** One row of tabs under the page title; on a phone it scrolls sideways instead of wrapping. */
+export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: TabItem<T>[]; value: T; onChange: (id: T) => void }) {
+  return (
+    <div role="tablist" className="-mx-1 flex gap-1 overflow-x-auto border-b border-slate-200 px-1">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          role="tab"
+          aria-selected={t.id === value}
+          onClick={() => onChange(t.id)}
+          className={`-mb-px flex shrink-0 items-center gap-1.5 rounded-t-xl border-b-2 px-4 py-2.5 font-medium transition-colors ${
+            t.id === value ? 'border-indigo-600 bg-white text-indigo-700' : 'border-transparent text-slate-600 hover:bg-white/70 hover:text-slate-900'
+          }`}
+        >
+          {t.label}
+          {t.badge}
+        </button>
+      ))}
+    </div>
+  );
+}
