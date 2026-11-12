@@ -1,6 +1,7 @@
 import type { UserRepository } from './admin/types.js';
 import { UserAdminService } from './admin/UserAdminService.js';
 import { FeedClusterer } from './ai/FeedClusterer.js';
+import { HomeworkGuideGenerator } from './ai/HomeworkGuideGenerator.js';
 import { HomeworkReviewer } from './ai/HomeworkReviewer.js';
 import { LectureSummarizer } from './ai/LectureSummarizer.js';
 import type { LLMProvider } from './ai/LLMProvider.js';
@@ -178,6 +179,7 @@ export function buildContainer(p: Ports): Container {
       p.submissionRepo,
       p.insightsRepo,
       new TextExtractor(),
+      new HomeworkGuideGenerator(p.llm),
       new HomeworkReviewer(p.llm),
       courses,
       queue,

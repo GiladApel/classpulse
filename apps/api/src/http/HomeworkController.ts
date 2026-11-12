@@ -1,22 +1,27 @@
 import { Hono } from 'hono';
 import type { SessionService } from '../attendance/SessionService.js';
 import type { HomeworkAnalysisService } from '../content/HomeworkAnalysisService.js';
+import type { FileInput } from '../content/repositories.js';
 import type { Assignment, AssignmentInsights, Submission } from '../content/types.js';
 import { ForbiddenError } from '../shared/errors.js';
 import { type AppEnv, requireLecturer } from './auth.js';
 import { participant } from './EngagementController.js';
 import { ValidationError } from './errors.js';
-import { jsonBody, str } from './validate.js';
 
-const MAX_SUBMISSION_BYTES = 10 * 1024 * 1024;
+export const MAX_HOMEWORK_BYTES = 20 * 1024 * 1024;
+export const MAX_SOLUTION_BYTES = 20 * 1024 * 1024;
+export const MAX_SOLUTION_IMAGES = 10;
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export const assignmentDto = (a: Assignment) => ({
   id: a.id,
   courseId: a.courseId,
+  sessionId: a.sessionId ?? null,
   title: a.title,
-  description: a.description,
-  rubric: a.rubric,
   dueAt: a.dueAt?.toISOString() ?? null,
+  guideStatus: a.guideStatus,
+  guideError: a.guideError,
+  outline: a.outline,
 });
 
 export const submissionDto = (s: Submission) => ({
@@ -24,14 +29,17 @@ export const submissionDto = (s: Submission) => ({
   assignmentId: s.assignmentId,
   studentNumber: s.studentNumber,
   studentName: s.studentName,
-  filename: s.filename,
   status: s.status,
   error: s.error,
-  review: s.review,
+  checkCount: s.checkCount,
+  report: s.report,
   total: s.total,
   late: s.late,
   submittedAt: s.submittedAt.toISOString(),
+  reviewedAt: s.reviewedAt?.toISOString() ?? null,
 });
+
+const toInput = async (f: File): Promise<FileInput> => ({ data: Buffer.from(await f.arrayBuffer()), filename: f.name.slice(0, 200), mimeType: f.type });
 
 export class HomeworkController {
   constructor(
@@ -42,38 +50,52 @@ export class HomeworkController {
   routes(): Hono<AppEnv> {
     const app = new Hono<AppEnv>();
 
+    // Multipart {title, file (PDF), dueAt?, sessionId?}: the AI reads the PDF in the background.
     app.post('/courses/:id/assignments', requireLecturer, async (c) => {
       const course = await this.sessions.getOwnedCourse(c.req.param('id'), c.get('user').id);
-      const b = await jsonBody(c.req);
-      if (!Array.isArray(b.rubric)) throw new ValidationError('rubric must be an array');
-      const rubric = (b.rubric as Record<string, unknown>[]).map((r) => {
-        if (!r || typeof r !== 'object' || typeof r.weight !== 'number') throw new ValidationError('each rubric item needs criterion, weight, description');
-        return { criterion: str(r, 'criterion', { max: 120 }), weight: r.weight, description: str(r, 'description', { max: 500, optional: true }) };
-      });
-      const dueRaw = str(b, 'dueAt', { optional: true });
-      const dueAt = dueRaw ? new Date(dueRaw) : undefined;
+      const body = await c.req.parseBody();
+      const file = body.file;
+      if (!(file instanceof File) || file.size === 0) throw new ValidationError('file is required');
+      if (file.type !== 'application/pdf') throw new ValidationError('המטלה צריכה להיות קובץ PDF');
+      if (file.size > MAX_HOMEWORK_BYTES) throw new ValidationError('הקובץ גדול מ-20MB');
+      const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
+      const dueAt = typeof body.dueAt === 'string' && body.dueAt ? new Date(body.dueAt) : undefined;
       if (dueAt && Number.isNaN(dueAt.getTime())) throw new ValidationError('dueAt must be an ISO date');
-      const assignment = await this.homework.createAssignment(course, {
-        title: str(b, 'title', { max: 200 }),
-        description: str(b, 'description', { max: 5000, optional: true }),
-        rubric,
-        dueAt,
-      });
+      let sessionId: string | undefined;
+      if (typeof body.sessionId === 'string' && body.sessionId) {
+        const session = await this.sessions.get(body.sessionId);
+        if (session.courseId !== course.id) throw new ValidationError('the lesson is not in this course');
+        sessionId = session.id;
+      }
+      const assignment = await this.homework.publish(course, { title, dueAt, sessionId }, await toInput(file));
       return c.json(assignmentDto(assignment), 201);
     });
 
-    app.post('/assignments/:id/submissions', async (c) => {
+    app.post('/assignments/:id/guide/retry', requireLecturer, async (c) => {
+      const assignment = await this.ownedAssignment(c.req.param('id'), c.get('user').id);
+      return c.json(assignmentDto(await this.homework.retryGuide(assignment)));
+    });
+
+    app.delete('/assignments/:id', requireLecturer, async (c) => {
+      const assignment = await this.ownedAssignment(c.req.param('id'), c.get('user').id);
+      await this.homework.remove(assignment);
+      return c.json({ ok: true });
+    });
+
+    // Multipart files[]: one PDF, or up to MAX_SOLUTION_IMAGES photos of a handwritten solution.
+    app.post('/assignments/:id/checks', async (c) => {
       const student = participant(c.get('user'));
       const assignment = await this.homework.getAssignment(c.req.param('id'));
-      const body = await c.req.parseBody();
-      const file = body.file;
-      if (!(file instanceof File)) throw new ValidationError('file is required');
-      if (file.size > MAX_SUBMISSION_BYTES) throw new ValidationError('הקובץ גדול מ-10MB');
-      const submission = await this.homework.submit(assignment, student, {
-        data: Buffer.from(await file.arrayBuffer()),
-        filename: file.name.slice(0, 200),
-        mimeType: file.type,
-      });
+      const files = ((await c.req.parseBody({ all: true }))['files'] ?? []) as unknown;
+      const list = (Array.isArray(files) ? files : [files]).filter((f): f is File => f instanceof File && f.size > 0);
+      if (list.length === 0) throw new ValidationError('files are required');
+      const pdfs = list.filter((f) => f.type === 'application/pdf');
+      const images = list.filter((f) => IMAGE_TYPES.includes(f.type));
+      if (pdfs.length + images.length !== list.length) throw new ValidationError('אפשר להעלות PDF או תמונות (JPG, PNG)');
+      if (pdfs.length > 1 || (pdfs.length === 1 && images.length > 0)) throw new ValidationError('העלו קובץ PDF אחד, או תמונות');
+      if (images.length > MAX_SOLUTION_IMAGES) throw new ValidationError(`עד ${MAX_SOLUTION_IMAGES} תמונות`);
+      if (list.reduce((sum, f) => sum + f.size, 0) > MAX_SOLUTION_BYTES) throw new ValidationError('הקבצים גדולים מ-20MB');
+      const submission = await this.homework.check(assignment, student, await Promise.all(list.map(toInput)));
       return c.json(submissionDto(submission), 202);
     });
 
@@ -83,11 +105,20 @@ export class HomeworkController {
       const submission = await this.homework.getSubmission(c.req.param('id'));
       if (submission.studentId !== user.id) {
         if (user.role !== 'lecturer') throw new ForbiddenError('Not your submission');
-        const assignment = await this.homework.getAssignment(submission.assignmentId);
-        await this.sessions.getOwnedCourse(assignment.courseId, user.id);
+        await this.ownedAssignment(submission.assignmentId, user.id);
       }
       const view = await this.homework.view(submission);
       return c.json({ ...view, submission: submissionDto(view.submission) });
+    });
+
+    // Course members see anonymous rows (their own marked); the course's lecturer sees names.
+    app.get('/assignments/:id/chart', async (c) => {
+      const user = c.get('user');
+      const assignment = await this.homework.getAssignment(c.req.param('id'));
+      const lecturer = user.role === 'lecturer';
+      if (lecturer) await this.sessions.getOwnedCourse(assignment.courseId, user.id);
+      else await this.homework.requireMember(assignment, participant(user));
+      return c.json(await this.homework.chart(assignment, { lecturer, studentNumber: user.studentNumber }));
     });
 
     app.post('/assignments/:id/insights', requireLecturer, async (c) => {
@@ -116,7 +147,6 @@ export class HomeworkController {
     const who = (id: string) => ({ submissionId: id, studentName: byId.get(id)?.studentName ?? '?', studentNumber: byId.get(id)?.studentNumber ?? '?' });
     return {
       submissionCount: insights.submissionCount,
-      distribution: insights.distribution,
       commonMistakes: insights.commonMistakes,
       similarPairs: insights.similarPairs.map((p) => ({ a: who(p.a), b: who(p.b), similarity: p.similarity })),
       builtAt: insights.builtAt.toISOString(),

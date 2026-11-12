@@ -15,9 +15,11 @@ import type {
   LectureSummary,
   Material,
   PracticeQuestion,
+  GuideOutline,
+  GuideStatus,
+  HomeworkReport,
   Recording,
-  Review,
-  RubricCriterion,
+  ReviewGuide,
   Submission,
 } from '../../content/types.js';
 import { compact, PbRepository, toDate } from './PbRepository.js';
@@ -76,26 +78,59 @@ export class PbAssignmentRepository extends PbRepository<Assignment> implements 
     super(pb, 'assignments');
   }
 
+  async createWithFile(data: Omit<Assignment, 'id'>, file: FileInput) {
+    return this.toEntity(await this.col.create({ ...this.toRecord(data), file: toFile(file) }));
+  }
+
+  /** The file is protected, so the API (superuser) downloads it with a file token. */
+  async getFile(id: string) {
+    const r = await this.col.getOne(id);
+    const res = await fetch(this.pb.files.getURL(r, r.file, { token: await this.pb.files.getToken() }));
+    if (!res.ok) throw new Error(`homework file ${id}: HTTP ${res.status}`);
+    return Buffer.from(await res.arrayBuffer());
+  }
+
+  async saveGuide(id: string, guide: ReviewGuide, outline: GuideOutline) {
+    return this.toEntity(await this.col.update(id, { guide, outline, guide_status: 'ready', guide_error: '' }));
+  }
+
+  async getGuide(id: string) {
+    const r = await this.col.getOne(id, { fields: 'guide' });
+    return (r.guide as ReviewGuide | null) || null;
+  }
+
+  async listByGuideStatus(status: GuideStatus) {
+    return (await this.col.getFullList({ filter: this.pb.filter('guide_status = {:s}', { s: status }) })).map((r) => this.toEntity(r));
+  }
+
+  async delete(id: string) {
+    await this.col.delete(id);
+  }
+
   protected toEntity(r: RecordModel): Assignment {
     return {
       id: r.id,
       courseId: r.course,
+      sessionId: r.session || undefined,
       title: r.title,
-      description: r.description,
-      rubric: r.rubric as RubricCriterion[],
       dueAt: toDate(r.due_at),
       createdAt: toDate(r.created_at)!,
+      guideStatus: r.guide_status,
+      guideError: r.guide_error ?? '',
+      outline: (r.outline as GuideOutline | null) || null,
     };
   }
 
   protected toRecord(d: Partial<Omit<Assignment, 'id'>>) {
     return compact({
       course: d.courseId,
+      session: d.sessionId,
       title: d.title,
-      description: d.description,
-      rubric: d.rubric,
       due_at: d.dueAt?.toISOString(),
       created_at: d.createdAt?.toISOString(),
+      guide_status: d.guideStatus,
+      guide_error: d.guideError,
+      outline: d.outline === null ? undefined : d.outline,
     });
   }
 }
@@ -103,14 +138,6 @@ export class PbAssignmentRepository extends PbRepository<Assignment> implements 
 export class PbSubmissionRepository extends PbRepository<Submission> implements SubmissionRepository {
   constructor(pb: PocketBase) {
     super(pb, 'submissions');
-  }
-
-  async createWithFile(data: Omit<Submission, 'id'>, file: FileInput) {
-    return this.toEntity(await this.col.create({ ...this.toRecord(data), file: toFile(file) }));
-  }
-
-  async replaceFile(id: string, data: Partial<Omit<Submission, 'id'>>, file: FileInput) {
-    return this.toEntity(await this.col.update(id, { ...this.toRecord(data), file: toFile(file) }));
   }
 
   findByAssignmentAndStudent(assignmentId: string, studentNumber: string) {
@@ -121,8 +148,8 @@ export class PbSubmissionRepository extends PbRepository<Submission> implements 
     return (await this.col.getFullList({ filter: this.pb.filter('assignment = {:a}', { a: assignmentId }), sort: 'submitted_at' })).map((r) => this.toEntity(r));
   }
 
-  async saveAnalysis(id: string, textExtract: string, fingerprint: number[]) {
-    await this.col.update(id, { text_extract: textExtract, fingerprint });
+  async saveFingerprint(id: string, fingerprint: number[]) {
+    await this.col.update(id, { fingerprint });
   }
 
   async getFingerprints(assignmentId: string) {
@@ -141,11 +168,11 @@ export class PbSubmissionRepository extends PbRepository<Submission> implements 
       studentId: r.student || undefined,
       studentNumber: r.student_number,
       studentName: r.student_name,
-      filename: r.filename,
       status: r.status,
       error: r.error,
-      review: (r.review as Review | null) || null,
-      // PB number fields can't be null; -1 means "not reviewed yet".
+      checkCount: r.check_count ?? 0,
+      report: (r.report as HomeworkReport | null) || null,
+      // PB number fields can't be null; -1 means "not checked yet".
       total: r.total >= 0 ? r.total : null,
       late: r.late,
       submittedAt: toDate(r.submitted_at)!,
@@ -159,11 +186,11 @@ export class PbSubmissionRepository extends PbRepository<Submission> implements 
       student: d.studentId,
       student_number: d.studentNumber,
       student_name: d.studentName,
-      filename: d.filename,
       status: d.status,
       error: d.error,
-      review: d.review,
-      total: 'total' in d ? (d.total ?? -1) : undefined,
+      check_count: d.checkCount,
+      report: d.report === null ? undefined : d.report,
+      total: d.total === undefined ? undefined : d.total === null ? -1 : d.total,
       late: d.late,
       submitted_at: d.submittedAt?.toISOString(),
       reviewed_at: d.reviewedAt?.toISOString(),
@@ -190,7 +217,6 @@ export class PbInsightsRepository extends PbRepository<AssignmentInsights> imple
       id: r.id,
       assignmentId: r.assignment,
       submissionCount: r.submission_count,
-      distribution: r.distribution,
       commonMistakes: r.common_mistakes ?? [],
       similarPairs: r.similar_pairs ?? [],
       builtAt: toDate(r.built_at)!,
@@ -201,7 +227,6 @@ export class PbInsightsRepository extends PbRepository<AssignmentInsights> imple
     return compact({
       assignment: d.assignmentId,
       submission_count: d.submissionCount,
-      distribution: d.distribution,
       common_mistakes: d.commonMistakes,
       similar_pairs: d.similarPairs,
       built_at: d.builtAt?.toISOString(),

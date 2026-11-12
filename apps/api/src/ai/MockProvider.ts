@@ -69,16 +69,6 @@ export const DEFAULT_FIXTURES: Record<string, unknown> = {
     ],
   },
   // Score follows submission length so mock reviews differ between students (and percentiles are meaningful).
-  review_homework: (req: StructuredRequest) => {
-    const body = /<submission>\n([\s\S]*)\n<\/submission>/.exec(req.prompt)?.[1] ?? '';
-    const ids = [...req.prompt.matchAll(/- id "([^"]+)"/g)].map((m) => m[1]);
-    const score = Math.min(100, 40 + Math.round(body.length / 20));
-    return {
-      summary: 'הגשה סבירה; יש מקום לשיפור בבדיקות.',
-      criteria: ids.map((id) => ({ id, score, strengths: ['מבנה ברור'], fixes: score < 80 ? ['חסרות בדיקות יחידה'] : [] })),
-      mistakes: score < 80 ? ['חסרות בדיקות יחידה'] : [],
-    };
-  },
   generate_homework_guide: {
     questions: [
       {

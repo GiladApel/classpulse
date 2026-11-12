@@ -47,58 +47,6 @@ export interface Timeline {
   spikes: Spike[];
 }
 
-export interface RubricCriterion {
-  id: string;
-  criterion: string;
-  /** Relative weight; totals are normalised, so weights need not sum to 100. */
-  weight: number;
-  description: string;
-}
-
-export interface Assignment {
-  id: string;
-  courseId: string;
-  title: string;
-  description: string;
-  rubric: RubricCriterion[];
-  dueAt?: Date;
-  createdAt: Date;
-}
-
-export interface CriterionReview {
-  id: string;
-  /** 0–100. */
-  score: number;
-  strengths: string[];
-  fixes: string[];
-}
-
-export interface Review {
-  summary: string;
-  criteria: CriterionReview[];
-  /** Short labels of mistakes, used to find class-wide common mistakes. */
-  mistakes: string[];
-}
-
-export type SubmissionStatus = 'processing' | 'done' | 'failed';
-
-export interface Submission {
-  id: string;
-  assignmentId: string;
-  studentId?: string;
-  studentNumber: string;
-  studentName: string;
-  filename: string;
-  status: SubmissionStatus;
-  error: string;
-  review: Review | null;
-  /** Weighted 0–100, null until reviewed. */
-  total: number | null;
-  late: boolean;
-  submittedAt: Date;
-  reviewedAt?: Date;
-}
-
 /** One section of a homework's review guide. `expected` holds the answer, so the guide never leaves the API. */
 export interface GuideSection {
   id: string;
@@ -142,6 +90,50 @@ export interface QuestionScore {
   score: number;
 }
 
+export type GuideStatus = 'generating' | 'ready' | 'failed';
+
+/** A homework published as a PDF; the AI's review guide is stored apart (hidden), the outline is public. */
+export interface Assignment {
+  id: string;
+  courseId: string;
+  /** The lesson it was published in, if any. */
+  sessionId?: string;
+  title: string;
+  dueAt?: Date;
+  createdAt: Date;
+  guideStatus: GuideStatus;
+  guideError: string;
+  outline: GuideOutline | null;
+}
+
+export interface HomeworkReport {
+  marks: SectionMark[];
+  questions: QuestionScore[];
+  /** Short labels of the mistakes made, used for the class-wide common mistakes. */
+  mistakes: string[];
+}
+
+export type SubmissionStatus = 'processing' | 'done' | 'failed';
+
+/** One per student per homework: the latest successful check. The solution file is never kept. */
+export interface Submission {
+  id: string;
+  assignmentId: string;
+  studentId?: string;
+  studentNumber: string;
+  studentName: string;
+  status: SubmissionStatus;
+  error: string;
+  /** Successful checks so far (a failed check does not count). */
+  checkCount: number;
+  report: HomeworkReport | null;
+  /** 1–100, null until the first successful check. */
+  total: number | null;
+  late: boolean;
+  submittedAt: Date;
+  reviewedAt?: Date;
+}
+
 export interface CommonMistake {
   title: string;
   description: string;
@@ -154,17 +146,10 @@ export interface SimilarPair {
   similarity: number;
 }
 
-export interface Histogram {
-  /** Bucket lower bounds 0, 10, …, 90; the last bucket includes 100. */
-  buckets: number[];
-  counts: number[];
-}
-
 export interface AssignmentInsights {
   id: string;
   assignmentId: string;
   submissionCount: number;
-  distribution: { total: Histogram; criteria: Record<string, { mean: number; histogram: Histogram }> };
   commonMistakes: CommonMistake[];
   /** Submission ids; lecturer-only. */
   similarPairs: SimilarPair[];

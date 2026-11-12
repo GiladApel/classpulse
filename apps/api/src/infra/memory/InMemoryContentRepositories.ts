@@ -1,4 +1,5 @@
 import type {
+  AssignmentRepository,
   FileInput,
   InsightsRepository,
   MaterialRepository,
@@ -6,7 +7,7 @@ import type {
   RecordingRepository,
   SubmissionRepository,
 } from '../../content/repositories.js';
-import type { Assignment, AssignmentInsights, Material, PracticeQuestion, Recording, Submission } from '../../content/types.js';
+import type { Assignment, AssignmentInsights, GuideOutline, GuideStatus, Material, PracticeQuestion, Recording, ReviewGuide, Submission } from '../../content/types.js';
 import { InMemoryRepository } from '../InMemoryRepository.js';
 
 export class InMemoryRecordingRepository extends InMemoryRepository<Recording> implements RecordingRepository {
@@ -15,24 +16,52 @@ export class InMemoryRecordingRepository extends InMemoryRepository<Recording> i
   }
 }
 
-export class InMemoryAssignmentRepository extends InMemoryRepository<Assignment> {}
+export class InMemoryAssignmentRepository extends InMemoryRepository<Assignment> implements AssignmentRepository {
+  readonly files = new Map<string, FileInput>();
+  readonly guides = new Map<string, ReviewGuide>();
+  /** Lets a test delete the related rows the way PocketBase cascades. */
+  onDelete?: (id: string) => void;
 
-export class InMemorySubmissionRepository extends InMemoryRepository<Submission> implements SubmissionRepository {
-  readonly files = new Map<string, { data: Buffer; filename: string; mimeType: string }>();
-  readonly texts = new Map<string, string>();
-  readonly sketches = new Map<string, number[]>();
-
-  async createWithFile(data: Omit<Submission, 'id'>, file: { data: Buffer; filename: string; mimeType: string }) {
-    // Mirrors the unique index (assignment, student_number); synchronous so it is atomic.
-    if (this.all().some((s) => s.assignmentId === data.assignmentId && s.studentNumber === data.studentNumber)) throw new Error('UNIQUE constraint');
+  async createWithFile(data: Omit<Assignment, 'id'>, file: FileInput) {
     const created = await this.create(data);
     this.files.set(created.id, file);
     return created;
   }
 
-  async replaceFile(id: string, data: Partial<Omit<Submission, 'id'>>, file: { data: Buffer; filename: string; mimeType: string }) {
-    this.files.set(id, file);
-    return this.update(id, data);
+  async getFile(id: string) {
+    const f = this.files.get(id);
+    if (!f) throw new Error('no file');
+    return f.data;
+  }
+
+  async saveGuide(id: string, guide: ReviewGuide, outline: GuideOutline) {
+    this.guides.set(id, guide);
+    return this.update(id, { outline, guideStatus: 'ready', guideError: '' });
+  }
+
+  async getGuide(id: string) {
+    return this.guides.get(id) ?? null;
+  }
+
+  async listByGuideStatus(status: GuideStatus) {
+    return this.all().filter((a) => a.guideStatus === status);
+  }
+
+  async delete(id: string) {
+    this.items.delete(id);
+    this.files.delete(id);
+    this.guides.delete(id);
+    this.onDelete?.(id);
+  }
+}
+
+export class InMemorySubmissionRepository extends InMemoryRepository<Submission> implements SubmissionRepository {
+  readonly sketches = new Map<string, number[]>();
+
+  async create(data: Omit<Submission, 'id'>) {
+    // Mirrors the unique index (assignment, student_number); synchronous so it is atomic.
+    if (this.all().some((s) => s.assignmentId === data.assignmentId && s.studentNumber === data.studentNumber)) throw new Error('UNIQUE constraint');
+    return super.create(data);
   }
 
   async findByAssignmentAndStudent(assignmentId: string, studentNumber: string) {
@@ -43,8 +72,7 @@ export class InMemorySubmissionRepository extends InMemoryRepository<Submission>
     return this.all().filter((s) => s.assignmentId === assignmentId);
   }
 
-  async saveAnalysis(id: string, text: string, fingerprint: number[]) {
-    this.texts.set(id, text);
+  async saveFingerprint(id: string, fingerprint: number[]) {
     this.sketches.set(id, fingerprint);
   }
 
@@ -55,6 +83,14 @@ export class InMemorySubmissionRepository extends InMemoryRepository<Submission>
 
   async listByStatus(status: Submission['status']) {
     return this.all().filter((s) => s.status === status);
+  }
+
+  /** Cascade of an assignment delete. */
+  removeByAssignment(assignmentId: string) {
+    for (const s of this.all().filter((x) => x.assignmentId === assignmentId)) {
+      this.items.delete(s.id);
+      this.sketches.delete(s.id);
+    }
   }
 }
 
