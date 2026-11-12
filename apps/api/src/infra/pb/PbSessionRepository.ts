@@ -9,6 +9,10 @@ export class PbSessionRepository extends PbRepository<Session> implements Sessio
     super(pb, 'sessions', 'course');
   }
 
+  async countByCourse(courseId: string) {
+    return (await this.col.getList(1, 1, { filter: this.pb.filter('course = {:c}', { c: courseId }), fields: 'id' })).totalItems;
+  }
+
   protected toEntity(r: RecordModel): Session {
     const hasLocation = r.geo_lat !== 0 || r.geo_lng !== 0;
     return {

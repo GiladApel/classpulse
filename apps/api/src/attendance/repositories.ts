@@ -9,7 +9,9 @@ export interface AttendanceRepository extends Repository<AttendanceRecord> {
   attendedCourse(courseId: string, studentNumber: string): Promise<boolean>;
 }
 
-export type SessionRepository = Repository<Session>;
+export interface SessionRepository extends Repository<Session> {
+  countByCourse(courseId: string): Promise<number>;
+}
 
 export interface CourseRepository {
   get(id: string): Promise<Course | null>;

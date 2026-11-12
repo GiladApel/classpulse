@@ -25,7 +25,7 @@ export class SessionController {
       const b = await jsonBody(c.req);
       const session = await this.sessions.start(c.get('user').id, {
         courseId: str(b, 'courseId'),
-        title: str(b, 'title', { max: 120 }),
+        title: str(b, 'title', { max: 120, optional: true }),
         location: geo(b, 'location'),
         geofenceMode: oneOf(b, 'geofenceMode', ['lenient', 'strict'] as const),
         geofenceRadiusM: num(b, 'geofenceRadiusM', 10, 2000),

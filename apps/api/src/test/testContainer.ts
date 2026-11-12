@@ -1,13 +1,11 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MockProvider } from '../ai/MockProvider.js';
-import type { Session } from '../attendance/types.js';
 import { buildContainer, type Ports } from '../container.js';
 import type { UserIdentity } from '../infra/pb/pbClient.js';
 import { FixedClock } from '../infra/Clock.js';
 import { CsvExporter } from '../infra/export/CsvExporter.js';
 import type { ImageProcessor } from '../infra/ImageProcessor.js';
-import { InMemoryRepository } from '../infra/InMemoryRepository.js';
 import { InMemoryAttendanceRepository } from '../infra/memory/InMemoryAttendanceRepository.js';
 import {
   InMemoryChallengeRepository,
@@ -23,6 +21,7 @@ import {
   InMemorySubmissionRepository,
 } from '../infra/memory/InMemoryContentRepositories.js';
 import { InMemoryCourseRepository } from '../infra/memory/InMemoryCourseRepository.js';
+import { InMemorySessionRepository } from '../infra/memory/InMemorySessionRepository.js';
 import { InMemoryCourseSlotRepository, InMemoryEnrollmentRepository } from '../infra/memory/InMemoryEnrollmentRepositories.js';
 import { InMemoryUserRepository } from '../infra/memory/InMemoryUserRepository.js';
 import {
@@ -61,7 +60,7 @@ let storeSeq = 0;
 
 export function makeTestPorts(over: Partial<Ports> = {}) {
   const clock = new FixedClock(T0);
-  const sessionRepo = new InMemoryRepository<Session>();
+  const sessionRepo = new InMemorySessionRepository();
   const llm = new MockProvider();
   const ports: Ports = {
     clock,

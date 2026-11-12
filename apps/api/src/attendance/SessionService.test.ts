@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { FixedClock } from '../infra/Clock.js';
-import { InMemoryRepository } from '../infra/InMemoryRepository.js';
 import { InMemoryHeadcountRepository } from '../infra/memory/InMemoryChallengeRepositories.js';
 import { InMemoryCourseRepository } from '../infra/memory/InMemoryCourseRepository.js';
+import { InMemorySessionRepository } from '../infra/memory/InMemorySessionRepository.js';
 import { CLASSROOM, T0 } from '../test/fixtures.js';
 import { QrTokenService } from './QrTokenService.js';
 import { SessionService } from './SessionService.js';
-import type { Session } from './types.js';
 
 describe('SessionService', () => {
   let clock: FixedClock;
@@ -20,7 +19,7 @@ describe('SessionService', () => {
     tokens = new QrTokenService(clock);
     const courses = new InMemoryCourseRepository([{ id: 'c1', code: 'I2SE', name: 'הנדסת תוכנה', lecturerId: 'lect1' }]);
     headcounts = new InMemoryHeadcountRepository();
-    svc = new SessionService(new InMemoryRepository<Session>(), courses, tokens, clock, headcounts);
+    svc = new SessionService(new InMemorySessionRepository(), courses, tokens, clock, headcounts);
   });
 
   it('end purges the clear class photos but keeps the blurred ones', async () => {
@@ -40,6 +39,12 @@ describe('SessionService', () => {
     expect(a).toMatchObject({ status: 'active', startedAt: T0, location: CLASSROOM, lecturerId: 'lect1' });
     expect(a.qrSecret).toHaveLength(43);
     expect(a.qrSecret).not.toBe(b.qrSecret);
+  });
+
+  it("an empty title becomes 'הרצאה N', numbered by the course's lessons", async () => {
+    expect((await svc.start('lect1', { ...input, title: '  ' })).title).toBe('הרצאה 1');
+    await svc.start('lect1', input);
+    expect((await svc.start('lect1', { ...input, title: '' })).title).toBe('הרצאה 3');
   });
 
   it('start refuses another lecturer’s course and unknown courses', async () => {

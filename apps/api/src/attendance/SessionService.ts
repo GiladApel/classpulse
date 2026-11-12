@@ -8,6 +8,7 @@ import type { Course, GeofenceMode, GeoPoint, Session } from './types.js';
 
 export interface StartSessionInput {
   courseId: string;
+  /** Empty → "הרצאה N", numbered by the course's lessons so far. */
   title: string;
   location?: GeoPoint;
   geofenceMode: GeofenceMode;
@@ -35,7 +36,7 @@ export class SessionService {
     return this.sessions.create({
       courseId: course.id,
       lecturerId,
-      title: input.title,
+      title: input.title.trim() || `הרצאה ${(await this.sessions.countByCourse(course.id)) + 1}`,
       status: 'active',
       startedAt: this.clock.now(),
       location: input.location,
