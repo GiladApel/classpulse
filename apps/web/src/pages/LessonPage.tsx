@@ -3,10 +3,13 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import AppShell from '../components/AppShell';
 import AssignmentManager from '../components/AssignmentManager';
+import ChallengeOverlay from '../components/ChallengeOverlay';
+import AttendanceTab from '../components/lesson/AttendanceTab';
 import ForumTab from '../components/lesson/ForumTab';
 import MaterialsTab from '../components/lesson/MaterialsTab';
 import StudentAssignments from '../components/StudentAssignments';
-import { ErrorText, type TabItem, Tabs } from '../components/ui';
+import { Button, ErrorText, type TabItem, Tabs } from '../components/ui';
+import { api, ApiError } from '../lib/api';
 import { parseDate } from '../lib/device';
 import { pb, useSessionActive, useUser } from '../lib/pb';
 import type { CourseRecord, SessionRecord } from '../lib/timetable';
@@ -46,6 +49,16 @@ export default function LessonPage() {
   }, [id]);
 
   const live = active && session?.status === 'active';
+
+  const end = async () => {
+    if (!confirm('לסיים את השיעור? לא ניתן יהיה לסמן נוכחות נוספת.')) return;
+    setError('');
+    try {
+      await api.post(`/sessions/${id}/end`);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'שגיאה');
+    }
+  };
   const tabs: TabItem<LessonTab>[] = [
     { id: 'attendance', label: 'נוכחות' },
     { id: 'forum', label: 'פורום', badge: live ? <span className="h-2 w-2 rounded-full bg-emerald-500" aria-label="פעיל" /> : undefined },
@@ -54,7 +67,9 @@ export default function LessonPage() {
   ];
 
   const panels: Record<LessonTab, ReactNode> = {
-    attendance: null,
+    attendance: course && (
+      <AttendanceTab sessionId={id} courseId={course.id} lecturer={lecturer} active={!!live} record={record} onJoined={() => setTab('forum')} />
+    ),
     forum: <ForumTab sessionId={id} lecturer={lecturer} live={!!live} attended={!!record} goToAttendance={() => setTab('attendance')} />,
     materials: <MaterialsTab sessionId={id} lecturer={lecturer} />,
     homework: course && (lecturer ? <AssignmentManager courseId={course.id} /> : <StudentAssignments courseId={course.id} />),
@@ -75,6 +90,14 @@ export default function LessonPage() {
           )}
         </div>
         {session && <p className="text-sm text-slate-500">{parseDate(session.started_at).toLocaleDateString('he-IL', { dateStyle: 'full' })}</p>}
+        {lecturer && live && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button onClick={() => window.open(`/projector/${id}`, '_blank')}>מסך הקרנה</Button>
+            <Button variant="danger" onClick={end}>
+              סיום שיעור
+            </Button>
+          </div>
+        )}
       </header>
       <ErrorText>{error}</ErrorText>
       {session && (
@@ -83,6 +106,8 @@ export default function LessonPage() {
           {panels[tab]}
         </>
       )}
+      {/* Challenges pop up over any tab, for students in the room only. */}
+      {!lecturer && live && record && record.method !== 'zoom' && <ChallengeOverlay sessionId={id} />}
     </AppShell>
   );
 }
