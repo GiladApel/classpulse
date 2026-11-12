@@ -49,6 +49,7 @@ export function nextSlot(slots: SlotRecord[], now: Date): SlotRecord | undefined
 export function useMyCourses(user: UserRecord) {
   const [courses, setCourses] = useState<CourseRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     const load = async (): Promise<CourseRecord[]> => {
@@ -70,7 +71,7 @@ export function useMyCourses(user: UserRecord) {
     load()
       .then(setCourses, () => setCourses([]))
       .finally(() => setLoaded(true));
-  }, [user.id, user.role]);
+  }, [user.id, user.role, version]);
 
   const ids = courses.map((c) => c.id);
   const byCourse = ids.length ? ids.map((id) => pb.filter('course = {:c}', { c: id })).join(' || ') : 'id = ""';
@@ -78,5 +79,5 @@ export function useMyCourses(user: UserRecord) {
   const live = useLiveRecords<SessionRecord>('sessions', `status = "active" && (${byCourse})`, '', ids.length > 0);
   const courseById = useMemo(() => new Map(courses.map((c) => [c.id, c])), [courses]);
 
-  return { courses, courseById, slots, live, loaded };
+  return { courses, courseById, slots, live, loaded, reload: () => setVersion((v) => v + 1) };
 }

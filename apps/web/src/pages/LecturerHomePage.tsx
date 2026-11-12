@@ -1,52 +1,51 @@
-import type { RecordModel } from 'pocketbase';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
+import AppShell from '../components/AppShell';
+import Timetable from '../components/Timetable';
 import { Button, Card, ErrorText, Field, inputClass } from '../components/ui';
 import { api, ApiError, type SessionDto } from '../lib/api';
-import { getLocation, parseDate } from '../lib/device';
-import { pb, useUser } from '../lib/pb';
-import { useIsAdmin } from '../lib/useIsAdmin';
+import { getLocation } from '../lib/device';
+import { startLesson } from '../lib/lessons';
+import { useUser } from '../lib/pb';
+import { DAYS, nextSlot, slotNow, useMyCourses } from '../lib/timetable';
 
 export default function LecturerHomePage() {
   const user = useUser()!;
   const navigate = useNavigate();
-  const [courses, setCourses] = useState<RecordModel[]>([]);
-  const [sessions, setSessions] = useState<RecordModel[]>([]);
+  const { courses, courseById, slots, live, loaded, reload } = useMyCourses(user);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [courseError, setCourseError] = useState('');
-  const admin = useIsAdmin();
 
-  const loadCourses = () => pb.collection('courses').getFullList({ filter: pb.filter('lecturer = {:u}', { u: user.id }), sort: 'code' }).then(setCourses);
+  const now = new Date();
+  const current = slotNow(slots, now);
+  const upcoming = current ? undefined : nextSlot(slots, now);
+  const running = live[0];
 
-  useEffect(() => {
-    loadCourses();
-    pb.collection('sessions')
-      .getList(1, 15, { filter: pb.filter('course.lecturer = {:u}', { u: user.id }), sort: '-started_at', expand: 'course' })
-      .then((r) => setSessions(r.items));
-  }, [user.id]);
-
-  const start = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const f = new FormData(e.currentTarget);
+  const run = async (fn: () => Promise<SessionDto>) => {
     setError('');
     setBusy(true);
     try {
+      navigate(`/lesson/${(await fn()).id}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'שגיאה בפתיחת השיעור');
+      setBusy(false);
+    }
+  };
+
+  const startWithOptions = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const f = new FormData(e.currentTarget);
+    return run(async () => {
       const location = f.get('useLocation') ? await getLocation(8000) : undefined;
-      if (f.get('useLocation') && !location) setError('המיקום לא זמין — השיעור ייפתח ללא בדיקת מיקום');
-      const session = await api.post<SessionDto>('/sessions', {
+      return api.post<SessionDto>('/sessions', {
         courseId: f.get('courseId'),
         title: f.get('title'),
         location,
         geofenceMode: f.get('geofenceMode'),
         geofenceRadiusM: Number(f.get('radius')),
       });
-      navigate(`/dash/${session.id}`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'שגיאה בפתיחת השיעור');
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
   const addCourse = async (e: FormEvent<HTMLFormElement>) => {
@@ -55,121 +54,126 @@ export default function LecturerHomePage() {
     const f = new FormData(form);
     setCourseError('');
     try {
-      await api.post('/courses', { code: f.get('code'), name: f.get('name') });
+      const created = await api.post<{ id: string }>('/courses', { code: f.get('code'), name: f.get('name') });
       form.reset();
-      await loadCourses();
+      reload();
+      navigate(`/course/${created.id}?tab=students`);
     } catch (err) {
       setCourseError(err instanceof ApiError ? err.message : 'שגיאה ביצירת הקורס');
     }
   };
 
-  const today = new Date().toLocaleDateString('he-IL');
-
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 md:p-8">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-indigo-700">ClassPulse · מרצה</h1>
-        <div className="flex items-center gap-1">
-          {admin && (
-            <Link to="/admin" className="rounded-xl px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50">
-              ניהול משתמשים
-            </Link>
-          )}
-          <Button variant="ghost" onClick={() => pb.authStore.clear()} className="text-sm">
-            התנתקות
+    <AppShell wide>
+      <h1 className="text-2xl font-bold">שלום {user.name.split(' ')[0]}</h1>
+
+      {running ? (
+        <Link to={`/lesson/${running.id}`} className="flex items-center justify-between gap-3 rounded-2xl bg-emerald-600 p-4 text-white shadow-sm hover:bg-emerald-700">
+          <span className="min-w-0">
+            <span className="flex items-center gap-2 text-sm text-emerald-100">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-white" /> שיעור פעיל
+            </span>
+            <span className="block truncate text-lg font-semibold">
+              {courseById.get(running.course)?.code} · {running.title}
+            </span>
+          </span>
+          <span className="shrink-0 rounded-xl bg-white/15 px-3 py-2 font-medium">חזרה לשיעור ←</span>
+        </Link>
+      ) : current ? (
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-s-4 border-indigo-600">
+          <span>
+            <span className="text-sm text-slate-500">
+              עכשיו לפי המערכת · {current.starts}–{current.ends}
+              {current.room && ` · חדר ${current.room}`}
+            </span>
+            <span className="block text-lg font-semibold">
+              {courseById.get(current.course)?.code} · {courseById.get(current.course)?.name}
+            </span>
+          </span>
+          <Button onClick={() => run(() => startLesson(current.course))} disabled={busy}>
+            {busy ? 'פותח…' : 'התחלת השיעור עכשיו'}
           </Button>
-        </div>
-      </header>
+        </Card>
+      ) : (
+        upcoming && (
+          <p className="text-sm text-slate-600">
+            השיעור הבא: {courseById.get(upcoming.course)?.code} ביום {DAYS[upcoming.weekday]} ב-{upcoming.starts}
+          </p>
+        )
+      )}
+      <ErrorText>{error}</ErrorText>
 
       <Card>
-        <h2 className="mb-4 text-lg font-semibold">פתיחת שיעור</h2>
-        {courses.length === 0 ? (
-          <p className="text-slate-600">עוד אין לך קורסים — צרו את הראשון למטה.</p>
-        ) : (
-          <form onSubmit={start} className="grid gap-4 md:grid-cols-2">
-            <Field label="קורס">
-              <select name="courseId" className={inputClass}>
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.code} · {c.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="כותרת">
-              <input name="title" required defaultValue={`הרצאה ${today}`} maxLength={120} className={inputClass} />
-            </Field>
-            <Field label="בדיקת מיקום">
-              <select name="geofenceMode" defaultValue="lenient" className={inputClass}>
-                <option value="lenient">מקלה — מסמנת חריגה בלבד</option>
-                <option value="strict">מחמירה — חוסמת סימון מרחוק</option>
-              </select>
-            </Field>
-            <Field label="רדיוס (מטרים)">
-              <input name="radius" type="number" min={10} max={2000} defaultValue={50} className={inputClass} />
-            </Field>
-            <label className="flex items-center gap-2 text-sm text-slate-700 md:col-span-2">
-              <input name="useLocation" type="checkbox" defaultChecked className="h-4 w-4" />
-              להשתמש במיקום הנוכחי שלי כמרכז הכיתה
-            </label>
-            <div className="md:col-span-2">
-              <ErrorText>{error}</ErrorText>
-            </div>
-            <Button type="submit" disabled={busy} className="md:col-span-2">
-              {busy ? 'פותח…' : 'התחלת שיעור'}
-            </Button>
-          </form>
-        )}
+        <h2 className="mb-3 font-semibold">מערכת השעות שלי</h2>
+        <Timetable slots={slots} courseById={courseById} liveCourses={new Set(live.map((s) => s.course))} linkFor={(id) => `/course/${id}`} />
       </Card>
 
-      <Card>
-        <h2 className="mb-3 text-lg font-semibold">קורס חדש</h2>
-        <form onSubmit={addCourse} className="flex flex-wrap gap-2">
-          <input name="code" required maxLength={20} placeholder="קוד (למשל I2SE)" dir="ltr" aria-label="קוד קורס" className={`${inputClass} w-36`} />
-          <input name="name" required maxLength={120} placeholder="שם הקורס" aria-label="שם הקורס" className={`${inputClass} min-w-0 flex-1`} />
-          <Button type="submit" variant="secondary">
-            יצירה
-          </Button>
-        </form>
-        <div className="mt-2">
-          <ErrorText>{courseError}</ErrorText>
-        </div>
-      </Card>
-
-      {courses.length > 0 && (
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <h2 className="mb-3 text-lg font-semibold">מטלות לפי קורס</h2>
-          <ul className="flex flex-wrap gap-2">
+          <h2 className="mb-2 font-semibold">הקורסים שלי</h2>
+          {loaded && courses.length === 0 && <p className="text-sm text-slate-500">עוד אין לך קורסים — צרו את הראשון כאן למטה.</p>}
+          <ul className="divide-y divide-slate-100">
             {courses.map((c) => (
               <li key={c.id}>
-                <Link to={`/course/${c.id}`} className="inline-block rounded-xl border border-slate-200 px-3 py-2 hover:border-indigo-400 hover:text-indigo-700">
-                  📝 {c.code} · {c.name}
+                <Link to={`/course/${c.id}`} className="flex items-center justify-between py-3 hover:text-indigo-700">
+                  <span>
+                    {c.code} · {c.name}
+                  </span>
+                  <span className="text-sm text-slate-400">שיעורים, סטודנטים, מערכת ←</span>
                 </Link>
               </li>
             ))}
           </ul>
+          <form onSubmit={addCourse} className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+            <input name="code" required maxLength={20} placeholder="קוד (למשל I2SE)" dir="ltr" aria-label="קוד קורס" className={`${inputClass} w-36`} />
+            <input name="name" required maxLength={120} placeholder="שם הקורס" aria-label="שם הקורס" className={`${inputClass} min-w-0 flex-1`} />
+            <Button type="submit" variant="secondary">
+              קורס חדש
+            </Button>
+          </form>
+          <div className="mt-2">
+            <ErrorText>{courseError}</ErrorText>
+          </div>
         </Card>
-      )}
 
-      <Card>
-        <h2 className="mb-3 text-lg font-semibold">שיעורים אחרונים</h2>
-        {sessions.length === 0 && <p className="text-slate-600">עדיין אין שיעורים.</p>}
-        <ul className="divide-y divide-slate-100">
-          {sessions.map((s) => (
-            <li key={s.id}>
-              <Link to={`/dash/${s.id}`} className="flex items-center justify-between py-3 hover:text-indigo-700">
-                <span>
-                  {s.expand?.course?.code} · {s.title}
-                </span>
-                <span className="flex items-center gap-2 text-sm text-slate-500">
-                  {parseDate(s.started_at).toLocaleDateString('he-IL')}
-                  {s.status === 'active' && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">פעיל</span>}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Card>
-    </main>
+        {courses.length > 0 && (
+          <Card>
+            <h2 className="mb-3 font-semibold">פתיחת שיעור עם הגדרות</h2>
+            <form onSubmit={startWithOptions} className="grid gap-3">
+              <Field label="קורס">
+                <select name="courseId" defaultValue={current?.course} className={inputClass}>
+                  {courses.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.code} · {c.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="כותרת">
+                <input name="title" maxLength={120} placeholder="ריק = הרצאה N" className={inputClass} />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="בדיקת מיקום">
+                  <select name="geofenceMode" defaultValue="lenient" className={inputClass}>
+                    <option value="lenient">מקלה — מסמנת חריגה</option>
+                    <option value="strict">מחמירה — חוסמת</option>
+                  </select>
+                </Field>
+                <Field label="רדיוס (מטרים)">
+                  <input name="radius" type="number" min={10} max={2000} defaultValue={50} className={inputClass} />
+                </Field>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input name="useLocation" type="checkbox" defaultChecked className="h-4 w-4" />
+                להשתמש במיקום הנוכחי שלי כמרכז הכיתה
+              </label>
+              <Button type="submit" disabled={busy}>
+                {busy ? 'פותח…' : 'התחלת שיעור'}
+              </Button>
+            </form>
+          </Card>
+        )}
+      </div>
+    </AppShell>
   );
 }
