@@ -312,37 +312,63 @@ sequenceDiagram
   FS-->>L: Theme[] (AI groups open questions)
 ```
 
-## SD8: Joining from Zoom (UC15)
+## SD8: Entering a live lesson and joining remotely (UC20, UC15)
 
 ```mermaid
 sequenceDiagram
   autonumber
-  actor L as Lecturer dashboard
-  participant API as SessionController / AttendanceController
-  participant SS as SessionService
-  participant QR as QrTokenService
-  participant AS as AttendanceService
+  actor S as Student phone (home)
   participant PB as PocketBase
-  actor S as Student on Zoom
+  participant API as AttendanceController
+  participant CS as CourseService
+  participant AS as AttendanceService
+  actor L as Lecturer (attendance tab)
 
-  L->>API: GET /sessions/:id/zoom-link
-  API->>SS: zoomToken(session)
-  SS->>QR: issueZoom(sessionId, qrSecret)
-  QR-->>L: token
-  L->>L: copy origin + /z/token, paste into the Zoom chat
-  S->>API: POST /zoom-checkins {token}
-  API->>QR: parseZoom(token), then verifyZoom(token, qrSecret)
+  S->>PB: list my enrollments, course_slots, active sessions of my courses
+  PB-->>S: rows the view rules allow (own roster row, member courses)
+  S->>S: home shows "Lesson live now" and the weekly timetable
+  S->>S: tap the live lesson, open /lesson/:id (attendance tab)
+  S->>API: POST /sessions/:id/join-remote
+  API->>CS: requireMember(courseId, studentNumber)
+  CS-->>API: enrolled or attended, else NOT_IN_COURSE
   API->>AS: joinRemote(ctx)
   loop remoteRules: DuplicateStudent, SessionActive
     AS->>AS: check(ctx)
   end
   alt reject
-    AS-->>S: 4xx (lecture ended / link altered / removed)
+    AS-->>S: 4xx (lesson ended / removed)
   else already has a record
-    AS-->>S: existing record (one record per lecture)
+    AS-->>S: existing record (one record per lesson)
   else pass
-    AS->>PB: create attendance_records {method: zoom}
-    PB--)L: realtime "create" -> row under "From Zoom"
-    AS-->>S: 201 "recorded as attending from Zoom"
+    AS->>PB: create attendance_records (remote method)
+    PB--)L: realtime "create", row under "Remote"
+    AS-->>S: 201, the app opens the forum tab
   end
+```
+
+## SD9: Uploading the course roster (UC18)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor L as Lecturer (course page, students tab)
+  participant API as CourseController
+  participant SS as SessionService
+  participant CS as CourseService
+  participant RP as RosterParser
+  participant PB as PocketBase
+  actor S as Student (later)
+
+  L->>API: POST /courses/:id/roster (Excel or CSV file, or pasted text)
+  API->>SS: getOwnedCourse(courseId, lecturerId)
+  API->>CS: importRoster(course, file)
+  CS->>RP: fromFile(data)
+  RP-->>CS: rows (ID padded to 9 digits, name) and skipped lines
+  loop each row
+    CS->>PB: create enrollment, or update the name if it changed
+  end
+  CS-->>L: added N, updated M, skipped lines
+  PB--)L: realtime, the roster table fills in
+  S->>PB: sign in once (Google + student ID)
+  PB-->>S: own enrollment row, so the course appears on the home screen
 ```
