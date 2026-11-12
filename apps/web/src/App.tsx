@@ -1,5 +1,6 @@
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import { RequireLecturer, RequireStudent } from './components/guards';
+import AdminPage from './pages/AdminPage';
 import AssignmentAdminPage from './pages/AssignmentAdminPage';
 import AssignmentPage from './pages/AssignmentPage';
 import CheckInPage from './pages/CheckInPage';
@@ -20,10 +21,12 @@ const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/onboarding', element: <OnboardingPage /> },
   { path: '/c/:token', element: <RequireStudent><CheckInPage /></RequireStudent> },
+  { path: '/z/:token', element: <RequireStudent><CheckInPage remote /></RequireStudent> },
   { path: '/r/:token', element: <RequireStudent><RollCallPage /></RequireStudent> },
   { path: '/course/:id', element: <RequireStudent><CoursePage /></RequireStudent> },
   { path: '/a/:id', element: <RequireStudent><AssignmentPage /></RequireStudent> },
   { path: '/lecture/:id', element: <RequireStudent><LecturePage /></RequireStudent> },
+  { path: '/admin', element: <AdminPage /> },
   { path: '/dash', element: <RequireLecturer><LecturerHomePage /></RequireLecturer> },
   { path: '/dash/course/:id', element: <RequireLecturer><LecturerCoursePage /></RequireLecturer> },
   { path: '/dash/assignment/:id', element: <RequireLecturer><AssignmentAdminPage /></RequireLecturer> },

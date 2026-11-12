@@ -30,7 +30,7 @@ if ! ssh "$HOST" "test -f $ROOT/.env"; then
   {
     echo "PB_SUPERUSER_EMAIL=admin@classpulse.local"
     echo "PB_SUPERUSER_PASSWORD=$(openssl rand -hex 24)"
-    grep -E '^(LLM_PROVIDER|GEMINI_API_KEY|GEMINI_MODEL|GOOGLE_SHEETS_ID|QR_WINDOW_SEC)=' .env || true
+    grep -E '^(LLM_PROVIDER|GEMINI_API_KEY|GEMINI_MODEL|GOOGLE_SHEETS_ID|QR_WINDOW_SEC|ADMIN_EMAILS)=' .env || true
   } | ssh "$HOST" "umask 077 && cat > $ROOT/.env"
 fi
 if [ -f secrets/google-sa.json ] && ! ssh "$HOST" "test -s $ROOT/secrets/google-sa.json"; then

@@ -10,6 +10,8 @@ const env = Object.fromEntries(
 );
 
 export const PB_URL = 'http://127.0.0.1:8090';
+/** The API under test treats this lecturer as the admin (ADMIN_EMAILS in playwright.config.ts). */
+export const ADMIN_EMAIL = 'e2e-admin@classpulse.test';
 export const CLASSROOM = { latitude: 32.1048, longitude: 35.2073, accuracy: 15 };
 export const metersNorth = (m: number) => ({ ...CLASSROOM, latitude: CLASSROOM.latitude + m / 111_320 });
 const PASSWORD = 'e2e-pass-1234';
@@ -28,7 +30,7 @@ export interface Person {
 }
 
 /** Throwaway lecturer, course and students for one spec file; `cleanup()` deletes them (records cascade with the course). */
-export async function makeClass(tag: string, studentNames: string[]) {
+export async function makeClass(tag: string, studentNames: string[], opts: { admin?: boolean } = {}) {
   const pb = new PocketBase(PB_URL);
   pb.autoCancellation(false);
   await pb.collection('_superusers').authWithPassword(env.PB_SUPERUSER_EMAIL, env.PB_SUPERUSER_PASSWORD);
@@ -36,7 +38,11 @@ export async function makeClass(tag: string, studentNames: string[]) {
   const create = (email: string, data: Record<string, unknown>) =>
     pb.collection('users').create<Person>({ email, password: PASSWORD, passwordConfirm: PASSWORD, verified: true, ...data });
 
-  const lecturer = await create(`lect-${run}@classpulse.test`, { name: `מרצה ${tag}`, role: 'lecturer' });
+  if (opts.admin) {
+    const stale = await pb.collection('users').getFirstListItem(pb.filter('email = {:e}', { e: ADMIN_EMAIL })).catch(() => null);
+    if (stale) await pb.collection('users').delete(stale.id);
+  }
+  const lecturer = await create(opts.admin ? ADMIN_EMAIL : `lect-${run}@classpulse.test`, { name: `מרצה ${tag}`, role: 'lecturer' });
   const course = await pb.collection('courses').create({ code: 'E2E', name: `E2E ${tag}`, lecturer: lecturer.id });
   const students: Person[] = [];
   for (const [i, name] of studentNames.entries()) {
@@ -49,13 +55,16 @@ export async function makeClass(tag: string, studentNames: string[]) {
     students,
     courseId: course.id,
     async cleanup() {
-      await pb.collection('courses').delete(course.id).catch(() => {});
+      // Includes courses a promoted student created during the test.
+      const people = [lecturer, ...students];
+      const courses = await pb.collection('courses').getFullList({ filter: people.map((u) => `lecturer = "${u.id}"`).join(' || ') });
+      for (const c of courses) await pb.collection('courses').delete(c.id).catch(() => {});
       for (const u of [lecturer, ...students]) await pb.collection('users').delete(u.id).catch(() => {});
     },
   };
 }
 
-async function login(context: BrowserContext, email: string): Promise<Page> {
+export async function login(context: BrowserContext, email: string): Promise<Page> {
   opened.push(context);
   const page = await context.newPage();
   await page.goto('/login');
@@ -68,7 +77,11 @@ async function login(context: BrowserContext, email: string): Promise<Page> {
 }
 
 export async function lecturerPage(browser: Browser, who: Person): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, geolocation: CLASSROOM, permissions: ['geolocation'] });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    geolocation: CLASSROOM,
+    permissions: ['geolocation', 'clipboard-read', 'clipboard-write'],
+  });
   return login(context, who.email);
 }
 
@@ -80,7 +93,7 @@ export async function phone(browser: Browser, who: Person, i: number, geolocatio
 /** Starts a session from the lecturer home form and returns its id (the page ends on the dashboard). */
 export async function startSession(page: Page, mode: 'lenient' | 'strict' = 'lenient'): Promise<string> {
   await page.locator('select[name=geofenceMode]').selectOption(mode);
-  await page.locator('form button[type=submit]').click();
+  await page.getByRole('button', { name: 'התחלת שיעור' }).click();
   await page.waitForURL(/\/dash\/\w+$/);
   return page.url().split('/').pop()!;
 }

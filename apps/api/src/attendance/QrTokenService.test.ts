@@ -70,4 +70,16 @@ describe('QrTokenService', () => {
     clock.advance(3_500);
     expect(qr.msUntilNextWindow()).toBe(6_500);
   });
+
+  it('zoom token: static for the whole lecture, bound to the session secret', () => {
+    const { qr, clock } = setup();
+    const token = qr.issueZoom('abc123', 's3cret');
+    clock.advance(3 * 60 * 60 * 1000);
+    expect(qr.issueZoom('abc123', 's3cret')).toBe(token);
+    expect(qr.parseZoom(token)).toBe('abc123');
+    expect(() => qr.verifyZoom(token, 's3cret')).not.toThrow();
+    expect(codeOf(() => qr.verifyZoom(token, 'other'))).toBe('TOKEN_INVALID');
+    expect(codeOf(() => qr.verifyZoom(token.replace('abc123', 'abc124'), 's3cret'))).toBe('TOKEN_INVALID');
+    expect(codeOf(() => qr.parseZoom(qr.issue('abc123', 's3cret')))).toBe('TOKEN_INVALID');
+  });
 });

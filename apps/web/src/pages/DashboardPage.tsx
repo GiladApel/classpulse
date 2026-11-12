@@ -13,6 +13,8 @@ import { pb } from '../lib/pb';
 import { useAttendance } from '../lib/useAttendance';
 
 const STATUS_LABEL = { present: 'נוכח', flagged: 'לבדיקה', removed: 'הוסר' } as const;
+const METHOD_LABEL = { qr: 'QR', manual: 'ידני', zoom: 'זום' } as const;
+const live = (r: RecordDto) => r.status !== 'removed';
 
 export default function DashboardPage() {
   const { id = '' } = useParams();
@@ -21,6 +23,9 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const { records, present } = useAttendance(id);
+  const inRoom = records.filter((r) => r.method !== 'zoom');
+  const fromZoom = records.filter((r) => r.method === 'zoom');
+  const [copied, setCopied] = useState('');
 
   useEffect(() => {
     pb.collection('sessions').getOne(id, { expand: 'course' }).then(setSession, () => setError('השיעור לא נמצא'));
@@ -78,6 +83,13 @@ export default function DashboardPage() {
 
   const active = session?.status === 'active';
 
+  const copy = (what: 'zoom' | 'lecture') =>
+    run(async () => {
+      const path = what === 'zoom' ? `/z/${(await api.get<{ token: string }>(`/sessions/${id}/zoom-link`)).token}` : `/lecture/${id}`;
+      await navigator.clipboard.writeText(location.origin + path);
+      setCopied(what);
+    });
+
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-5 p-4 md:p-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
@@ -109,6 +121,9 @@ export default function DashboardPage() {
         <Card className="flex flex-col items-center justify-center">
           <span className="text-5xl font-bold tabular-nums text-indigo-700">{present}</span>
           <span className="text-slate-600">נוכחים</span>
+          <span className="text-xs text-slate-500">
+            {inRoom.filter(live).length} בכיתה · {fromZoom.filter(live).length} מזום
+          </span>
         </Card>
         <Card className="md:col-span-2">
           <h2 className="mb-2 font-semibold">ייצוא</h2>
@@ -121,13 +136,30 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      <Card>
+        <h2 className="mb-1 font-semibold">קישורים לשיתוף</h2>
+        <p className="mb-3 text-xs text-slate-500">
+          קישור הזום רושם את מי שנכנס דרכו כנוכח מזום (בלי בדיקת מיקום) ועובד רק כל עוד השיעור פעיל. דף השיעור פתוח לכל סטודנטי הקורס — גם למי שלא היה.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {active && (
+            <Button variant="secondary" onClick={() => copy('zoom')}>
+              {copied === 'zoom' ? '✓ הועתק — הדביקו בצ׳אט של הזום' : '📋 העתקת קישור לזום'}
+            </Button>
+          )}
+          <Button variant="secondary" onClick={() => copy('lecture')}>
+            {copied === 'lecture' ? '✓ הועתק' : '📋 העתקת קישור לדף השיעור'}
+          </Button>
+        </div>
+      </Card>
+
       <ErrorText>{error}</ErrorText>
 
       {session && !active && <FeedbackResults sessionId={id} />}
 
       {session && <EngagementPanel sessionId={id} active={active} />}
 
-      {session && <VerificationPanel sessionId={id} active={active} presentCount={present} />}
+      {session && <VerificationPanel sessionId={id} active={active} presentCount={inRoom.filter(live).length} />}
 
       {session && <RecordingPanel sessionId={id} />}
 
@@ -143,72 +175,98 @@ export default function DashboardPage() {
         </form>
       </Card>
 
-      <Card className="overflow-x-auto p-0">
-        <table className="w-full text-start text-sm">
-          <thead className="bg-slate-50 text-slate-600">
-            <tr>
-              {['#', 'שם', 'מס׳ סטודנט', 'שעה', 'אופן', 'מרחק', 'סטטוס', ''].map((h) => (
-                <th key={h} className="px-3 py-2 text-start font-medium">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {records.map((r, i) => (
-              <tr key={r.id} className={r.status === 'removed' ? 'text-slate-400 line-through' : r.status === 'flagged' ? 'bg-amber-50' : ''}>
-                <td className="px-3 py-2 tabular-nums">{i + 1}</td>
-                <td className="px-3 py-2 font-medium">{r.studentName}</td>
-                <td className="px-3 py-2 tabular-nums" dir="ltr">
-                  {r.studentNumber}
-                </td>
-                <td className="px-3 py-2 tabular-nums">{formatTime(r.checkedInAt)}</td>
-                <td className="px-3 py-2">{r.method === 'qr' ? 'QR' : 'ידני'}</td>
-                <td className="px-3 py-2">
-                  {r.geoFlag ? (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800" title={r.note}>
-                      {r.distanceM === null ? 'מיקום לא ידוע' : `${r.distanceM} מ׳ ⚠`}
-                    </span>
-                  ) : r.distanceM !== null ? (
-                    `${r.distanceM} מ׳`
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  {r.status === 'flagged' ? (
-                    <span className="rounded-full bg-amber-200 px-2 py-0.5 text-amber-900" title={r.note}>
-                      {STATUS_LABEL.flagged}
-                    </span>
-                  ) : (
-                    STATUS_LABEL[r.status]
-                  )}
-                  {r.status === 'flagged' && r.note && <div className="mt-0.5 text-xs text-amber-800">{r.note}</div>}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 text-end">
-                  {r.status === 'flagged' && (
-                    <button onClick={() => confirmRecord(r)} className="me-3 text-xs text-emerald-700 hover:underline">
-                      השאר
-                    </button>
-                  )}
-                  {r.status !== 'removed' && (
-                    <button onClick={() => remove(r)} className="text-xs text-red-600 hover:underline">
-                      הסרה
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {records.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
-                  עדיין אין נרשמים. פתחו את מסך ההקרנה.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
+      <AttendanceTable
+        title={`בכיתה (${inRoom.filter(live).length})`}
+        records={inRoom}
+        empty="עדיין אין נרשמים. פתחו את מסך ההקרנה."
+        onConfirm={confirmRecord}
+        onRemove={remove}
+      />
+      {fromZoom.length > 0 && <AttendanceTable title={`מזום (${fromZoom.filter(live).length})`} records={fromZoom} empty="" onConfirm={confirmRecord} onRemove={remove} />}
     </main>
+  );
+}
+
+function AttendanceTable({
+  title,
+  records,
+  empty,
+  onConfirm,
+  onRemove,
+}: {
+  title: string;
+  records: RecordDto[];
+  empty: string;
+  onConfirm: (r: RecordDto) => void;
+  onRemove: (r: RecordDto) => void;
+}) {
+  return (
+    <Card className="overflow-x-auto p-0">
+      <h2 className="px-3 pt-3 font-semibold">{title}</h2>
+      <table className="w-full text-start text-sm">
+        <thead className="bg-slate-50 text-slate-600">
+          <tr>
+            {['#', 'שם', 'מס׳ סטודנט', 'שעה', 'אופן', 'מרחק', 'סטטוס', ''].map((h) => (
+              <th key={h} className="px-3 py-2 text-start font-medium">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {records.map((r, i) => (
+            <tr key={r.id} className={r.status === 'removed' ? 'text-slate-400 line-through' : r.status === 'flagged' ? 'bg-amber-50' : ''}>
+              <td className="px-3 py-2 tabular-nums">{i + 1}</td>
+              <td className="px-3 py-2 font-medium">{r.studentName}</td>
+              <td className="px-3 py-2 tabular-nums" dir="ltr">
+                {r.studentNumber}
+              </td>
+              <td className="px-3 py-2 tabular-nums">{formatTime(r.checkedInAt)}</td>
+              <td className="px-3 py-2">{METHOD_LABEL[r.method]}</td>
+              <td className="px-3 py-2">
+                {r.geoFlag ? (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800" title={r.note}>
+                    {r.distanceM === null ? 'מיקום לא ידוע' : `${r.distanceM} מ׳ ⚠`}
+                  </span>
+                ) : r.distanceM !== null ? (
+                  `${r.distanceM} מ׳`
+                ) : (
+                  '—'
+                )}
+              </td>
+              <td className="px-3 py-2">
+                {r.status === 'flagged' ? (
+                  <span className="rounded-full bg-amber-200 px-2 py-0.5 text-amber-900" title={r.note}>
+                    {STATUS_LABEL.flagged}
+                  </span>
+                ) : (
+                  STATUS_LABEL[r.status]
+                )}
+                {r.status === 'flagged' && r.note && <div className="mt-0.5 text-xs text-amber-800">{r.note}</div>}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2 text-end">
+                {r.status === 'flagged' && (
+                  <button onClick={() => onConfirm(r)} className="me-3 text-xs text-emerald-700 hover:underline">
+                    השאר
+                  </button>
+                )}
+                {r.status !== 'removed' && (
+                  <button onClick={() => onRemove(r)} className="text-xs text-red-600 hover:underline">
+                    הסרה
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+          {records.length === 0 && (
+            <tr>
+              <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
+                {empty}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </Card>
   );
 }

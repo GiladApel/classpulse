@@ -1,6 +1,6 @@
 export type GeofenceMode = 'lenient' | 'strict';
 export type SessionStatus = 'active' | 'ended';
-export type CheckInMethod = 'qr' | 'manual';
+export type CheckInMethod = 'qr' | 'manual' | 'zoom';
 export type AttendanceStatus = 'present' | 'flagged' | 'removed';
 
 export interface GeoPoint {

@@ -311,3 +311,38 @@ sequenceDiagram
   API->>FS: clusterOpen(sessionId)
   FS-->>L: Theme[] (AI groups open questions)
 ```
+
+## SD8: Joining from Zoom (UC15)
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor L as Lecturer dashboard
+  participant API as SessionController / AttendanceController
+  participant SS as SessionService
+  participant QR as QrTokenService
+  participant AS as AttendanceService
+  participant PB as PocketBase
+  actor S as Student on Zoom
+
+  L->>API: GET /sessions/:id/zoom-link
+  API->>SS: zoomToken(session)
+  SS->>QR: issueZoom(sessionId, qrSecret)
+  QR-->>L: token
+  L->>L: copy origin + /z/token, paste into the Zoom chat
+  S->>API: POST /zoom-checkins {token}
+  API->>QR: parseZoom(token), then verifyZoom(token, qrSecret)
+  API->>AS: joinRemote(ctx)
+  loop remoteRules: DuplicateStudent, SessionActive
+    AS->>AS: check(ctx)
+  end
+  alt reject
+    AS-->>S: 4xx (lecture ended / link altered / removed)
+  else already has a record
+    AS-->>S: existing record (one record per lecture)
+  else pass
+    AS->>PB: create attendance_records {method: zoom}
+    PB--)L: realtime "create" -> row under "From Zoom"
+    AS-->>S: 201 "recorded as attending from Zoom"
+  end
+```

@@ -1,6 +1,6 @@
 # Use Cases: ClassPulse
 
-**Actors:** Student · Lecturer · LLM Provider (external) · System Timer
+**Actors:** Student · Lecturer · Admin · LLM Provider (external) · System Timer
 
 ```mermaid
 flowchart LR
@@ -11,6 +11,7 @@ flowchart LR
   S --- UC10[UC10 Get homework review]
   S --- UC12[UC12 Review a lecture]
   S --- UC14[UC14 Give lecture feedback]
+  S --- UC15[UC15 Join from Zoom]
   L([Lecturer]) --- UC2[UC2 Run session]
   L --- UC3[UC3 Manage attendance & export]
   L --- UC4[UC4 Snap headcount & launch challenge]
@@ -18,6 +19,8 @@ flowchart LR
   L --- UC9[UC9 Summarize lecture]
   L --- UC11[UC11 Review class homework insights]
   L --- UC13[UC13 Add content after the lecture]
+  L --- UC17[UC17 Create a course]
+  A([Admin]) --- UC16[UC16 Make a user a lecturer]
   UC13 --- AI
   UC4 --- AI([LLM Provider])
   UC8 --- AI
@@ -42,6 +45,9 @@ flowchart LR
 | UC12 | As a **student**, I open a lecture's page (even one I missed) to get the materials and review questions and read the answers to the class's questions. | LP-01..03 |
 | UC13 | As a **lecturer**, after the lecture I answer open questions, publish review questions and upload the slides. | LP-02..04 |
 | UC14 | As a **student**, when the lecture ends I tell the lecturer anonymously how it went, in one tap, so the next lecture can improve. | FB-01..03 |
+| UC15 | As a **student** watching on Zoom, I open the link the lecturer posted in the chat and I'm recorded as attending from Zoom, so I can join the questions and polls too. | ATT-10, 11 |
+| UC16 | As the **admin**, I find a registered user and make them a lecturer, without touching the server. | AD-01 |
+| UC17 | As a **lecturer**, I create my course myself and share each lecture's page with the class. | AD-02, 03 |
 
 ## Detailed use cases
 
@@ -185,3 +191,33 @@ flowchart LR
   - 1a. The student already closed the page: the form waits on the lecture page for 24 hours.
   - 2a. The student taps "not now": nothing is sent.
   - 3a. The student already answered, or 24 hours have passed: the form is not shown.
+
+### UC15: Join from Zoom (student)
+- **Actor:** Student watching the lecture on Zoom.
+- **Preconditions:** the lecture is active; the lecturer copied the Zoom link from the dashboard and posted it in the Zoom chat.
+- **Main flow:**
+  1. The student opens the link (`/z/:token`); the app is signed in.
+  2. The API checks the link's signature and that the lecture is active, then creates a record with method `zoom`.
+  3. The student sees "recorded as attending from Zoom" and the live panel (questions, polls, "I'm lost"). The dashboard shows the student under "From Zoom".
+- **Alternate flows:**
+  - 1a. First visit: Google sign-in and student ID, then continue at step 2.
+  - 2a. The lecture has ended or the link was altered: rejected with a message.
+  - 2b. The student already checked in from the classroom (or opened the link before): the existing record is shown; there is still one record.
+- **Postcondition:** the student is a course participant, so later they can open every lecture page of the course (UC12). Challenges are not sent to them.
+
+### UC16: Make a user a lecturer (admin)
+- **Actor:** Admin (an email listed in the server's `ADMIN_EMAILS`).
+- **Main flow:**
+  1. The admin opens "Manage users" from the home screen.
+  2. The admin types part of a name, email or student ID.
+  3. The admin taps "Make lecturer" on the right user. The user's next visit opens the lecturer home.
+- **Alternate flows:**
+  - 1a. Not an admin: the page says it is for admins only.
+  - 3a. "Back to student" reverses it. The admin cannot change their own role.
+
+### UC17: Create a course and share a lecture page (lecturer)
+- **Actor:** Lecturer.
+- **Main flow:**
+  1. On the lecturer home, the lecturer enters a course code and name under "New course"; the course appears in the start-lecture form.
+  2. On a lecture's dashboard, the lecturer taps "Copy lecture-page link" and posts it to the course group.
+- **Alternate flow:** 1a. The lecturer already has a course with that code: rejected.

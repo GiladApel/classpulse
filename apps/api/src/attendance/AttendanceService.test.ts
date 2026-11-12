@@ -3,8 +3,9 @@ import { FixedClock } from '../infra/Clock.js';
 import { InMemoryAttendanceRepository } from '../infra/memory/InMemoryAttendanceRepository.js';
 import { CLASSROOM, makeCtx, makeSession, north, T0 } from '../test/fixtures.js';
 import { AttendanceService, CheckInRejected } from './AttendanceService.js';
-import { type CheckInRule, pass, reject } from './CheckInRule.js';
+import { type CheckInContext, type CheckInRule, pass, reject } from './CheckInRule.js';
 import { DuplicateStudentRule } from './DuplicateStudentRule.js';
+import { SessionActiveRule } from './SessionActiveRule.js';
 
 describe('AttendanceService', () => {
   let repo: InMemoryAttendanceRepository;
@@ -88,5 +89,45 @@ describe('AttendanceService', () => {
 
   it('remove of an unknown record throws NOT_FOUND', async () => {
     await expect(svc([]).remove('nope', 'x')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  describe('joinRemote (Zoom link)', () => {
+    const remote = () => {
+      const rules = [new DuplicateStudentRule(repo), new SessionActiveRule()];
+      return new AttendanceService([new DuplicateStudentRule(repo)], repo, clock, rules);
+    };
+    const zoomCtx = (over: Partial<CheckInContext> = {}) => ({ session: makeSession(), studentId: 'u1', studentNumber: '123456789', studentName: 'דנה כהן', now: T0, ...over });
+
+    it('records a zoom attendance without device or location', async () => {
+      const { record, alreadyCheckedIn } = await remote().joinRemote(zoomCtx());
+      expect(alreadyCheckedIn).toBe(false);
+      expect(record).toMatchObject({ method: 'zoom', status: 'present', deviceId: '', geoFlag: false, distanceM: undefined });
+    });
+
+    it('the first record wins: room then zoom, or zoom then room, is one record', async () => {
+      const s = remote();
+      const room = await s.checkIn(makeCtx());
+      expect(await s.joinRemote(zoomCtx())).toEqual({ record: room.record, alreadyCheckedIn: true });
+      const zoom = await s.joinRemote(zoomCtx({ studentNumber: '987654321' }));
+      expect((await s.checkIn(makeCtx({ studentNumber: '987654321', deviceId: 'dev-2' }))).record).toEqual(zoom.record);
+    });
+
+    it('rejects an ended lecture and a removed student', async () => {
+      const s = remote();
+      await expect(s.joinRemote(zoomCtx({ session: makeSession({ status: 'ended' }) }))).rejects.toMatchObject({ code: 'SESSION_ENDED' });
+      const { record } = await s.joinRemote(zoomCtx());
+      await s.remove(record.id, 'x');
+      await expect(s.joinRemote(zoomCtx())).rejects.toMatchObject({ code: 'REMOVED' });
+    });
+
+    it('inRoomCount leaves out zoom and removed students; presentCount counts zoom', async () => {
+      const s = remote();
+      await s.checkIn(makeCtx());
+      await s.joinRemote(zoomCtx({ studentNumber: '2' }));
+      const { record } = await s.checkIn(makeCtx({ studentNumber: '3', deviceId: 'dev-3' }));
+      await s.remove(record.id, 'x');
+      expect(await s.inRoomCount('sess1')).toBe(1);
+      expect(await s.presentCount('sess1')).toBe(2);
+    });
   });
 });

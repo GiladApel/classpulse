@@ -14,6 +14,12 @@ export const requireUser = (resolve: UserResolver) =>
     await next();
   });
 
+export const requireAdmin = (isAdmin: (email: string) => boolean) =>
+  createMiddleware<AppEnv>(async (c, next) => {
+    if (!isAdmin(c.get('user').email)) throw new ForbiddenError('Admins only');
+    await next();
+  });
+
 export const requireLecturer = createMiddleware<AppEnv>(async (c, next) => {
   if (c.get('user').role !== 'lecturer') throw new ForbiddenError('Lecturers only');
   await next();

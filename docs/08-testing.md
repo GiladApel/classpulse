@@ -19,7 +19,7 @@ Coverage key: **U** = unit test, **C** = contract test, **I** = integration test
 ### attendance/
 | Class | Test cases | Type | FRs |
 |---|---|---|---|
-| `QrTokenService` | issue → verify round-trip; accepted in window w and w+1; rejected in w+2 (expired); a flipped signature byte is rejected; a token from another session is rejected; malformed base64 is rejected | U | ATT-02, 03 |
+| `QrTokenService` | issue → verify round-trip; accepted in window w and w+1; rejected in w+2 (expired); a flipped signature byte is rejected; a token from another session is rejected; malformed base64 is rejected; the Zoom token is the same hours later, fails with another secret or session id, and a QR token is not a Zoom token | U | ATT-02, 03, 10 |
 | `TokenRule` | valid → pass; expired → reject `TOKEN_EXPIRED`; tampered → reject `TOKEN_INVALID` | U | ATT-03 |
 | `SessionActiveRule` | active → pass; ended → reject | U | ATT-01 |
 | `DuplicateStudentRule` | first check-in → pass; second → reject `ALREADY_CHECKED_IN` | U | ATT-05 |
@@ -28,10 +28,13 @@ Coverage key: **U** = unit test, **C** = contract test, **I** = integration test
 | `LenientGeofencePolicy` | inside → pass; outside → warn with distance; no location → warn | U | ATT-06 |
 | `StrictGeofencePolicy` | inside → pass; outside → reject; no location → reject | U | ATT-06 |
 | `GeofencePolicyFactory` | each mode returns the correct class | U | ATT-06 |
-| `AttendanceService` | chain order (a rule after a reject is not called); a warn sets `geoFlag`; duplicate returns the existing record; `manualApprove` sets method `manual`; `remove` keeps the row with status `removed`; `presentCount` excludes removed records | U | ATT-04..08 |
+| `AttendanceService` | chain order (a rule after a reject is not called); a warn sets `geoFlag`; duplicate returns the existing record; `manualApprove` sets method `manual`; `remove` keeps the row with status `removed`; `presentCount` excludes removed records; `joinRemote` writes method `zoom` with no device or location, one record whichever way came first, rejects an ended lecture and a removed student; `inRoomCount` leaves out Zoom and removed records | U | ATT-04..08, 10, 11 |
 | `SessionService` | `start` stores location and generates a secret; `end` rejects further tokens and purges clear photos | U | ATT-01, AF-08 |
 | `AttendanceExportService` + `XlsxExporter` / `CsvExporter` | golden file: Hebrew names and the column order are correct | U | ATT-09 |
 | `GoogleSheetsExporter` | writes rows to a test spreadsheet | I | ATT-09 |
+| `UserAdminService` | admins by configured email, case-insensitive, an empty entry admits nobody; search by name, email or student number; promote and demote others, never oneself; unknown user → `NOT_FOUND` | U | AD-01 |
+| HTTP: admin, courses, Zoom | `/admin/*` 403 for non-admins, `/me` flag; a course code once per lecturer, students 403; the Zoom link for the session's lecturer only, works in strict mode without location, stops at the end; a Zoom student posts a question; the headcount and a roll-call count only the room | U | AD-01, 02, ATT-10, 11 |
+| Access rules (Zoom) | the `zoom` record is readable by the student and the lecturer; challenges are not listed to a Zoom student; a Zoom-only student reads the lecture page after the end; the role is written by the API and a user cannot change their own | I | ATT-10, 11, AD-01, LP-01 |
 
 ### challenge/
 | Class | Test cases | Type | FRs |
@@ -72,7 +75,7 @@ Coverage key: **U** = unit test, **C** = contract test, **I** = integration test
 | Access rules (M6) | unpublished summary lecturer-only; published summary readable by every course participant (even one who missed that lecture), not by outsiders; text extract and fingerprint hidden; students see only their own submissions and can download their own file; `similar_pairs` unreadable through PocketBase, even by the lecturer | I | VS-05, HW-03, 04, NFR-04 |
 
 ## 3. E2E scenarios (Playwright, `LLM_PROVIDER=mock`)
-Implemented in `e2e/` (`npm run e2e`): scenarios 1, 2, 3, 4, 6, 8 and 9, plus the optional note after "I'm lost", run on Edge with iPhone 13 and Pixel 7 emulation for the phones and a desktop window for the lecturer. The suite starts its own API (mock provider, 3 s QR windows so expiry takes seconds, not minutes) and Vite instance next to the real PocketBase, and creates and deletes its own lecturer, course and students. Scenarios 5 and 7 need the real model, so they run as Puppeteer scripts with Gemini.
+Implemented in `e2e/` (`npm run e2e`): scenarios 1, 2, 3, 4, 6, 8, 9 and 10, plus the optional note after "I'm lost", run on Edge with iPhone 13 and Pixel 7 emulation for the phones and a desktop window for the lecturer. The suite starts its own API (mock provider, 3 s QR windows so expiry takes seconds, not minutes) and Vite instance next to the real PocketBase, and creates and deletes its own lecturer, course and students. Scenarios 5 and 7 need the real model, so they run as Puppeteer scripts with Gemini.
 
 1. **Happy check-in:** the lecturer starts a session, a student opens the token URL, the student sees ✅, and the dashboard row appears within 1 s.
 2. **Expired token:** opening a token older than two QR windows shows the expiry message; a malformed token shows "invalid code" (this caught the raw `TOKEN_INVALID` code leaking to students).
@@ -83,6 +86,7 @@ Implemented in `e2e/` (`npm run e2e`): scenarios 1, 2, 3, 4, 6, 8 and 9, plus th
 7. **Summary + homework** (implemented as a Puppeteer script during M6, real Gemini): 5 phones check in, 2 press "I'm lost"; the lecturer uploads an 88 s Hebrew lecture video, sees the summary with the spike in the right chapter and publishes it; a student opens it from "My courses"; the lecturer creates an assignment; 5 students submit from their phones (one is a renamed copy); reviews arrive live; percentiles appear; the class analysis flags exactly the copied pair; no other student's name appears in a student's view.
 8. **Lecture page** (Playwright): a student attends an earlier lecture only; in the next one another student asks a question; before the end the lecturer uploads a slide image, opens one of the AI drafts as a poll and the phone shows it; the lecturer ends the lecture, then answers the question, publishes an open review question, uploads the deck PDF, unticks one of the 8 drafts and publishes the other 7, uploads a file with the single upload button and adds a link; the first student opens the lecture from the course page, sees the answer, the file and the link, cannot post, and sees the review questions without the unticked one.
 9. **Lecture feedback** (Playwright): 3 phones keep the page open; the lecturer ends the lecture; without a reload every phone shows the anonymous feedback form and the "I'm lost" button disappears; 2 answer (one with a comment); the dashboard shows only "results from 3 answers"; after the third, the counts and the comment appear and no student's name is in the card.
+10. **Admin and Zoom** (Playwright): the admin finds a student on "Manage users" and makes them a lecturer; that user signs in to the lecturer home, creates a course and starts a lecture; the lecturer copies the Zoom link, one student opens it (no location) and another scans the QR; the dashboard shows "In class (1)" and "From Zoom (1)"; after the end the lecturer copies the lecture-page link, publishes a review question, and the Zoom-only student sees it on that page.
 
 ## 4. Load test (k6)
 - **Script:** `loadtest/run.sh <baseUrl>`. `apps/api/scripts/loadtest.ts prepare` creates a lecturer, 80 students (each with its own auth token) and an active session. `listen` opens 80 PocketBase SSE subscriptions, one per student, each waiting for its own `attendance_records` event. `loadtest/checkin.js` (k6) starts each student at a random moment within 30 s; the student fetches the QR the projector currently shows, then POSTs `/checkins`. `cleanup` deletes the course and the accounts.

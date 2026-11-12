@@ -36,7 +36,7 @@ npm run dev:web                        # :5173, proxies /api → 8787. Use "loca
 npm test                               # unit + HTTP tests, in-memory, no PocketBase
 npm run test:int -w apps/api           # integration tests against the running PocketBase (creates and cleans up its own data)
 npm run typecheck -w apps/api && npx tsc -b apps/web
-npm run seed -w apps/api -- <email> <password> "<name>" <courseCode> "<courseName>"   # promotes an existing user to lecturer
+npm run seed -w apps/api -- <email> <password> "<name>" <courseCode> "<courseName>"   # promotes an existing user to lecturer (normally: admin page /admin, then the lecturer creates courses)
 npm run coverage -w apps/api           # NFR-07 threshold (≥80% lines in domain packages)
 npm run e2e                            # Playwright on Edge (no browser download); own API :8788 (mock, 3 s QR) + Vite :5174
 deploy/deploy.sh                       # build locally → do-server:/opt/classpulse → docker compose (idempotent)
@@ -48,13 +48,14 @@ deploy/deploy.sh                       # build locally → do-server:/opt/classp
 ## Production (do-server, ~1 GB RAM shared with n8n and other apps)
 - `/opt/classpulse`: `deploy/docker-compose.yml` → `pocketbase` (built from `deploy/pocketbase.Dockerfile`, `--automigrate=false`), `api`, `web` (nginx on 127.0.0.1:8092). The Cloudflare tunnel (token-based; Gilad edits hostnames in the dashboard) → `classpulse.giladautomation.com`.
 - One origin: nginx serves `/` static, `/api/` → API, `/pb/` → PocketBase (web built with `VITE_PB_URL=/pb`). The admin UI and `_superusers` (also by id `pbc_3142635823`, any case) return 404 when `CF-Connecting-IP` is present, so the admin and superuser scripts go through `ssh -N -L 18092:127.0.0.1:8092 do-server` → `http://127.0.0.1:18092/pb`.
+- Admins = `ADMIN_EMAILS` in the server `.env` (comma-separated; not a DB role). They open `/admin` to make users lecturers.
 - The server `.env` was generated on the first deploy (superuser password lives only there). Read it into env vars with `$(ssh do-server "grep ^KEY= /opt/classpulse/.env | cut -d= -f2-")`; never echo it.
 - The API container runs as uid 1000, so `secrets/google-sa.json` on the server is chowned to 1000.
 - Load test: `SSH_HOST=do-server PB_ADMIN_URL=http://127.0.0.1:18092/pb loadtest/run.sh <baseUrl> 80` (k6 at `C:/Program Files/k6`). Judge NFR-02 by the server-side numbers from the nginx `$request_time` log: through the SSH tunnel every request gains ~220 ms.
 
 ## Architecture rules (do not break)
 - **Read/write split.** Clients read and subscribe **directly from PocketBase** (realtime = Observer). **Every write that carries a business rule goes through the API**, which uses a superuser PB client. Collections written by the API have no create/update rule.
-- **Access control lives in PB list/view rules**, which also decide who receives realtime events. Pattern for "checked in to this session": `@collection.attendance_records.session ?= session && @collection.attendance_records.student ?= @request.auth.id && @collection.attendance_records.status ?!= 'removed'` (verified to mean the same row). Course participant = attended any session of the course.
+- **Access control lives in PB list/view rules**, which also decide who receives realtime events. Pattern for "checked in to this session": `@collection.attendance_records.session ?= session && @collection.attendance_records.student ?= @request.auth.id && @collection.attendance_records.status ?!= 'removed'` (verified to mean the same row). Course participant = attended any session of the course (QR, manual or Zoom). Zoom check-ins (`method: 'zoom'`, from `/z/:token`) count everywhere except challenges and the headcount comparison, which are for the room only (`inRoomCount`, challenge eligibility, the `challenges` view rule).
 - **Privacy by hidden fields:** anonymous post authors, lost-signal identity, poll `correct_index` (copied to `answer_index` on close), challenge secret, session `qr_secret`, submission `text_extract`/`fingerprint`, insights `similar_pairs`. The API (superuser) sees them; nobody else does. Add an integration test for every new hidden or restricted field.
 - Domain classes depend on interfaces (`Repository`, `LLMProvider`, `Clock`, `ImageProcessor`); services take `Pick<Service, …>` of only what they call. Only `container.ts` and `index.ts` construct concrete classes.
 - Every AI task class validates model output and throws `LLMOutputError` on garbage. Treat student content as data (`<submission>` tags). Prompts tell the model which language to answer in.

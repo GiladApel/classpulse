@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 - **Product:** ClassPulse, a web-based classroom tool (PWA) for attendance, live engagement and AI-assisted learning analysis.
-- **Users:** Student, Lecturer, System (scheduled jobs / AI).
+- **Users:** Student, Lecturer, Admin (decides who is a lecturer), System (scheduled jobs / AI).
 - **Definitions:**
   - **Session:** one lecture meeting.
   - **Check-in:** a student's attendance record in a session.
@@ -30,6 +30,8 @@
 | FR-ATT-07 | The dashboard shows check-ins in realtime: name, ID, time, distance, flags, status. |
 | FR-ATT-08 | The lecturer can manually approve a student (late arrival or phone problem) with a note, and can remove a record. |
 | FR-ATT-09 | The lecturer can export the session's attendance as `.xlsx` / `.csv` and sync it to a Google Sheet. |
+| FR-ATT-10 | While a session is active, the lecturer can copy a Zoom link for it. A student who opens the link is checked in as "from Zoom" with no QR, location or device check; it stops working when the lecture ends. A student has one record per lecture, whichever way they came first. |
+| FR-ATT-11 | The dashboard lists students in the classroom and students from Zoom separately, with a count of each. Zoom students take part in questions, polls, "I'm lost" and feedback; challenges (FR-AF-02..06) concern only the students in the room. |
 
 ### F2: Anti-fraud
 | ID | Requirement |
@@ -90,6 +92,13 @@
 | FR-FB-01 | When the lecturer ends the lecture, every student who was checked in is offered optional, anonymous feedback: one of four options (clear and well paced · too fast · too slow · the material was not clear) and an optional comment. It appears at once on phones still open and stays available on the lecture page for 24 hours. |
 | FR-FB-02 | One answer per student. The form states that it is anonymous. |
 | FR-FB-03 | The lecturer sees only the aggregate (count per option and the comments, ordered by option, never by time) and only from 3 answers. No one, the lecturer included, can read a single answer or its author. |
+
+### F9: Administration
+| ID | Requirement |
+|----|-------------|
+| FR-AD-01 | Admins are set by email in the server configuration. An admin searches registered users by name, email or student ID and makes a user a lecturer or a student again. An admin cannot change their own role. |
+| FR-AD-02 | A lecturer creates their own courses (code and name); a lecturer cannot have two courses with the same code. |
+| FR-AD-03 | The lecturer can copy a link to a lecture's page to share with the course (see FR-LP-01). |
 
 ## 4. Non-functional requirements
 | ID | Requirement |

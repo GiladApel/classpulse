@@ -43,6 +43,11 @@ export class SessionController {
       return c.json(this.sessions.currentQrToken(session));
     });
 
+    app.get('/:id/zoom-link', requireLecturer, async (c) => {
+      const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
+      return c.json({ token: this.sessions.zoomToken(session) });
+    });
+
     app.post('/:id/attendance', requireLecturer, async (c) => {
       const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
       const b = await jsonBody(c.req);

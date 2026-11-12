@@ -317,27 +317,35 @@ classDiagram
     +issue(sessionId: string, secret: string) string
     +parse(token: string) TokenClaims
     +verify(token: string, secret: string) TokenClaims
+    +issueZoom(sessionId: string, secret: string) string
+    +parseZoom(token: string) string
+    +verifyZoom(token: string, secret: string) void
   }
   class AttendanceService {
     -baseRules: CheckInRule[]
+    -remoteRules: CheckInRule[]
     -repo: AttendanceRepository
     -clock: Clock
     +checkIn(ctx: CheckInContext) Promise~CheckInOutcome~
+    +joinRemote(ctx) Promise~CheckInOutcome~
     +manualApprove(session, studentNumber, studentName, note) Promise~AttendanceRecord~
     +remove(recordId, reason) Promise~AttendanceRecord~
     +get(recordId) Promise~AttendanceRecord~
     +listForSession(sessionId) Promise~AttendanceRecord[]~
     +flag(recordId, reason) Promise~void~ «M4»
     +presentCount(sessionId) Promise~number~ «M4»
+    +inRoomCount(sessionId) Promise~number~
   }
   class SessionService {
     -sessions: SessionRepository
     -courses: CourseRepository
     -tokens: QrTokenService
     -clock: Clock
+    +createCourse(lecturerId, code, name) Promise~Course~
     +start(lecturerId, input: StartSessionInput) Promise~Session~
     +end(session) Promise~Session~
     +currentQrToken(session) QrTicket
+    +zoomToken(session) string
     +get(sessionId) Promise~Session~
     +getOwned(sessionId, lecturerId) Promise~Session~
   }
@@ -361,7 +369,7 @@ classDiagram
   StrictGeofencePolicy ..> GeoMath
   TokenRule o-- QrTokenService
   SessionService o-- QrTokenService
-  AttendanceService o-- "*" CheckInRule : baseRules
+  AttendanceService o-- "*" CheckInRule : baseRules, remoteRules
   AttendanceService ..> GeofencePolicyFactory : appends policy per session
   CheckInRule ..> CheckInContext
   CheckInRule ..> RuleResult
@@ -372,6 +380,8 @@ classDiagram
 **Idempotency.** `DuplicateStudentRule` returns `reject` with code `ALREADY_CHECKED_IN`. `AttendanceService` maps that code to "return the existing record" (UC1 4b). Two concurrent scans by the same student are caught by the DB unique index `(session, student_number)`, and the loser also receives the existing record.
 
 **Geofence and GPS accuracy.** `GeoMath.isInside` credits the accuracy the phone reports, capped at 100 m. A fix that is noisy but honest still passes, while a fix with 2 km accuracy cannot pass anywhere. A session with no location (the lecturer denied access) disables the geofence.
+
+**Zoom link.** `joinRemote` runs a shorter chain, `remoteRules` = DuplicateStudent then SessionActive, and writes method `zoom`. There is no QR window, location or device to check. The link token is `sessionId.HMAC(qrSecret, "sessionId.zoom")`: it is static for the whole lecture, so the lecturer pastes it once into the Zoom chat, and it dies with the session. A student has one record per lecture whichever way came first. `ChallengeManager` counts only the room: the headcount compares the photo with `inRoomCount`, and challenge eligibility skips `zoom` records. The `challenges` view rule likewise excludes them, so Zoom students never receive the event.
 
 **Identity key.** Records are keyed by `studentNumber` (not by user id), so the lecturer can manually approve a student who never signed in.
 
@@ -688,6 +698,8 @@ classDiagram
   }
   class PbCourseRepository {
     +get(id) Promise~Course | null~
+    +create(data) Promise~Course~
+    +findByLecturerAndCode(lecturerId, code) Promise~Course | null~
   }
   class PbHeadcountRepository {
     +purgeClearPhotos(sessionId) Promise~void~ «M4»
@@ -747,6 +759,40 @@ classDiagram
 Queries are named methods on domain-specific repository interfaces, never raw PocketBase filter strings, so the PocketBase query language never leaks into the domain. Other repositories follow the same pattern (`PbChallengeRepository`, `PbPollRepository` and so on). Each domain-specific repository is an interface, for example `AttendanceRepository extends Repository<AttendanceRecord>`. Unit tests use `InMemoryRepository`-based fakes.
 
 **Why `KeyedLock`:** PocketBase's `votes+` modifier is a read-modify-write in Go, not an atomic SQL update. An integration test fired 12 concurrent upvotes from 6 students; all 6 valid votes were accepted but only 2 were counted. `PbFeedPostRepository` now serialises increments per post inside the API process. This is valid because the API runs as a single instance; scaling out would need a recount or a database-side counter.
+
+## 6b. `admin/`: user roles
+
+```mermaid
+classDiagram
+  direction LR
+  class UserRepository {
+    <<interface>>
+    +get(id) Promise~ManagedUser | null~
+    +search(q: string, limit: number) Promise~ManagedUser[]~
+    +setRole(id, role: Role) Promise~ManagedUser~
+  }
+  class PbUserRepository
+  class InMemoryUserRepository
+  class UserAdminService {
+    -users: UserRepository
+    -admins: Set~string~
+    +isAdmin(email) boolean
+    +search(q) Promise~ManagedUser[]~
+    +setRole(actorId, userId, role: Role) Promise~ManagedUser~
+  }
+  class AdminController {
+    -admins: UserAdminService
+    -sessions: SessionService
+    +routes() Hono
+  }
+  UserRepository <|.. PbUserRepository
+  UserRepository <|.. InMemoryUserRepository
+  UserAdminService o-- UserRepository
+  AdminController o-- UserAdminService
+  AdminController o-- SessionService : createCourse
+```
+
+Admins are not a role in the database: `ADMIN_EMAILS` (server configuration) lists them, so no user can make themselves an admin, and the `users` update rule already stops users from changing their own `role`. Only the API, through `PbUserRepository`, writes `role`. `AdminController` serves `GET /me` (is the caller an admin), `GET /admin/users`, `POST /admin/users/:id/role` (both behind `requireAdmin`) and `POST /courses` (behind `requireLecturer`, delegating to `SessionService.createCourse`). An admin cannot change their own role, so the last admin cannot lock themselves out of the lecturer screens.
 
 ## 7. SOLID mapping
 | Principle | Evidence |

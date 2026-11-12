@@ -1,3 +1,5 @@
+import type { UserRepository } from './admin/types.js';
+import { UserAdminService } from './admin/UserAdminService.js';
 import { FeedClusterer } from './ai/FeedClusterer.js';
 import { HomeworkReviewer } from './ai/HomeworkReviewer.js';
 import { LectureSummarizer } from './ai/LectureSummarizer.js';
@@ -73,6 +75,7 @@ import {
   PbPostVoteRepository,
 } from './infra/pb/PbEngagementRepositories.js';
 import { PbSessionRepository } from './infra/pb/PbSessionRepository.js';
+import { PbUserRepository } from './infra/pb/PbUserRepository.js';
 import { UploadStore } from './infra/UploadStore.js';
 
 export interface Container {
@@ -90,6 +93,7 @@ export interface Container {
   homework: HomeworkAnalysisService;
   practice: PracticeService;
   materials: MaterialService;
+  admins: UserAdminService;
   /** Background AI jobs (summaries, reviews); tests await queue.idle(). */
   queue: BackgroundQueue;
   resolveUser: UserResolver;
@@ -100,6 +104,8 @@ export interface Ports {
   attendanceRepo: AttendanceRepository;
   sessionRepo: SessionRepository;
   courseRepo: CourseRepository;
+  userRepo: UserRepository;
+  adminEmails: string[];
   headcountRepo: HeadcountRepository;
   challengeRepo: ChallengeRepository;
   responseRepo: ChallengeResponseRepository;
@@ -134,7 +140,8 @@ export function buildContainer(p: Ports): Container {
     new SessionActiveRule(),
     new DeviceBindingRule(p.attendanceRepo),
   ];
-  const attendance = new AttendanceService(rules, p.attendanceRepo, p.clock);
+  const remoteRules = [new DuplicateStudentRule(p.attendanceRepo), new SessionActiveRule()];
+  const attendance = new AttendanceService(rules, p.attendanceRepo, p.clock, remoteRules);
   const confusion = new ConfusionMeter(p.lostRepo, attendance, p.clock);
   const queue = new BackgroundQueue();
   return {
@@ -171,6 +178,7 @@ export function buildContainer(p: Ports): Container {
     ),
     practice: new PracticeService(p.practiceRepo, new PracticeQuestionGenerator(p.llm), p.clock),
     materials: new MaterialService(p.materialRepo, p.clock),
+    admins: new UserAdminService(p.userRepo, p.adminEmails),
     queue,
     resolveUser: p.resolveUser,
   };
@@ -190,6 +198,8 @@ export async function buildProductionContainer(cfg: Config): Promise<Container> 
     attendanceRepo: new PbAttendanceRepository(pb),
     sessionRepo: new PbSessionRepository(pb),
     courseRepo: new PbCourseRepository(pb),
+    userRepo: new PbUserRepository(pb),
+    adminEmails: cfg.adminEmails,
     headcountRepo: new PbHeadcountRepository(pb),
     challengeRepo: new PbChallengeRepository(pb),
     responseRepo: new PbChallengeResponseRepository(pb),

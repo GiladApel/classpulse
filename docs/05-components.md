@@ -5,8 +5,8 @@
 ```mermaid
 flowchart TB
   subgraph Client["apps/web: React PWA (Hebrew RTL)"]
-    SV["Student views<br/>/c/:token · /live/:session · /hw"]
-    LV["Lecturer views<br/>/dash/:session · /hw/admin"]
+    SV["Student views<br/>/c/:token · /z/:token · /live/:session · /hw"]
+    LV["Lecturer and admin views<br/>/dash/:session · /hw/admin · /admin"]
     PV["Projector view<br/>/projector/:session"]
     APIC["ApiClient<br/>(REST, Bearer = PB token)"]
     PBC["PocketBase SDK<br/>(auth, reads, subscriptions)"]

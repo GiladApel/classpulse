@@ -23,6 +23,7 @@ import {
   InMemorySubmissionRepository,
 } from '../infra/memory/InMemoryContentRepositories.js';
 import { InMemoryCourseRepository } from '../infra/memory/InMemoryCourseRepository.js';
+import { InMemoryUserRepository } from '../infra/memory/InMemoryUserRepository.js';
 import {
   InMemoryFeedPostRepository,
   InMemoryLessonFeedbackRepository,
@@ -52,6 +53,7 @@ export const USERS: Record<string, UserIdentity> = {
   avi: { id: 'u2', name: 'אבי', email: 'a@x', role: 'student', studentNumber: '222222222' },
   rina: { id: 'u4', name: 'רינה', email: 'r@x', role: 'student', studentNumber: '444444444' },
   fresh: { id: 'u3', name: 'חדש', email: 'n@x', role: 'student', studentNumber: '' },
+  boss: { id: 'adm1', name: 'מנהל', email: 'Boss@x', role: 'lecturer', studentNumber: '' },
 };
 
 let storeSeq = 0;
@@ -65,6 +67,8 @@ export function makeTestPorts(over: Partial<Ports> = {}) {
     attendanceRepo: new InMemoryAttendanceRepository(sessionRepo),
     sessionRepo,
     courseRepo: new InMemoryCourseRepository([{ id: 'c1', code: 'I2SE', name: 'הנדסת תוכנה', lecturerId: 'lect1' }]),
+    userRepo: new InMemoryUserRepository(Object.values(USERS).map((u) => ({ ...u }))),
+    adminEmails: ['boss@x'],
     headcountRepo: new InMemoryHeadcountRepository(),
     challengeRepo: new InMemoryChallengeRepository(),
     responseRepo: new InMemoryChallengeResponseRepository(),

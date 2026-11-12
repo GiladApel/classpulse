@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react';
 export const pb = new PocketBase(import.meta.env.VITE_PB_URL ?? 'http://127.0.0.1:8090');
 pb.autoCancellation(false);
 
+// A role changed by the admin reaches an open app on its next load, not only after signing in again.
+if (pb.authStore.isValid) pb.collection('users').authRefresh().catch(() => {});
+
 export interface UserRecord {
   id: string;
   email: string;

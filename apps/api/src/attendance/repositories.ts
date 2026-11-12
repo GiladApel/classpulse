@@ -13,4 +13,6 @@ export type SessionRepository = Repository<Session>;
 
 export interface CourseRepository {
   get(id: string): Promise<Course | null>;
+  create(data: Omit<Course, 'id'>): Promise<Course>;
+  findByLecturerAndCode(lecturerId: string, code: string): Promise<Course | null>;
 }

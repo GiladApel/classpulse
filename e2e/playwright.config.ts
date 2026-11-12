@@ -17,7 +17,7 @@ export default defineConfig({
       command: 'node --import tsx src/index.ts',
       cwd: '../apps/api',
       url: 'http://127.0.0.1:8788/health',
-      env: { PORT: '8788', LLM_PROVIDER: 'mock', QR_WINDOW_SEC: '3' },
+      env: { PORT: '8788', LLM_PROVIDER: 'mock', QR_WINDOW_SEC: '3', ADMIN_EMAILS: 'e2e-admin@classpulse.test' },
       reuseExistingServer: false,
     },
     {

@@ -6,6 +6,7 @@ export interface Config {
   pbSuperuserEmail: string;
   pbSuperuserPassword: string;
   qrWindowSec: number;
+  adminEmails: string[];
   googleServiceAccountFile?: string;
   googleSheetsId?: string;
   ai: AiConfig;
@@ -24,6 +25,7 @@ export function loadConfig(): Config {
     pbSuperuserEmail: required('PB_SUPERUSER_EMAIL'),
     pbSuperuserPassword: required('PB_SUPERUSER_PASSWORD'),
     qrWindowSec: Number(process.env.QR_WINDOW_SEC ?? 10),
+    adminEmails: (process.env.ADMIN_EMAILS ?? '').split(','),
     googleServiceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE || undefined,
     googleSheetsId: process.env.GOOGLE_SHEETS_ID || undefined,
     ai: {

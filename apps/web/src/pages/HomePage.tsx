@@ -3,10 +3,12 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { Button, Card, Screen } from '../components/ui';
 import { pb, useUser } from '../lib/pb';
+import { useIsAdmin } from '../lib/useIsAdmin';
 
 export default function HomePage() {
   const user = useUser();
   const [courses, setCourses] = useState<RecordModel[]>([]);
+  const admin = useIsAdmin();
 
   // "My courses" = courses with at least one session I attended; that is also what unlocks summaries and homework.
   useEffect(() => {
@@ -51,6 +53,11 @@ export default function HomePage() {
             ))}
           </ul>
         </Card>
+      )}
+      {admin && (
+        <Link to="/admin" className="self-center text-sm text-indigo-600 hover:underline">
+          ניהול משתמשים
+        </Link>
       )}
       <Button variant="ghost" onClick={() => pb.authStore.clear()} className="self-center text-sm">
         התנתקות

@@ -53,7 +53,7 @@ export interface RecordDto {
   studentNumber: string;
   studentName: string;
   checkedInAt: string;
-  method: 'qr' | 'manual';
+  method: 'qr' | 'manual' | 'zoom';
   distanceM: number | null;
   geoFlag: boolean;
   status: 'present' | 'flagged' | 'removed';

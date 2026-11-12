@@ -19,31 +19,34 @@ interface CheckInResponse {
   sessionTitle: string;
 }
 
-/** Zero taps: opening the scanned URL checks in immediately. */
-export default function CheckInPage() {
+/** Zero taps: opening the scanned URL (or, with `remote`, the Zoom link) checks in immediately. */
+export default function CheckInPage({ remote = false }: { remote?: boolean }) {
   const { token = '' } = useParams();
-  const [state, setState] = useState<State>({ kind: 'locating' });
+  const [state, setState] = useState<State>({ kind: remote ? 'sending' : 'locating' });
   const started = useRef(false);
 
   useEffect(() => {
     if (started.current) return;
     started.current = true;
     (async () => {
-      const location = await getLocation();
+      const location = remote ? undefined : await getLocation();
       setState({ kind: 'sending' });
       try {
-        const res = await api.post<CheckInResponse>('/checkins', { token, deviceId: getDeviceId(), location });
+        const res = remote
+          ? await api.post<CheckInResponse>('/zoom-checkins', { token })
+          : await api.post<CheckInResponse>('/checkins', { token, deviceId: getDeviceId(), location });
         setState({ kind: 'done', record: res.record, already: res.alreadyCheckedIn, title: res.sessionTitle });
       } catch (e) {
         if (e instanceof ApiError && e.code === 'ONBOARDING_REQUIRED') return setState({ kind: 'onboarding' });
-        setState({ kind: 'error', message: e instanceof ApiError && e.status < 500 ? e.message : 'שגיאת רשת — נסו לסרוק שוב' });
+        setState({ kind: 'error', message: e instanceof ApiError && e.status < 500 ? e.message : remote ? 'שגיאת רשת — פתחו שוב את הקישור' : 'שגיאת רשת — נסו לסרוק שוב' });
       }
     })();
-  }, [token]);
+  }, [token, remote]);
 
   const active = useSessionActive(state.kind === 'done' ? state.record.sessionId : undefined);
 
-  if (state.kind === 'onboarding') return <Navigate to={`/onboarding?next=/c/${token}`} replace />;
+  if (state.kind === 'onboarding') return <Navigate to={`/onboarding?next=/${remote ? 'z' : 'c'}/${token}`} replace />;
+  const zoom = state.kind === 'done' && state.record.method === 'zoom';
 
   return (
     <Screen>
@@ -57,7 +60,7 @@ export default function CheckInPage() {
         {state.kind === 'done' && (
           <>
             <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-5xl text-emerald-600">✓</div>
-            <h1 className="text-2xl font-bold">{state.already ? 'כבר נרשמת' : 'הנוכחות נרשמה'}</h1>
+            <h1 className="text-2xl font-bold">{state.already ? 'כבר נרשמת' : zoom ? 'נרשמת כנוכח/ת מזום' : 'הנוכחות נרשמה'}</h1>
             <p className="text-slate-600">
               {state.title} · {formatTime(state.record.checkedInAt)}
             </p>
@@ -66,13 +69,13 @@ export default function CheckInPage() {
                 לא הצלחנו לאמת שאתם בכיתה לפי המיקום — המרצה יראה סימון ליד שמכם.
               </p>
             )}
-            <p className="mt-2 text-xs text-slate-400">השאירו את הדף פתוח — סקרים ובדיקות נוכחות יופיעו כאן.</p>
+            <p className="mt-2 text-xs text-slate-400">השאירו את הדף פתוח — {zoom ? 'סקרים ושאלות יופיעו כאן' : 'סקרים ובדיקות נוכחות יופיעו כאן'}.</p>
             {state.record.sessionId && (
               <Link to={`/lecture/${state.record.sessionId}`} className="text-sm text-indigo-600 hover:underline">
                 דף השיעור — חומרים, תרגול וסיכום ←
               </Link>
             )}
-            {state.record.sessionId && <ChallengeOverlay sessionId={state.record.sessionId} />}
+            {state.record.sessionId && !zoom && <ChallengeOverlay sessionId={state.record.sessionId} />}
           </>
         )}
         {state.kind === 'error' && (

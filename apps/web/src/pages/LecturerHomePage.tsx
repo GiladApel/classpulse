@@ -5,6 +5,7 @@ import { Button, Card, ErrorText, Field, inputClass } from '../components/ui';
 import { api, ApiError, type SessionDto } from '../lib/api';
 import { getLocation, parseDate } from '../lib/device';
 import { pb, useUser } from '../lib/pb';
+import { useIsAdmin } from '../lib/useIsAdmin';
 
 export default function LecturerHomePage() {
   const user = useUser()!;
@@ -13,9 +14,13 @@ export default function LecturerHomePage() {
   const [sessions, setSessions] = useState<RecordModel[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [courseError, setCourseError] = useState('');
+  const admin = useIsAdmin();
+
+  const loadCourses = () => pb.collection('courses').getFullList({ filter: pb.filter('lecturer = {:u}', { u: user.id }), sort: 'code' }).then(setCourses);
 
   useEffect(() => {
-    pb.collection('courses').getFullList({ filter: pb.filter('lecturer = {:u}', { u: user.id }), sort: 'code' }).then(setCourses);
+    loadCourses();
     pb.collection('sessions')
       .getList(1, 15, { filter: pb.filter('course.lecturer = {:u}', { u: user.id }), sort: '-started_at', expand: 'course' })
       .then((r) => setSessions(r.items));
@@ -44,21 +49,42 @@ export default function LecturerHomePage() {
     }
   };
 
+  const addCourse = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    setCourseError('');
+    try {
+      await api.post('/courses', { code: f.get('code'), name: f.get('name') });
+      form.reset();
+      await loadCourses();
+    } catch (err) {
+      setCourseError(err instanceof ApiError ? err.message : 'שגיאה ביצירת הקורס');
+    }
+  };
+
   const today = new Date().toLocaleDateString('he-IL');
 
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 p-4 md:p-8">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-indigo-700">ClassPulse · מרצה</h1>
-        <Button variant="ghost" onClick={() => pb.authStore.clear()} className="text-sm">
-          התנתקות
-        </Button>
+        <div className="flex items-center gap-1">
+          {admin && (
+            <Link to="/admin" className="rounded-xl px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50">
+              ניהול משתמשים
+            </Link>
+          )}
+          <Button variant="ghost" onClick={() => pb.authStore.clear()} className="text-sm">
+            התנתקות
+          </Button>
+        </div>
       </header>
 
       <Card>
         <h2 className="mb-4 text-lg font-semibold">פתיחת שיעור</h2>
         {courses.length === 0 ? (
-          <p className="text-slate-600">אין קורסים משויכים לחשבון זה.</p>
+          <p className="text-slate-600">עוד אין לך קורסים — צרו את הראשון למטה.</p>
         ) : (
           <form onSubmit={start} className="grid gap-4 md:grid-cols-2">
             <Field label="קורס">
@@ -94,6 +120,20 @@ export default function LecturerHomePage() {
             </Button>
           </form>
         )}
+      </Card>
+
+      <Card>
+        <h2 className="mb-3 text-lg font-semibold">קורס חדש</h2>
+        <form onSubmit={addCourse} className="flex flex-wrap gap-2">
+          <input name="code" required maxLength={20} placeholder="קוד (למשל I2SE)" dir="ltr" aria-label="קוד קורס" className={`${inputClass} w-36`} />
+          <input name="name" required maxLength={120} placeholder="שם הקורס" aria-label="שם הקורס" className={`${inputClass} min-w-0 flex-1`} />
+          <Button type="submit" variant="secondary">
+            יצירה
+          </Button>
+        </form>
+        <div className="mt-2">
+          <ErrorText>{courseError}</ErrorText>
+        </div>
       </Card>
 
       {courses.length > 0 && (
