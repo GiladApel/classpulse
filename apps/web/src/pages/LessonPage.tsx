@@ -27,7 +27,7 @@ export interface CheckInBanner {
 }
 
 export interface MyRecord extends RecordModel {
-  method: 'qr' | 'manual' | 'zoom';
+  method: 'qr' | 'manual';
   status: 'present' | 'flagged' | 'removed';
   checked_in_at: string;
   geo_flag: boolean;
@@ -76,7 +76,7 @@ export default function LessonPage() {
 
   const panels: Record<LessonTab, ReactNode> = {
     attendance: course && (
-      <AttendanceTab sessionId={id} courseId={course.id} lecturer={lecturer} active={!!live} record={record} onJoined={() => setTab('forum')} />
+      <AttendanceTab sessionId={id} courseId={course.id} lecturer={lecturer} active={!!live} record={record} />
     ),
     forum: <ForumTab sessionId={id} lecturer={lecturer} live={!!live} attended={!!record} goToAttendance={() => setTab('attendance')} />,
     materials: <MaterialsTab sessionId={id} lecturer={lecturer} />,
@@ -125,8 +125,8 @@ export default function LessonPage() {
           {panels[tab]}
         </>
       )}
-      {/* Challenges pop up over any tab, for students in the room only. */}
-      {!lecturer && live && record && record.method !== 'zoom' && <ChallengeOverlay sessionId={id} />}
+      {/* Challenges pop up over any tab. */}
+      {!lecturer && live && record && <ChallengeOverlay sessionId={id} />}
     </AppShell>
   );
 }

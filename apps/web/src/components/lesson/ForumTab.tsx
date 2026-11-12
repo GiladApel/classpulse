@@ -31,7 +31,7 @@ export default function ForumTab({ sessionId, lecturer, live, attended, goToAtte
     <>
       {live && (
         <Card className="flex flex-wrap items-center justify-between gap-3 border-s-4 border-amber-400">
-          <p>כדי לשאול ולהצביע בסקרים, סמנו קודם נוכחות — בכיתה או מרחוק.</p>
+          <p>כדי לשאול ולהצביע בסקרים, סמנו קודם נוכחות בכיתה.</p>
           <Button variant="secondary" onClick={goToAttendance}>
             לסימון נוכחות
           </Button>

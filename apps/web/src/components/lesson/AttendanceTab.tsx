@@ -10,7 +10,7 @@ import { Button, Card, ErrorText, inputClass } from '../ui';
 import VerificationPanel from '../VerificationPanel';
 
 const STATUS_LABEL = { present: 'נוכח', flagged: 'לבדיקה', removed: 'הוסר' } as const;
-const METHOD_LABEL = { qr: 'QR', manual: 'ידני', zoom: 'מרחוק' } as const;
+const METHOD_LABEL = { qr: 'QR', manual: 'ידני' } as const;
 const live = (r: RecordDto) => r.status !== 'removed';
 
 interface EnrollmentRow extends RecordModel {
@@ -23,37 +23,19 @@ interface Props {
   lecturer: boolean;
   active: boolean;
   record?: MyRecord;
-  onJoined: () => void;
 }
 
 export default function AttendanceTab(p: Props) {
   return p.lecturer ? <LecturerAttendance {...p} /> : <StudentAttendance {...p} />;
 }
 
-/** Student: my attendance for this lesson, or how to mark it: scan in the room, or join remotely. */
-function StudentAttendance({ sessionId, active, record, onJoined }: Props) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  const joinRemote = async () => {
-    setError('');
-    setBusy(true);
-    try {
-      await api.post(`/sessions/${sessionId}/join-remote`);
-      onJoined();
-    } catch (e) {
-      setError(e instanceof ApiError && e.status < 500 ? e.message : 'שגיאת רשת — נסו שוב');
-    } finally {
-      setBusy(false);
-    }
-  };
-
+/** Student: my attendance for this lesson, or how to mark it (scan the code in the room). */
+function StudentAttendance({ active, record }: Props) {
   if (record) {
-    const remote = record.method === 'zoom';
     return (
       <Card className="flex flex-col items-center gap-2 py-8 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-4xl text-emerald-600">✓</div>
-        <h2 className="text-xl font-bold">{remote ? 'נוכחות מרחוק נרשמה' : 'הנוכחות נרשמה'}</h2>
+        <h2 className="text-xl font-bold">הנוכחות נרשמה</h2>
         <p className="text-slate-600">{formatTime(record.checked_in_at)}</p>
         {record.status === 'flagged' && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">המרצה יבדוק את הנוכחות שלך.</p>}
         {record.geo_flag && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">לא הצלחנו לאמת שאתם בכיתה לפי המיקום — המרצה יראה סימון ליד שמכם.</p>}
@@ -64,34 +46,21 @@ function StudentAttendance({ sessionId, active, record, onJoined }: Props) {
   if (!active) return <Card className="py-8 text-center text-slate-500">לא נרשמה לך נוכחות בשיעור הזה.</Card>;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      <Card className="flex flex-col items-center gap-2 py-6 text-center">
-        <div className="text-5xl">📷</div>
-        <h2 className="text-lg font-semibold">בכיתה</h2>
-        <p className="text-slate-600">סרקו עם מצלמת הטלפון את הקוד שמוקרן על הלוח.</p>
-      </Card>
-      <Card className="flex flex-col items-center gap-3 py-6 text-center">
-        <div className="text-5xl">💻</div>
-        <h2 className="text-lg font-semibold">לא בכיתה</h2>
-        <p className="text-slate-600">מצטרפים מרחוק ומשתתפים בשאלות ובסקרים. המרצה רואה אתכם ברשימה נפרדת.</p>
-        <Button onClick={joinRemote} disabled={busy}>
-          {busy ? 'מצטרף…' : 'הצטרפות מרחוק'}
-        </Button>
-        <ErrorText>{error}</ErrorText>
-      </Card>
-    </div>
+    <Card className="flex flex-col items-center gap-2 py-8 text-center">
+      <div className="text-5xl">📷</div>
+      <h2 className="text-lg font-semibold">סימון נוכחות</h2>
+      <p className="text-slate-600">סרקו עם מצלמת הטלפון את הקוד שמוקרן על הלוח בכיתה.</p>
+    </Card>
   );
 }
 
-/** Lecturer: who is here (in the room and remote), checks, manual approval and export. */
+/** Lecturer: who is here, checks, manual approval and export. */
 function LecturerAttendance({ sessionId, courseId, active }: Props) {
   const [formats, setFormats] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const { records, present } = useAttendance(sessionId);
   const roster = useLiveRecords<EnrollmentRow>('enrollments', pb.filter('course = {:c}', { c: courseId }));
-  const inRoom = records.filter((r) => r.method !== 'zoom');
-  const remote = records.filter((r) => r.method === 'zoom');
   const enrolled = new Set(roster.map((e) => e.student_number));
   // A course without a roster has nobody "off" it.
   const offRoster = new Set(roster.length === 0 ? [] : records.map((r) => r.studentNumber).filter((n) => !enrolled.has(n)));
@@ -150,9 +119,6 @@ function LecturerAttendance({ sessionId, courseId, active }: Props) {
         <Card className="flex flex-col items-center justify-center">
           <span className="text-5xl font-bold tabular-nums text-indigo-700">{present}</span>
           <span className="text-slate-600">נוכחים</span>
-          <span className="text-xs text-slate-500">
-            {inRoom.filter(live).length} בכיתה · {remote.filter(live).length} מרחוק
-          </span>
         </Card>
         <Card className="md:col-span-2">
           <h2 className="mb-2 font-semibold">ייצוא</h2>
@@ -167,20 +133,17 @@ function LecturerAttendance({ sessionId, courseId, active }: Props) {
 
       <ErrorText>{error}</ErrorText>
 
-      <VerificationPanel sessionId={sessionId} active={active} presentCount={inRoom.filter(live).length} />
+      <VerificationPanel sessionId={sessionId} active={active} presentCount={present} />
 
       <AttendanceTable
-        title={`בכיתה (${inRoom.filter(live).length})`}
-        records={inRoom}
+        title={`רשימת נוכחות (${records.filter(live).length})`}
+        records={records}
         empty="עדיין אין נרשמים. פתחו את מסך ההקרנה."
         onConfirm={confirmRecord}
         onRemove={remove}
         offRoster={offRoster}
         onEnroll={enroll}
       />
-      {remote.length > 0 && (
-        <AttendanceTable title={`מרחוק (${remote.filter(live).length})`} records={remote} empty="" onConfirm={confirmRecord} onRemove={remove} offRoster={offRoster} onEnroll={enroll} />
-      )}
 
       <Card>
         <h2 className="mb-3 font-semibold">אישור ידני</h2>
