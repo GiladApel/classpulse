@@ -312,7 +312,7 @@ sequenceDiagram
   FS-->>L: Theme[] (AI groups open questions)
 ```
 
-## SD8: Entering a live lesson and joining remotely (UC20, UC15)
+## SD8: Entering a live lesson from home (UC20)
 
 ```mermaid
 sequenceDiagram
@@ -320,30 +320,20 @@ sequenceDiagram
   actor S as Student phone (home)
   participant PB as PocketBase
   participant API as AttendanceController
-  participant CS as CourseService
   participant AS as AttendanceService
   actor L as Lecturer (attendance tab)
 
   S->>PB: list my enrollments, course_slots, active sessions of my courses
   PB-->>S: rows the view rules allow (own roster row, member courses)
+  PB--)S: realtime, a session of my course becomes active
   S->>S: home shows "Lesson live now" and the weekly timetable
-  S->>S: tap the live lesson, open /lesson/:id (attendance tab)
-  S->>API: POST /sessions/:id/join-remote
-  API->>CS: requireMember(courseId, studentNumber)
-  CS-->>API: enrolled or attended, else NOT_IN_COURSE
-  API->>AS: joinRemote(ctx)
-  loop remoteRules: DuplicateStudent, SessionActive
-    AS->>AS: check(ctx)
-  end
-  alt reject
-    AS-->>S: 4xx (lesson ended / removed)
-  else already has a record
-    AS-->>S: existing record (one record per lesson)
-  else pass
-    AS->>PB: create attendance_records (remote method)
-    PB--)L: realtime "create", row under "Remote"
-    AS-->>S: 201, the app opens the forum tab
-  end
+  S->>S: tap the live lesson, open /lesson/:id (attendance tab: scan the code)
+  S->>S: camera scans the projected QR, opens /c/:token
+  S->>API: POST /checkins {token, deviceId, location}
+  API->>AS: checkIn(ctx) (rule chain of SD1)
+  AS->>PB: create attendance_records
+  PB--)L: realtime "create", row in the attendance list
+  AS-->>S: record, the app opens the lesson's forum tab with a confirmation
 ```
 
 ## SD9: Uploading the course roster (UC18)
