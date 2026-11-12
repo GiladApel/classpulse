@@ -228,47 +228,47 @@ sequenceDiagram
   Note over PB: list rule now lets every course participant read the summary
 ```
 
-## SD6: Homework review (UC10, UC11)
+## SD6: Homework: publish, check, report (UC11, UC10)
 
 ```mermaid
 sequenceDiagram
   autonumber
-  actor S as Student
   actor L as Lecturer
+  actor S as Student
   participant API as HomeworkController
   participant HA as HomeworkAnalysisService
-  participant TE as TextExtractor
-  participant FP as Fingerprinter
   participant Q as BackgroundQueue
+  participant GG as HomeworkGuideGenerator
   participant HR as HomeworkReviewer
+  participant SC as ScoreCalculator
   participant PB as PocketBase
 
-  S->>API: POST /assignments/:id/submissions (file)
-  API->>HA: submit(assignment, participant, file)
-  HA->>HA: requireCourseParticipant
-  HA->>TE: extract(file)
-  TE-->>HA: {text, kind: code | prose} (or UNSUPPORTED / EMPTY_FILE)
-  HA->>PB: create submissions {file, status: processing}
-  HA->>FP: sketch(text, kind)
-  HA->>PB: save text_extract + fingerprint (hidden fields)
-  HA->>Q: add(review)
-  API-->>S: 202 "being reviewed"
-  Q->>HR: review(text, assignment) (submission wrapped as data)
-  HR-->>HA: Review {criteria[score, strengths, fixes], mistakes}
-  HA->>PB: update {review, total = weighted, status: done}
-  PB--)S: realtime -> status done
-  S->>API: GET /submissions/:id
-  API->>HA: view(submission)
-  HA-->>S: review + percentiles (only if ≥5 reviewed) + class mistakes
+  L->>API: POST /courses/:id/assignments (title, PDF, lesson)
+  API->>HA: publish(course, input, pdf)
+  HA->>PB: create assignment {file, guide_status: generating}
+  HA->>Q: add(generateGuide)
+  Q->>GG: fromHomework(pdf)
+  GG-->>HA: ReviewGuide (questions, sections, requirements, expected answers)
+  HA->>PB: save guide (hidden) and outline, guide_status ready
+  PB--)S: realtime, the homework is open for checking
 
-  L->>API: POST /assignments/:id/insights
-  API->>HA: buildInsights(assignment)
-  HA->>HA: histograms per criterion (PercentileCalculator for students)
-  HA->>HR: commonMistakes(labels per student, assignment)
-  HA->>PB: getFingerprints(assignmentId)
-  HA->>HA: SimilarityAnalyzer.pairsAbove(sketches, 0.5)
-  HA->>PB: upsert assignment_insights (similar_pairs hidden)
-  API-->>L: distribution, common mistakes, named pairs for manual review
+  S->>API: POST /assignments/:id/checks (PDF or photos)
+  API->>HA: check(assignment, student, files)
+  HA->>HA: course member? guide ready? checks left? none running?
+  HA->>PB: upsert submission {status: processing}
+  HA->>Q: add(review), the files stay in memory only
+  API-->>S: 202 "checking"
+  Q->>HR: reviewSolution(guide, files)
+  HR-->>HA: one mark per section (answered, score, meets, missing, direction)
+  HA->>SC: questions(outline, marks), total(outline, marks)
+  HA->>PB: update {report, total, check_count + 1, status: done}
+  HA->>PB: save the text fingerprint (hidden), the files are dropped
+  PB--)S: realtime, status done
+  S->>API: GET /submissions/:id and GET /assignments/:id/chart
+  API-->>S: report, checks left, place, anonymous chart (from 3 checked)
+
+  L->>API: GET /assignments/:id/chart, POST /assignments/:id/insights
+  API-->>L: chart with names, common mistakes, similar pairs for review by hand
 ```
 
 ## SD7: "I'm lost" and the questions feed (UC6)
