@@ -79,5 +79,18 @@ export const DEFAULT_FIXTURES: Record<string, unknown> = {
       mistakes: score < 80 ? ['חסרות בדיקות יחידה'] : [],
     };
   },
+  generate_homework_guide: {
+    questions: [
+      {
+        title: 'שאלה 1: Strategy',
+        sections: [
+          { asked: 'הסבירו מתי נעדיף Strategy על פני if/else', requirements: ['דוגמה מהעולם האמיתי', 'השוואה ל-if/else'], expected: 'כשההתנהגות מתחלפת בזמן ריצה ויש כמה אלגוריתמים', givingAway: 'פתרון מלא בקוד' },
+          { asked: 'ציירו דיאגרמת מחלקות', requirements: ['ממשק Strategy', 'שתי מימושים', 'Context'], expected: 'Context מחזיק הפניה לממשק', givingAway: 'הדיאגרמה המלאה' },
+        ],
+      },
+      { title: 'שאלה 2: Observer', sections: [{ asked: 'למה Observer ולא polling?', requirements: ['עלות polling', 'צימוד חלש'], expected: 'דחיפה במקום משיכה', givingAway: 'התשובה המלאה' }] },
+    ],
+    instructions: 'בדקו שהנימוק מבוסס על עקרונות SOLID ולא רק על הגדרות.',
+  },
   aggregate_mistakes: { mistakes: [{ title: 'חסרות בדיקות יחידה', description: 'כתבו בדיקה לכל מחלקה בדומיין לפני ההגשה.', count: 1 }] },
 };
