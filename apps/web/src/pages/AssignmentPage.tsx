@@ -53,7 +53,7 @@ export default function AssignmentPage() {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
       {assignment && (
-        <Link to={`/course/${assignment.course}`} className="text-sm text-indigo-600 hover:underline">
+        <Link to={`/course/${assignment.course}?tab=homework`} className="text-sm text-indigo-600 hover:underline">
           → לקורס
         </Link>
       )}

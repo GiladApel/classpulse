@@ -142,7 +142,7 @@ export default function LecturerHomePage() {
           <ul className="flex flex-wrap gap-2">
             {courses.map((c) => (
               <li key={c.id}>
-                <Link to={`/dash/course/${c.id}`} className="inline-block rounded-xl border border-slate-200 px-3 py-2 hover:border-indigo-400 hover:text-indigo-700">
+                <Link to={`/course/${c.id}`} className="inline-block rounded-xl border border-slate-200 px-3 py-2 hover:border-indigo-400 hover:text-indigo-700">
                   📝 {c.code} · {c.name}
                 </Link>
               </li>

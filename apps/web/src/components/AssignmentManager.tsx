@@ -1,7 +1,6 @@
-import type { RecordModel } from 'pocketbase';
-import { type FormEvent, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router';
-import { Button, Card, ErrorText, Field, inputClass } from '../components/ui';
+import { type FormEvent, useState } from 'react';
+import { Link } from 'react-router';
+import { Button, Card, ErrorText, Field, inputClass } from './ui';
 import { api, ApiError } from '../lib/api';
 import type { AssignmentRecord } from '../lib/content';
 import { parseDate } from '../lib/device';
@@ -21,17 +20,11 @@ const STARTER: Row[] = [
 ];
 
 /** Lecturer: a course's assignments, and a form to create one with a weighted rubric. */
-export default function LecturerCoursePage() {
-  const { id = '' } = useParams();
-  const [course, setCourse] = useState<RecordModel | null>(null);
+export default function AssignmentManager({ courseId: id }: { courseId: string }) {
   const assignments = useLiveRecords<AssignmentRecord>('assignments', pb.filter('course = {:c}', { c: id }), '-created_at');
   const [rubric, setRubric] = useState<Row[]>(STARTER);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    pb.collection('courses').getOne(id).then(setCourse, () => setError('הקורס לא נמצא'));
-  }, [id]);
 
   const create = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -60,14 +53,7 @@ export default function LecturerCoursePage() {
   const sorted = [...assignments].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   return (
-    <main className="mx-auto flex max-w-3xl flex-col gap-5 p-4 md:p-8">
-      <Link to="/dash" className="text-sm text-indigo-600 hover:underline">
-        → כל השיעורים
-      </Link>
-      <h1 className="text-2xl font-bold">
-        {course?.code} · מטלות
-      </h1>
-
+    <>
       <Card>
         <ul className="divide-y divide-slate-100">
           {sorted.map((a) => (
@@ -120,6 +106,6 @@ export default function LecturerCoursePage() {
           </Button>
         </form>
       </Card>
-    </main>
+    </>
   );
 }

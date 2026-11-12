@@ -1,13 +1,12 @@
 import { createBrowserRouter, RouterProvider } from 'react-router';
-import { LessonRedirect, RequireLecturer, RequireStudent } from './components/guards';
+import { CourseRedirect, LessonRedirect, RequireLecturer, RequireSignedIn, RequireStudent } from './components/guards';
 import AdminPage from './pages/AdminPage';
 import AssignmentAdminPage from './pages/AssignmentAdminPage';
 import AssignmentPage from './pages/AssignmentPage';
 import CheckInPage from './pages/CheckInPage';
-import CoursePage from './pages/CoursePage';
+import CourseHubPage from './pages/CourseHubPage';
 import DashboardPage from './pages/DashboardPage';
 import HomePage from './pages/HomePage';
-import LecturerCoursePage from './pages/LecturerCoursePage';
 import LecturePage from './pages/LecturePage';
 import LecturerHomePage from './pages/LecturerHomePage';
 import LoginPage from './pages/LoginPage';
@@ -22,13 +21,13 @@ const router = createBrowserRouter([
   { path: '/onboarding', element: <OnboardingPage /> },
   { path: '/c/:token', element: <RequireStudent><CheckInPage /></RequireStudent> },
   { path: '/r/:token', element: <RequireStudent><RollCallPage /></RequireStudent> },
-  { path: '/course/:id', element: <RequireStudent><CoursePage /></RequireStudent> },
+  { path: '/course/:id', element: <RequireSignedIn><CourseHubPage /></RequireSignedIn> },
   { path: '/a/:id', element: <RequireStudent><AssignmentPage /></RequireStudent> },
   { path: '/lecture/:id', element: <RequireStudent><LecturePage /></RequireStudent> },
   { path: '/lesson/:id', element: <LessonRedirect /> },
   { path: '/admin', element: <AdminPage /> },
   { path: '/dash', element: <RequireLecturer><LecturerHomePage /></RequireLecturer> },
-  { path: '/dash/course/:id', element: <RequireLecturer><LecturerCoursePage /></RequireLecturer> },
+  { path: '/dash/course/:id', element: <CourseRedirect /> },
   { path: '/dash/assignment/:id', element: <RequireLecturer><AssignmentAdminPage /></RequireLecturer> },
   { path: '/hw/:id', element: <RequireLecturer><SubmissionPage /></RequireLecturer> },
   { path: '/dash/:id', element: <RequireLecturer><DashboardPage /></RequireLecturer> },

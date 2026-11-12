@@ -75,7 +75,7 @@ export default function AssignmentAdminPage() {
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-5 p-4 md:p-8">
       {assignment && (
-        <Link to={`/dash/course/${assignment.course}`} className="text-sm text-indigo-600 hover:underline">
+        <Link to={`/course/${assignment.course}?tab=homework`} className="text-sm text-indigo-600 hover:underline">
           → מטלות הקורס
         </Link>
       )}
