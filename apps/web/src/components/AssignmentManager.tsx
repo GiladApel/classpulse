@@ -1,109 +1,97 @@
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
-import { Button, Card, ErrorText, Field, inputClass } from './ui';
 import { api, ApiError } from '../lib/api';
 import type { AssignmentRecord } from '../lib/content';
 import { parseDate } from '../lib/device';
 import { pb } from '../lib/pb';
 import { useLiveRecords } from '../lib/useLiveRecords';
+import { Button, Card, ErrorText, Field, inputClass } from './ui';
 
-interface Row {
-  criterion: string;
-  weight: number;
-  description: string;
-}
+export const GUIDE_LABEL = {
+  generating: { text: 'ה-AI קורא…', className: 'bg-indigo-50 text-indigo-800' },
+  ready: { text: 'פתוח לבדיקה', className: 'bg-emerald-50 text-emerald-800' },
+  failed: { text: 'נכשל — לנסות שוב', className: 'bg-red-50 text-red-700' },
+} as const;
 
-const STARTER: Row[] = [
-  { criterion: 'נכונות', weight: 3, description: 'הפתרון עונה על הדרישות' },
-  { criterion: 'עיצוב ו-OOP', weight: 2, description: 'הפרדת אחריות, שימוש נכון בתבניות' },
-  { criterion: 'בדיקות', weight: 1, description: 'בדיקות יחידה כולל מקרי קצה' },
-];
-
-/** Lecturer: a course's assignments, and a form to create one with a weighted rubric. */
-export default function AssignmentManager({ courseId: id }: { courseId: string }) {
-  const assignments = useLiveRecords<AssignmentRecord>('assignments', pb.filter('course = {:c}', { c: id }), '-created_at');
-  const [rubric, setRubric] = useState<Row[]>(STARTER);
+/**
+ * Lecturer: the homework of a course (or of one lesson, when `sessionId` is given) and publishing a new one:
+ * a title, an optional due date and the homework PDF, which the AI turns into a review guide.
+ */
+export default function AssignmentManager({ courseId, sessionId }: { courseId: string; sessionId?: string }) {
+  const filter = sessionId ? pb.filter('course = {:c} && session = {:s}', { c: courseId, s: sessionId }) : pb.filter('course = {:c}', { c: courseId });
+  const assignments = useLiveRecords<AssignmentRecord>('assignments', filter, '-created_at');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const create = async (e: FormEvent<HTMLFormElement>) => {
+  const publish = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const f = new FormData(form);
+    const file = f.get('file');
+    if (!(file instanceof File) || file.size === 0) return setError('בחרו את קובץ המטלה (PDF)');
     setError('');
     setBusy(true);
     try {
-      const due = f.get('dueAt') as string;
-      await api.post(`/courses/${id}/assignments`, {
-        title: f.get('title'),
-        description: f.get('description'),
-        rubric,
-        dueAt: due ? new Date(due).toISOString() : undefined,
-      });
+      const body = new FormData();
+      body.set('title', String(f.get('title') ?? ''));
+      const due = String(f.get('dueAt') ?? '');
+      if (due) body.set('dueAt', new Date(due).toISOString());
+      if (sessionId) body.set('sessionId', sessionId);
+      body.set('file', file);
+      await api.upload(`/courses/${courseId}/assignments`, body);
       form.reset();
-      setRubric(STARTER);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'שגיאה');
+      setError(err instanceof ApiError ? err.message : 'הפרסום נכשל');
     } finally {
       setBusy(false);
     }
   };
 
-  const setRow = (i: number, patch: Partial<Row>) => setRubric(rubric.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const sorted = [...assignments].sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   return (
     <>
       <Card>
+        <h2 className="mb-2 font-semibold">{sessionId ? 'שיעורי הבית של השיעור' : 'שיעורי הבית של הקורס'}</h2>
         <ul className="divide-y divide-slate-100">
           {sorted.map((a) => (
             <li key={a.id}>
-              <Link to={`/dash/assignment/${a.id}`} className="flex items-center justify-between py-3 hover:text-indigo-700">
+              <Link to={`/dash/assignment/${a.id}`} className="flex flex-wrap items-center justify-between gap-2 py-3 hover:text-indigo-700">
                 <span className="font-medium">{a.title}</span>
-                <span className="text-sm text-slate-500">{a.due_at ? `עד ${parseDate(a.due_at).toLocaleDateString('he-IL')}` : 'ללא מועד'}</span>
+                <span className="flex items-center gap-2 text-sm text-slate-500">
+                  {a.due_at && `עד ${parseDate(a.due_at).toLocaleDateString('he-IL')}`}
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${GUIDE_LABEL[a.guide_status].className}`}>{GUIDE_LABEL[a.guide_status].text}</span>
+                </span>
               </Link>
             </li>
           ))}
-          {assignments.length === 0 && <li className="py-3 text-slate-500">עוד אין מטלות.</li>}
+          {assignments.length === 0 && <li className="py-3 text-slate-500">עוד אין שיעורי בית.</li>}
         </ul>
       </Card>
 
       <Card>
-        <h2 className="mb-3 font-semibold">מטלה חדשה</h2>
-        <form onSubmit={create} className="flex flex-col gap-3">
+        <h2 className="mb-1 font-semibold">פרסום שיעורי בית</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          מעלים את המטלה כ-PDF. ה-AI מחלק אותה לשאלות ולסעיפים ומכין לכל סעיף דרישות, והסטודנטים יכולים לקבל משוב על הפתרון לפני ההגשה (עד 3 פעמים).
+        </p>
+        <form onSubmit={publish} className="grid gap-3 md:grid-cols-2">
           <Field label="כותרת">
-            <input name="title" required maxLength={200} className={inputClass} />
+            <input name="title" required maxLength={200} placeholder="למשל: תרגיל 2 — Strategy" className={inputClass} />
           </Field>
-          <Field label="תיאור (ה-AI בודק לפיו ולפי המחוון)">
-            <textarea name="description" rows={4} maxLength={5000} className={inputClass} />
-          </Field>
-          <Field label="מועד הגשה">
+          <Field label="מועד הגשה (לא חובה)">
             <input name="dueAt" type="datetime-local" className={inputClass} />
           </Field>
-          <div>
-            <p className="mb-1 text-sm font-medium text-slate-700">מחוון</p>
-            <div className="flex flex-col gap-2">
-              {rubric.map((r, i) => (
-                <div key={i} className="grid grid-cols-[1fr_5rem_auto] gap-2 md:grid-cols-[1fr_5rem_2fr_auto]">
-                  <input value={r.criterion} required maxLength={120} placeholder="קריטריון" onChange={(e) => setRow(i, { criterion: e.target.value })} className={inputClass} />
-                  <input type="number" min={1} max={100} value={r.weight} aria-label="משקל" onChange={(e) => setRow(i, { weight: Number(e.target.value) })} className={inputClass} />
-                  <input value={r.description} maxLength={500} placeholder="מה בודקים" onChange={(e) => setRow(i, { description: e.target.value })} className={`${inputClass} col-span-3 md:col-span-1`} />
-                  <button type="button" onClick={() => setRubric(rubric.filter((_, j) => j !== i))} disabled={rubric.length === 1} className="row-start-1 text-sm text-red-600 disabled:opacity-30 md:row-start-auto" aria-label="מחיקה">
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-            {rubric.length < 10 && (
-              <Button type="button" variant="ghost" className="mt-1" onClick={() => setRubric([...rubric, { criterion: '', weight: 1, description: '' }])}>
-                + קריטריון
-              </Button>
-            )}
+          <Field label="קובץ המטלה (PDF, עד 20MB)">
+            <input name="file" type="file" accept="application/pdf" required aria-label="קובץ המטלה" className={`${inputClass} file:me-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1 file:text-indigo-700`} />
+          </Field>
+          <div className="flex items-end">
+            <Button type="submit" disabled={busy} className="w-full">
+              {busy ? 'מעלה…' : 'פרסום'}
+            </Button>
           </div>
-          <ErrorText>{error}</ErrorText>
-          <Button type="submit" disabled={busy}>
-            יצירת מטלה
-          </Button>
+          <div className="md:col-span-2">
+            <ErrorText>{error}</ErrorText>
+          </div>
         </form>
       </Card>
     </>

@@ -80,7 +80,7 @@ export default function LessonPage() {
     ),
     forum: <ForumTab sessionId={id} lecturer={lecturer} live={!!live} attended={!!record} goToAttendance={() => setTab('attendance')} />,
     materials: <MaterialsTab sessionId={id} lecturer={lecturer} />,
-    homework: course && (lecturer ? <AssignmentManager courseId={course.id} /> : <StudentAssignments courseId={course.id} />),
+    homework: course && (lecturer ? <AssignmentManager courseId={course.id} sessionId={id} /> : <StudentAssignments courseId={course.id} sessionId={id} />),
   };
 
   return (
