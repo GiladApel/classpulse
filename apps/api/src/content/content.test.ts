@@ -269,7 +269,7 @@ describe('HomeworkAnalysisService', () => {
       new TextExtractor(),
       new HomeworkReviewer(llm),
       {
-        requireCourseParticipant: async (_c, n) => {
+        requireMember: async (_c, n) => {
           if (!inCourse.has(n)) throw new DomainError('NOT_IN_COURSE', 'x');
         },
       },
@@ -312,7 +312,7 @@ describe('HomeworkAnalysisService', () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     const gated = { generateStructured: async <T,>(req: Parameters<MockProvider['generateStructured']>[0]) => (await gate, llm.generateStructured<T>(req)) };
-    svc = new HomeworkAnalysisService(new InMemoryAssignmentRepository(), subs, new InMemoryInsightsRepository(), new TextExtractor(), new HomeworkReviewer(gated), { requireCourseParticipant: async () => {} }, queue, clock);
+    svc = new HomeworkAnalysisService(new InMemoryAssignmentRepository(), subs, new InMemoryInsightsRepository(), new TextExtractor(), new HomeworkReviewer(gated), { requireMember: async () => {} }, queue, clock);
     const late = { ...assignment, dueAt: new Date(T0.getTime() - 1000) };
     const first = await svc.submit(late, student('1'), file('first version of the homework'));
     expect(first.late).toBe(true);
@@ -327,7 +327,7 @@ describe('HomeworkAnalysisService', () => {
 
   it('a failed review is marked failed with a retry message', async () => {
     llm = new MockProvider({ review_homework: { criteria: [] } });
-    svc = new HomeworkAnalysisService(new InMemoryAssignmentRepository(), subs, new InMemoryInsightsRepository(), new TextExtractor(), new HomeworkReviewer(llm), { requireCourseParticipant: async () => {} }, queue, clock);
+    svc = new HomeworkAnalysisService(new InMemoryAssignmentRepository(), subs, new InMemoryInsightsRepository(), new TextExtractor(), new HomeworkReviewer(llm), { requireMember: async () => {} }, queue, clock);
     const s = await svc.submit(assignment, student('1'), file('some homework text here'));
     await queue.idle();
     expect(await svc.getSubmission(s.id)).toMatchObject({ status: 'failed', error: 'ה-AI לא החזיר בדיקה תקינה — הגישו שוב' });

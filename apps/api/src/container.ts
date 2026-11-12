@@ -148,13 +148,14 @@ export function buildContainer(p: Ports): Container {
   ];
   const remoteRules = [new DuplicateStudentRule(p.attendanceRepo), new SessionActiveRule()];
   const attendance = new AttendanceService(rules, p.attendanceRepo, p.clock, remoteRules);
+  const courses = new CourseService(p.courseRepo, p.enrollmentRepo, p.slotRepo, p.attendanceRepo, new RosterParser(), p.clock);
   const confusion = new ConfusionMeter(p.lostRepo, attendance, p.clock);
   const queue = new BackgroundQueue();
   return {
     clock: p.clock,
     tokens,
     sessions: new SessionService(p.sessionRepo, p.courseRepo, tokens, p.clock, p.headcountRepo),
-    courses: new CourseService(p.courseRepo, p.enrollmentRepo, p.slotRepo, p.attendanceRepo, new RosterParser(), p.clock),
+    courses,
     attendance,
     exports: new AttendanceExportService(p.attendanceRepo, p.courseRepo, p.exporters),
     challenges: new ChallengeManager(
@@ -179,7 +180,7 @@ export function buildContainer(p: Ports): Container {
       p.insightsRepo,
       new TextExtractor(),
       new HomeworkReviewer(p.llm),
-      attendance,
+      courses,
       queue,
       p.clock,
     ),

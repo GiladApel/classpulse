@@ -1,6 +1,6 @@
 import type { HomeworkReviewer } from '../ai/HomeworkReviewer.js';
 import { LLMOutputError } from '../ai/LLMProvider.js';
-import type { AttendanceService } from '../attendance/AttendanceService.js';
+import type { CourseService } from '../attendance/CourseService.js';
 import type { Course } from '../attendance/types.js';
 import type { Participant } from '../engagement/types.js';
 import type { BackgroundQueue } from '../infra/BackgroundQueue.js';
@@ -39,7 +39,7 @@ export class HomeworkAnalysisService {
     private readonly insights: InsightsRepository,
     private readonly extractor: TextExtractor,
     private readonly reviewer: HomeworkReviewer,
-    private readonly attendance: Pick<AttendanceService, 'requireCourseParticipant'>,
+    private readonly membership: Pick<CourseService, 'requireMember'>,
     private readonly queue: BackgroundQueue,
     private readonly clock: Clock,
   ) {}
@@ -60,7 +60,7 @@ export class HomeworkAnalysisService {
 
   /** Text is extracted synchronously so an unreadable file is rejected at once; the AI review runs in the background. */
   async submit(assignment: Assignment, student: Participant, file: UploadedFile): Promise<Submission> {
-    await this.attendance.requireCourseParticipant(assignment.courseId, student.studentNumber);
+    await this.membership.requireMember(assignment.courseId, student.studentNumber);
     const { text, kind } = await this.extractor.extract(file);
     const now = this.clock.now();
     const data = {
