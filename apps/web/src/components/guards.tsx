@@ -29,13 +29,10 @@ export function RequireLecturer({ children }: { children: ReactNode }) {
   return children;
 }
 
-/** One address per lesson: lecturers land on its dashboard, students on its lesson page. */
+/** Old lesson addresses (lecturer dashboard, student lecture page) now open the one lesson page. */
 export function LessonRedirect() {
   const { id = '' } = useParams();
-  const user = useUser();
-  const loc = useLocation();
-  if (!user) return <Navigate to={`/login${nextParam(loc)}`} replace />;
-  return <Navigate to={user.role === 'lecturer' ? `/dash/${id}` : `/lecture/${id}`} replace />;
+  return <Navigate to={`/lesson/${id}`} replace />;
 }
 
 /** The old lecturer course address now opens the course page on its homework tab. */

@@ -5,9 +5,8 @@ import AssignmentAdminPage from './pages/AssignmentAdminPage';
 import AssignmentPage from './pages/AssignmentPage';
 import CheckInPage from './pages/CheckInPage';
 import CourseHubPage from './pages/CourseHubPage';
-import DashboardPage from './pages/DashboardPage';
 import HomePage from './pages/HomePage';
-import LecturePage from './pages/LecturePage';
+import LessonPage from './pages/LessonPage';
 import LecturerHomePage from './pages/LecturerHomePage';
 import LoginPage from './pages/LoginPage';
 import OnboardingPage from './pages/OnboardingPage';
@@ -23,14 +22,14 @@ const router = createBrowserRouter([
   { path: '/r/:token', element: <RequireStudent><RollCallPage /></RequireStudent> },
   { path: '/course/:id', element: <RequireSignedIn><CourseHubPage /></RequireSignedIn> },
   { path: '/a/:id', element: <RequireStudent><AssignmentPage /></RequireStudent> },
-  { path: '/lecture/:id', element: <RequireStudent><LecturePage /></RequireStudent> },
-  { path: '/lesson/:id', element: <LessonRedirect /> },
+  { path: '/lesson/:id', element: <RequireSignedIn><LessonPage /></RequireSignedIn> },
+  { path: '/lecture/:id', element: <LessonRedirect /> },
   { path: '/admin', element: <AdminPage /> },
   { path: '/dash', element: <RequireLecturer><LecturerHomePage /></RequireLecturer> },
   { path: '/dash/course/:id', element: <CourseRedirect /> },
   { path: '/dash/assignment/:id', element: <RequireLecturer><AssignmentAdminPage /></RequireLecturer> },
   { path: '/hw/:id', element: <RequireLecturer><SubmissionPage /></RequireLecturer> },
-  { path: '/dash/:id', element: <RequireLecturer><DashboardPage /></RequireLecturer> },
+  { path: '/dash/:id', element: <LessonRedirect /> },
   { path: '/projector/:id', element: <RequireLecturer><ProjectorPage /></RequireLecturer> },
 ]);
 
