@@ -2,6 +2,7 @@ import type { RecordModel } from 'pocketbase';
 import { type ChangeEvent, useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import AppShell from '../components/AppShell';
+import ClassChart from '../components/ClassChart';
 import HomeworkReport from '../components/HomeworkReport';
 import { Card, ErrorText } from '../components/ui';
 import { api, ApiError } from '../lib/api';
@@ -109,6 +110,12 @@ export default function AssignmentPage() {
             {left <= 0 && <p className="text-sm text-slate-600">זו הייתה הבדיקה האחרונה — התוצאה שלה היא הסופית.</p>}
             {view && <HomeworkReport view={view} />}
           </Card>
+
+          {mine && mine.check_count > 0 && (
+            <Card>
+              <ClassChart assignmentId={id} outline={hw.outline} refreshKey={`${mine.status}-${mine.check_count}`} />
+            </Card>
+          )}
         </>
       )}
     </AppShell>

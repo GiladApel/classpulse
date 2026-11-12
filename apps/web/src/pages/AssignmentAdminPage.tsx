@@ -2,6 +2,7 @@ import type { RecordModel } from 'pocketbase';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import AppShell from '../components/AppShell';
+import ClassChart from '../components/ClassChart';
 import { Button, Card, ErrorText } from '../components/ui';
 import { api, ApiError } from '../lib/api';
 import { type AssignmentRecord, MAX_CHECKS, openHomeworkPdf } from '../lib/content';
@@ -128,6 +129,12 @@ export default function AssignmentAdminPage() {
             )}
             {hw.outline && <p className="mt-2 text-xs text-slate-400">הסטודנטים רואים את השאלות והדרישות. התשובות שה-AI מצפה להן נשארות בשרת.</p>}
           </Card>
+
+          {checked.length > 0 && (
+            <Card>
+              <ClassChart assignmentId={id} outline={hw.outline} refreshKey={checked.map((s) => `${s.id}${s.total}`).join()} />
+            </Card>
+          )}
 
           <Card className="overflow-x-auto p-0">
             <h2 className="px-3 pt-3 font-semibold">סטודנטים שבדקו ({checked.length})</h2>
