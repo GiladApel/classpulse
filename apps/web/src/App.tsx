@@ -1,5 +1,5 @@
 import { createBrowserRouter, RouterProvider } from 'react-router';
-import { RequireLecturer, RequireStudent } from './components/guards';
+import { LessonRedirect, RequireLecturer, RequireStudent } from './components/guards';
 import AdminPage from './pages/AdminPage';
 import AssignmentAdminPage from './pages/AssignmentAdminPage';
 import AssignmentPage from './pages/AssignmentPage';
@@ -25,6 +25,7 @@ const router = createBrowserRouter([
   { path: '/course/:id', element: <RequireStudent><CoursePage /></RequireStudent> },
   { path: '/a/:id', element: <RequireStudent><AssignmentPage /></RequireStudent> },
   { path: '/lecture/:id', element: <RequireStudent><LecturePage /></RequireStudent> },
+  { path: '/lesson/:id', element: <LessonRedirect /> },
   { path: '/admin', element: <AdminPage /> },
   { path: '/dash', element: <RequireLecturer><LecturerHomePage /></RequireLecturer> },
   { path: '/dash/course/:id', element: <RequireLecturer><LecturerCoursePage /></RequireLecturer> },

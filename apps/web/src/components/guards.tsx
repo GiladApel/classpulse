@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Navigate, useLocation } from 'react-router';
+import { Navigate, useLocation, useParams } from 'react-router';
 import { useUser } from '../lib/pb';
 
 const nextParam = (loc: { pathname: string; search: string }) => `?next=${encodeURIComponent(loc.pathname + loc.search)}`;
@@ -18,4 +18,13 @@ export function RequireLecturer({ children }: { children: ReactNode }) {
   if (!user) return <Navigate to={`/login${nextParam(loc)}`} replace />;
   if (user.role !== 'lecturer') return <Navigate to="/" replace />;
   return children;
+}
+
+/** One address per lesson: lecturers land on its dashboard, students on its lesson page. */
+export function LessonRedirect() {
+  const { id = '' } = useParams();
+  const user = useUser();
+  const loc = useLocation();
+  if (!user) return <Navigate to={`/login${nextParam(loc)}`} replace />;
+  return <Navigate to={user.role === 'lecturer' ? `/dash/${id}` : `/lecture/${id}`} replace />;
 }
