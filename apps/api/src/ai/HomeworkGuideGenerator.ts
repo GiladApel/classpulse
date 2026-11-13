@@ -3,6 +3,7 @@ import { type Attachment, type LLMProvider, LLMOutputError } from './LLMProvider
 
 export const MAX_QUESTIONS = 20;
 export const MAX_SECTIONS = 12;
+export const MAX_NOTES = 3000;
 
 const PROMPT = `You prepare a review guide for one homework assignment of a university course. The attached PDF is the homework.
 Split it into its questions and, inside each question, its sections (a question with no sub-parts is one section). Keep the homework's own order.
@@ -44,8 +45,11 @@ const text = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slic
 export class HomeworkGuideGenerator {
   constructor(private readonly llm: LLMProvider) {}
 
-  async fromHomework(homework: Attachment): Promise<ReviewGuide> {
-    const raw = await this.llm.generateStructured<Record<string, unknown>>({ task: 'generate_homework_guide', prompt: PROMPT, schema: SCHEMA, files: [homework] });
+  /** `notes` are the lecturer's own wishes for the rubric; unlike the homework file they are instructions. */
+  async fromHomework(homework: Attachment, notes = ''): Promise<ReviewGuide> {
+    const wishes = notes.trim().slice(0, MAX_NOTES);
+    const prompt = wishes ? `${PROMPT}\n\nThe lecturer's instructions for this rubric (follow them; they override your defaults):\n<lecturer_notes>\n${wishes}\n</lecturer_notes>` : PROMPT;
+    const raw = await this.llm.generateStructured<Record<string, unknown>>({ task: 'generate_homework_guide', prompt, schema: SCHEMA, files: [homework] });
     return HomeworkGuideGenerator.validate(raw);
   }
 

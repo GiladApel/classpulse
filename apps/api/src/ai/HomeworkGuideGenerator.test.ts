@@ -26,6 +26,16 @@ describe('HomeworkGuideGenerator', () => {
     expect(guide.instructions).toBe('בדקו נימוק');
   });
 
+  it("passes the lecturer's notes as instructions, and leaves the prompt alone without them", async () => {
+    const llm = new MockProvider({ generate_homework_guide: { questions: [{ title: 'Q', sections: [section('S')] }], instructions: '' } });
+    const generator = new HomeworkGuideGenerator(llm);
+    await generator.fromHomework(pdf, '  להוריד נקודות על חוסר בדיאגרמה  ');
+    await generator.fromHomework(pdf, '   ');
+    expect(llm.calls[0].prompt).toContain("lecturer's instructions");
+    expect(llm.calls[0].prompt).toContain('<lecturer_notes>\nלהוריד נקודות על חוסר בדיאגרמה\n</lecturer_notes>');
+    expect(llm.calls[1].prompt).not.toContain('lecturer_notes');
+  });
+
   it('drops questions without sections and sections without text, caps the count, and fails when nothing is left', () => {
     const many = Array.from({ length: MAX_QUESTIONS + 3 }, () => ({ title: 'q', sections: [section('s')] }));
     expect(HomeworkGuideGenerator.validate({ questions: [{ title: 'ריקה', sections: [{ asked: ' ' }] }, ...many] }).questions).toHaveLength(MAX_QUESTIONS);
