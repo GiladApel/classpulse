@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
 import type { FixedClock } from './infra/Clock.js';
-import { makeTestPorts, type USERS } from './test/testContainer.js';
+import { makeTestPorts, USERS } from './test/testContainer.js';
 
 describe('HTTP: backchannel + polls', () => {
   let app: ReturnType<typeof createApp>;
@@ -61,10 +61,19 @@ describe('HTTP: backchannel + polls', () => {
     const answered = await call('lect', 'POST', `/posts/${post.body.id}/answered`, { answered: true });
     expect(answered.body).toMatchObject({ answered: true, votes: 1 });
 
-    // After class the feed stays open (FR-BC-02).
+    // After class, questions go to the course forum (FR-BC-02); the lecturer still answers the lesson's questions.
     await call('lect', 'POST', `/sessions/${sessionId}/end`);
-    expect((await call('avi', 'POST', `/sessions/${sessionId}/posts`, { text: 'שאלה אחרי השיעור' })).status).toBe(201);
+    expect((await call('avi', 'POST', `/sessions/${sessionId}/posts`, { text: 'שאלה אחרי השיעור' })).body.code).toBe('SESSION_ENDED');
     expect((await call('avi', 'POST', `/sessions/${sessionId}/lost`)).body.code).toBe('SESSION_ENDED');
+    expect((await call('lect', 'POST', `/posts/${post.body.id}/answer`, { text: 'Strategy בוחר; State משתנה' })).body.answer).toBe('Strategy בוחר; State משתנה');
+
+    const general = await call('avi', 'POST', '/courses/c1/posts', { text: 'שאלה אחרי השיעור', anonymous: false });
+    expect(general).toMatchObject({ status: 201, body: { courseId: 'c1', sessionId: null, displayName: USERS.avi.name } });
+    expect((await call('avi', 'POST', '/courses/c1/posts', { text: '' })).status).toBe(400);
+    expect((await call('rina', 'POST', '/courses/c1/posts', { text: 'x' })).body.code).toBe('NOT_IN_COURSE');
+    expect((await call('dana', 'POST', `/posts/${general.body.id}/votes`)).status).toBe(201);
+    expect((await call('dana', 'POST', `/posts/${general.body.id}/answer`, { text: 'x' })).status).toBe(403);
+    expect((await call('lect', 'POST', `/posts/${general.body.id}/answer`, { text: 'תשובה' })).body).toMatchObject({ answer: 'תשובה', answered: true });
   });
 
   it('poll from a slide: AI drafts → create (open) → vote → close reveals the answer', async () => {

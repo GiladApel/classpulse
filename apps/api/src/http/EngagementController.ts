@@ -13,7 +13,8 @@ import { jsonBody, oneOf, str } from './validate.js';
 /** Never exposes the author of a post. */
 export const postDto = (p: FeedPost) => ({
   id: p.id,
-  sessionId: p.sessionId,
+  courseId: p.courseId,
+  sessionId: p.sessionId ?? null,
   displayName: p.displayName,
   anonymous: p.anonymous,
   text: p.text,
@@ -57,6 +58,15 @@ export class EngagementController {
       return c.json(postDto(await this.feed.post(session, participant(c.get('user')), text, b.anonymous === true)), 201);
     });
 
+    // The course forum: any course member, during or between lessons.
+    app.post('/courses/:id/posts', async (c) => {
+      const course = await this.sessions.getCourse(c.req.param('id'));
+      const b = await jsonBody(c.req);
+      const text = str(b, 'text', { max: 500 });
+      if (b.anonymous !== undefined && typeof b.anonymous !== 'boolean') throw new ValidationError('anonymous must be a boolean');
+      return c.json(postDto(await this.feed.postToCourse(course, participant(c.get('user')), text, b.anonymous === true)), 201);
+    });
+
     app.post('/posts/:id/votes', async (c) => {
       await this.feed.upvote(c.req.param('id'), participant(c.get('user')));
       return c.json({ ok: true }, 201);
@@ -64,7 +74,7 @@ export class EngagementController {
 
     app.post('/posts/:id/answered', requireLecturer, async (c) => {
       const post = await this.feed.get(c.req.param('id'));
-      await this.sessions.getOwned(post.sessionId, c.get('user').id);
+      await this.sessions.getOwnedCourse(post.courseId, c.get('user').id);
       const b = await jsonBody(c.req);
       if (typeof b.answered !== 'boolean') throw new ValidationError('answered must be a boolean');
       return c.json(postDto(await this.feed.markAnswered(post.id, b.answered)));
@@ -72,7 +82,7 @@ export class EngagementController {
 
     app.post('/posts/:id/answer', requireLecturer, async (c) => {
       const post = await this.feed.get(c.req.param('id'));
-      await this.sessions.getOwned(post.sessionId, c.get('user').id);
+      await this.sessions.getOwnedCourse(post.courseId, c.get('user').id);
       const b = await jsonBody(c.req);
       return c.json(postDto(await this.feed.answer(post.id, str(b, 'text', { max: 2000, optional: true }))));
     });
