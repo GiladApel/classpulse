@@ -47,10 +47,11 @@
 | ID | Requirement |
 |----|-------------|
 | FR-BC-01 | A student can press "I'm lost" (at most once per 60 s). The dashboard shows a confusion level over a rolling 2-minute window. After the tap, the student may optionally write what is unclear; the note is posted to the questions feed anonymously. |
-| FR-BC-02 | A student can post a question or suggestion, optionally anonymously, during or after the lecture. |
+| FR-BC-02 | A student can post a question or suggestion, optionally anonymously, in a lesson's forum while the lesson is live. After it ends, that forum is read-only and points to the course forum. |
 | FR-BC-03 | Participants can upvote posts (once each). The lecturer can mark a post as answered. |
 | FR-BC-04 | The lecturer can request an AI clustering of open posts into themes. |
 | FR-BC-05 | While a lesson is live, every course member takes part in it ("I'm lost", questions, upvotes, polls) whether or not they checked in, so students at home can follow and ask. Attendance itself is recorded only by the QR in the room. |
+| FR-BC-06 | Every course has a general forum, open to its members at any time: they ask (optionally anonymously) and upvote; the lecturer answers and marks questions answered. |
 
 ### F4: Polls
 | ID | Requirement |
@@ -86,10 +87,11 @@
 ### F7: Lecture page
 | ID | Requirement |
 |----|-------------|
-| FR-LP-01 | Every lecture has a page for every course member (on the roster, or attended any lesson of the course), including students who missed it: published summary, materials, practice questions, the closed polls with results, and the questions with answers. Every course member may also ask and upvote questions, during the lecture or after it, and vote while it is live (FR-BC-05). |
+| FR-LP-01 | Every lecture has a page for every course member (on the roster, or attended any lesson of the course), including students who missed it: published summary, materials, practice questions, the closed polls with results, and the questions with answers. While it is live every course member may also ask, upvote and vote (FR-BC-05); afterwards questions go to the course forum (FR-BC-06). |
 | FR-LP-02 | During or after the lecture, the lecturer publishes open review questions (no answer options), written by hand or drafted by the AI from the lecture's slide deck (PDF or image, ≤50 MB): up to 8 drafts, of which the lecturer publishes the ones they select. Students read them on the lecture page; there is nothing to submit. |
 | FR-LP-03 | During or after the lecture, the lecturer attaches files or images (≤50 MB; one button opens the file picker and uploads at once) and links. Files are downloadable only by course participants. |
 | FR-LP-04 | The lecturer can write an answer under a student's question, during or after the lecture; it marks the question answered. |
+| FR-LP-05 | A lesson with homework shows it next to its title, in the course's lesson list and in the lesson header: "homework to hand in" with the earliest due date, or "homework handed in" once the student handed in all of it. |
 
 ### F8: Lecture feedback
 | ID | Requirement |
