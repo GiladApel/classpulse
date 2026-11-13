@@ -576,6 +576,9 @@ classDiagram
     +vote(pollId, student: Participant, optionIndex) Promise~void~
     +close(pollId) Promise~PollResults~
   }
+  class LessonAccess {
+    +requireParticipant(sessionId, studentNumber) Promise~void~
+  }
   class AttendanceService {
     +requireParticipant(sessionId, studentNumber) Promise~AttendanceRecord~
     +presentCount(sessionId) Promise~number~
@@ -673,9 +676,12 @@ classDiagram
     +remove(id) Promise~void~
   }
 
-  ConfusionMeter ..> AttendanceService : participant + present count
-  FeedService ..> AttendanceService : participant check
-  PollService ..> AttendanceService : participant check
+  ConfusionMeter ..> LessonAccess : participant check
+  ConfusionMeter ..> AttendanceService : present count
+  FeedService ..> LessonAccess : participant check
+  PollService ..> LessonAccess : participant check
+  LessonAccess ..> AttendanceService : checked in?
+  LessonAccess ..> CourseService : course member?
   PollService o-- McqGenerator
   FeedService o-- FeedClusterer
   RecordingPipeline o-- LectureSummarizer
@@ -695,7 +701,7 @@ classDiagram
   PracticeService o-- PracticeQuestionGenerator
 ```
 
-**Who may take part:** the backchannel and polls are open to students checked in to the session and not removed (`AttendanceService.requireParticipant`, error `NOT_CHECKED_IN`). PocketBase list rules enforce the same condition, so it also decides who receives realtime events.
+**Who may take part:** the backchannel and polls are open to the whole course: `LessonAccess.requireParticipant` accepts a student checked in to the session (not removed) or any course member (`CourseService.isMember`: on the roster or attended a lesson), else `NOT_IN_COURSE`. `FeedService`, `PollService` and `ConfusionMeter` depend only on that `LessonParticipation` interface. PocketBase list rules give members the feed and every non-draft poll, so they also receive the realtime events. Attendance, challenges and lecture feedback stay with those checked in.
 
 **Rules encoded in the classes:**
 - `ConfusionMeter.record` accepts one signal per student per 60 s. A repeat inside the cooldown returns `{accepted: false, retryInSec}` instead of an error, so pressing twice never shows a failure. `level` counts *distinct* students in the last 120 s, relative to those present.
@@ -714,7 +720,7 @@ classDiagram
 - `PracticeService` publishes open review questions: trimmed text, no options and nothing for students to submit. `draftFromLecture` returns AI drafts only; the lecturer publishes the ones they tick. Both sides read the questions straight from PocketBase.
 - `MaterialService` accepts http(s) links and files up to 50 MB (stored as protected PocketBase files, so downloading needs a short-lived file token).
 - `FeedService.answer` stores a written answer and marks the post answered, during or after the lecture.
-- Access, all in PocketBase rules: course participants read questions and answers, review questions and materials, and **closed** polls only (an open poll stays limited to those checked in). Posting, upvoting and voting still require being checked in to that lecture.
+- Access, all in PocketBase rules: course participants read questions and answers, review questions and materials, and every non-draft poll. While the lecture is live they may also post, upvote, vote and signal "I'm lost" without checking in.
 
 **Lecture feedback (`engagement/`, M9):** `FeedbackService` opens when the session ends and closes 24 h later (`FEEDBACK_WINDOW_MS`). Only students checked in to that lecture may answer, once each (`ALREADY_SENT`, plus a unique index). The `lesson_feedback` collection has **no** list or view rule, so no one, the lecturer included, can read a single answer through PocketBase. `summary` returns only the count until there are 3 answers (`MIN_FEEDBACK_RESPONSES`), then counts per option and the comments ordered by option and text, never by time, so their order cannot reveal who wrote them.
 
