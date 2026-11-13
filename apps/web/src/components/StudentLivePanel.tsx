@@ -147,7 +147,7 @@ function PollCard({ sessionId }: { sessionId: string }) {
   );
 }
 
-/** Questions with the lecturer's answers. Every course member may post or upvote while the lesson is live (`canPost`). */
+/** Questions with the lecturer's answers. Every course member may post or upvote, during the lesson or after it (`canPost`). */
 export function Feed({ sessionId, canPost }: { sessionId: string; canPost: boolean }) {
   const userId = pb.authStore.record?.id ?? '';
   const posts = useLiveRecords<PostRecord>('feed_posts', pb.filter('session = {:s}', { s: sessionId }));

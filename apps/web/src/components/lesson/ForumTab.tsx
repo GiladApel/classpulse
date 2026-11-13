@@ -17,7 +17,7 @@ interface Props {
 
 /**
  * The class conversation, open to everyone in the course, in the room or at home: questions, polls and "I'm lost" while
- * live; answers, poll results and feedback afterwards. Attendance alone still needs the QR in the room.
+ * live; questions, answers, poll results and feedback afterwards. Attendance alone still needs the QR in the room.
  */
 export default function ForumTab({ sessionId, lecturer, live, attended, goToAttendance }: Props) {
   if (lecturer)
@@ -47,7 +47,7 @@ export default function ForumTab({ sessionId, lecturer, live, attended, goToAtte
     <>
       {attended && <FeedbackCard sessionId={sessionId} ended />}
       <ClosedPolls sessionId={sessionId} />
-      <Feed sessionId={sessionId} canPost={false} />
+      <Feed sessionId={sessionId} canPost />
     </>
   );
 }
