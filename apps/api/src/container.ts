@@ -14,6 +14,7 @@ import { AttendanceService } from './attendance/AttendanceService.js';
 import { CourseService } from './attendance/CourseService.js';
 import { DeviceBindingRule } from './attendance/DeviceBindingRule.js';
 import { DuplicateStudentRule } from './attendance/DuplicateStudentRule.js';
+import { LessonAccess } from './attendance/LessonAccess.js';
 import { QrTokenService } from './attendance/QrTokenService.js';
 import type { AttendanceRepository, CourseRepository, CourseSlotRepository, EnrollmentRepository, SessionRepository } from './attendance/repositories.js';
 import { RosterParser } from './attendance/RosterParser.js';
@@ -149,7 +150,9 @@ export function buildContainer(p: Ports): Container {
   ];
   const attendance = new AttendanceService(rules, p.attendanceRepo, p.clock);
   const courses = new CourseService(p.courseRepo, p.enrollmentRepo, p.slotRepo, p.attendanceRepo, new RosterParser(), p.clock);
-  const confusion = new ConfusionMeter(p.lostRepo, attendance, p.clock);
+  // The forum, polls and "I'm lost" are open to the whole course; attendance and challenges stay with those in the room.
+  const lesson = new LessonAccess(attendance, p.sessionRepo, courses);
+  const confusion = new ConfusionMeter(p.lostRepo, { requireParticipant: (s, n) => lesson.requireParticipant(s, n), presentCount: (s) => attendance.presentCount(s) }, p.clock);
   const queue = new BackgroundQueue();
   return {
     clock: p.clock,
@@ -170,9 +173,9 @@ export function buildContainer(p: Ports): Container {
       p.challengeOptions,
     ),
     confusion,
-    feed: new FeedService(p.postRepo, p.postVoteRepo, attendance, new FeedClusterer(p.llm), p.clock),
+    feed: new FeedService(p.postRepo, p.postVoteRepo, lesson, new FeedClusterer(p.llm), p.clock),
     feedback: new FeedbackService(p.feedbackRepo, attendance, p.clock),
-    polls: new PollService(p.pollRepo, p.pollVoteRepo, attendance, new McqGenerator(p.llm), p.clock),
+    polls: new PollService(p.pollRepo, p.pollVoteRepo, lesson, new McqGenerator(p.llm), p.clock),
     recordings: new RecordingPipeline(p.recordingRepo, p.uploads, new LectureSummarizer(p.llm), confusion, attendance, queue, p.clock),
     homework: new HomeworkAnalysisService(
       p.assignmentRepo,

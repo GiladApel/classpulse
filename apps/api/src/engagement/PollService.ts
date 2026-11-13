@@ -1,6 +1,6 @@
 import type { Attachment } from '../ai/LLMProvider.js';
 import type { McqGenerator } from '../ai/McqGenerator.js';
-import type { AttendanceService } from '../attendance/AttendanceService.js';
+import type { LessonParticipation } from '../attendance/LessonAccess.js';
 import type { Session } from '../attendance/types.js';
 import type { Clock } from '../infra/Clock.js';
 import { DomainError, NotFoundError } from '../shared/errors.js';
@@ -11,7 +11,7 @@ export class PollService {
   constructor(
     private readonly polls: PollRepository,
     private readonly votes: PollVoteRepository,
-    private readonly attendance: Pick<AttendanceService, 'requireParticipant'>,
+    private readonly attendance: LessonParticipation,
     private readonly generator: McqGenerator,
     private readonly clock: Clock,
   ) {}

@@ -30,10 +30,10 @@ describe('HTTP: backchannel + polls', () => {
     sessionId = (await call('lect', 'POST', '/sessions', { courseId: 'c1', title: 'L', geofenceMode: 'lenient', geofenceRadiusM: 50 })).body.id;
   });
 
-  it("I'm lost: checked-in students only, cooldown, lecturer-only level", async () => {
+  it("I'm lost: course members only, cooldown, lecturer-only level", async () => {
     await checkIn('dana');
     await checkIn('avi');
-    expect((await call('rina', 'POST', `/sessions/${sessionId}/lost`)).body.code).toBe('NOT_CHECKED_IN');
+    expect((await call('rina', 'POST', `/sessions/${sessionId}/lost`)).body.code).toBe('NOT_IN_COURSE');
     expect((await call('fresh', 'POST', `/sessions/${sessionId}/lost`)).body.code).toBe('ONBOARDING_REQUIRED');
     expect((await call('dana', 'POST', `/sessions/${sessionId}/lost`)).body).toEqual({ accepted: true, retryInSec: 60 });
     clock.advance(5000);
@@ -84,7 +84,7 @@ describe('HTTP: backchannel + polls', () => {
     expect((await call('dana', 'POST', `/polls/${poll.body.id}/votes`, { optionIndex: 0 })).status).toBe(201);
     expect((await call('avi', 'POST', `/polls/${poll.body.id}/votes`, { optionIndex: 2 })).status).toBe(201);
     expect((await call('avi', 'POST', `/polls/${poll.body.id}/votes`, { optionIndex: 1 })).body.code).toBe('ALREADY_VOTED');
-    expect((await call('rina', 'POST', `/polls/${poll.body.id}/votes`, { optionIndex: 1 })).body.code).toBe('NOT_CHECKED_IN');
+    expect((await call('rina', 'POST', `/polls/${poll.body.id}/votes`, { optionIndex: 1 })).body.code).toBe('NOT_IN_COURSE');
 
     expect((await call('dana', 'POST', `/polls/${poll.body.id}/close`)).status).toBe(403);
     expect((await call('lect', 'POST', `/polls/${poll.body.id}/close`)).body).toEqual({ counts: [1, 0, 1, 0], total: 2, correctIndex: 0 });
@@ -98,5 +98,20 @@ describe('HTTP: backchannel + polls', () => {
     expect((await call('lect', 'POST', `/sessions/${sessionId}/polls`, { question: 'q', options: ['a'] })).body.code).toBe('INVALID_POLL');
     expect((await call('dana', 'POST', `/sessions/${sessionId}/polls`, { question: 'q', options: ['a', 'b'] })).status).toBe(403);
     expect((await call('lect', 'POST', `/polls/${yn.body.id}/open`)).body.status).toBe('open');
+  });
+
+  it("a student enrolled in the course takes part from home without checking in: questions, upvotes, polls and I'm lost", async () => {
+    await checkIn('dana');
+    expect((await call('rina', 'POST', `/sessions/${sessionId}/posts`, { text: 'שאלה מהבית', anonymous: false })).body.code).toBe('NOT_IN_COURSE');
+    expect((await call('lect', 'POST', '/courses/c1/enrollments', { studentNumber: '444444444', name: 'רינה' })).status).toBe(201);
+
+    const post = await call('rina', 'POST', `/sessions/${sessionId}/posts`, { text: 'שאלה מהבית', anonymous: false });
+    expect(post.status).toBe(201);
+    expect((await call('rina', 'POST', `/posts/${post.body.id}/votes`)).status).toBe(201);
+    expect((await call('rina', 'POST', `/sessions/${sessionId}/lost`)).body).toEqual({ accepted: true, retryInSec: 60 });
+    const poll = await call('lect', 'POST', `/sessions/${sessionId}/polls`, { question: 'מה נכון?', options: ['א', 'ב'], correctIndex: 0, source: 'manual', open: true });
+    expect((await call('rina', 'POST', `/polls/${poll.body.id}/votes`, { optionIndex: 0 })).status).toBe(201);
+    // Attendance is still only by the QR in the room.
+    expect((await call('lect', 'GET', `/sessions/${sessionId}/confusion`)).body).toMatchObject({ lost: 1, present: 1 });
   });
 });

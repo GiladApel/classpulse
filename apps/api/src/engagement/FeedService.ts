@@ -1,5 +1,5 @@
 import type { FeedClusterer } from '../ai/FeedClusterer.js';
-import type { AttendanceService } from '../attendance/AttendanceService.js';
+import type { LessonParticipation } from '../attendance/LessonAccess.js';
 import type { Session } from '../attendance/types.js';
 import type { Clock } from '../infra/Clock.js';
 import { DomainError, NotFoundError } from '../shared/errors.js';
@@ -10,7 +10,7 @@ export class FeedService {
   constructor(
     private readonly posts: FeedPostRepository,
     private readonly votes: PostVoteRepository,
-    private readonly attendance: Pick<AttendanceService, 'requireParticipant'>,
+    private readonly attendance: LessonParticipation,
     private readonly clusterer: FeedClusterer,
     private readonly clock: Clock,
   ) {}

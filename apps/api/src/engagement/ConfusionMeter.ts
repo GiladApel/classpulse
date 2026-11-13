@@ -1,4 +1,5 @@
 import type { AttendanceService } from '../attendance/AttendanceService.js';
+import type { LessonParticipation } from '../attendance/LessonAccess.js';
 import type { Session } from '../attendance/types.js';
 import type { Clock } from '../infra/Clock.js';
 import { DomainError } from '../shared/errors.js';
@@ -14,7 +15,7 @@ export interface LostOutcome {
 export class ConfusionMeter {
   constructor(
     private readonly signals: LostSignalRepository,
-    private readonly attendance: Pick<AttendanceService, 'requireParticipant' | 'presentCount'>,
+    private readonly attendance: LessonParticipation & Pick<AttendanceService, 'presentCount'>,
     private readonly clock: Clock,
     private readonly cooldownSec = 60,
   ) {}
