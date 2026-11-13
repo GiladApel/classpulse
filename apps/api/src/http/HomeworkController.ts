@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { MAX_NOTES } from '../ai/HomeworkGuideGenerator.js';
 import type { SessionService } from '../attendance/SessionService.js';
 import type { HomeworkAnalysisService } from '../content/HomeworkAnalysisService.js';
 import type { FileInput } from '../content/repositories.js';
@@ -24,7 +25,8 @@ export const assignmentDto = (a: Assignment) => ({
   outline: a.outline,
 });
 
-export const submissionDto = (s: Submission) => ({
+/** The AI's grade of a hand-in is a draft for the lecturer: a student's own copy leaves it out. */
+export const submissionDto = (s: Submission, lecturer = false) => ({
   id: s.id,
   assignmentId: s.assignmentId,
   studentNumber: s.studentNumber,
@@ -37,7 +39,30 @@ export const submissionDto = (s: Submission) => ({
   late: s.late,
   submittedAt: s.submittedAt.toISOString(),
   reviewedAt: s.reviewedAt?.toISOString() ?? null,
+  handedInAt: s.handedInAt?.toISOString() ?? null,
+  files: s.files,
+  ...(lecturer ? { finalStatus: s.finalStatus ?? null, finalError: s.finalError, finalReport: s.finalReport, finalTotal: s.finalTotal } : {}),
 });
+
+const notesOf = (v: unknown) => {
+  const notes = typeof v === 'string' ? v.trim() : '';
+  if (notes.length > MAX_NOTES) throw new ValidationError(`ההנחיות ארוכות מ-${MAX_NOTES} תווים`);
+  return notes;
+};
+
+/** One PDF, or up to MAX_SOLUTION_IMAGES photos of a handwritten solution. */
+async function solutionFiles(form: Record<string, unknown>): Promise<FileInput[]> {
+  const files = form['files'] ?? [];
+  const list = (Array.isArray(files) ? files : [files]).filter((f): f is File => f instanceof File && f.size > 0);
+  if (list.length === 0) throw new ValidationError('files are required');
+  const pdfs = list.filter((f) => f.type === 'application/pdf');
+  const images = list.filter((f) => IMAGE_TYPES.includes(f.type));
+  if (pdfs.length + images.length !== list.length) throw new ValidationError('אפשר להעלות PDF או תמונות (JPG, PNG)');
+  if (pdfs.length > 1 || (pdfs.length === 1 && images.length > 0)) throw new ValidationError('העלו קובץ PDF אחד, או תמונות');
+  if (images.length > MAX_SOLUTION_IMAGES) throw new ValidationError(`עד ${MAX_SOLUTION_IMAGES} תמונות`);
+  if (list.reduce((sum, f) => sum + f.size, 0) > MAX_SOLUTION_BYTES) throw new ValidationError('הקבצים גדולים מ-20MB');
+  return Promise.all(list.map(toInput));
+}
 
 const toInput = async (f: File): Promise<FileInput> => ({ data: Buffer.from(await f.arrayBuffer()), filename: f.name.slice(0, 200), mimeType: f.type });
 
@@ -50,7 +75,7 @@ export class HomeworkController {
   routes(): Hono<AppEnv> {
     const app = new Hono<AppEnv>();
 
-    // Multipart {title, file (PDF), dueAt?, sessionId?}: the AI reads the PDF in the background.
+    // Multipart {title, file (PDF), dueAt?, sessionId?, notes?}: the AI reads the PDF in the background.
     app.post('/courses/:id/assignments', requireLecturer, async (c) => {
       const course = await this.sessions.getOwnedCourse(c.req.param('id'), c.get('user').id);
       const body = await c.req.parseBody();
@@ -67,8 +92,21 @@ export class HomeworkController {
         if (session.courseId !== course.id) throw new ValidationError('the lesson is not in this course');
         sessionId = session.id;
       }
-      const assignment = await this.homework.publish(course, { title, dueAt, sessionId }, await toInput(file));
+      const notes = notesOf(body.notes);
+      const assignment = await this.homework.publish(course, { title, dueAt, sessionId, notes }, await toInput(file));
       return c.json(assignmentDto(assignment), 201);
+    });
+
+    // The whole rubric, with the expected answers and the lecturer's notes: never sent to students.
+    app.get('/assignments/:id/rubric', requireLecturer, async (c) => {
+      const assignment = await this.ownedAssignment(c.req.param('id'), c.get('user').id);
+      return c.json(await this.homework.rubric(assignment));
+    });
+
+    app.put('/assignments/:id/rubric', requireLecturer, async (c) => {
+      const assignment = await this.ownedAssignment(c.req.param('id'), c.get('user').id);
+      const body = await c.req.json().catch(() => ({}));
+      return c.json(assignmentDto(await this.homework.regenerateRubric(assignment, notesOf((body as { notes?: unknown }).notes))));
     });
 
     app.post('/assignments/:id/guide/retry', requireLecturer, async (c) => {
@@ -82,43 +120,51 @@ export class HomeworkController {
       return c.json({ ok: true });
     });
 
-    // Multipart files[]: one PDF, or up to MAX_SOLUTION_IMAGES photos of a handwritten solution.
+    // Multipart files[]: a practice check; the files are not kept.
     app.post('/assignments/:id/checks', async (c) => {
       const student = participant(c.get('user'));
       const assignment = await this.homework.getAssignment(c.req.param('id'));
-      const files = ((await c.req.parseBody({ all: true }))['files'] ?? []) as unknown;
-      const list = (Array.isArray(files) ? files : [files]).filter((f): f is File => f instanceof File && f.size > 0);
-      if (list.length === 0) throw new ValidationError('files are required');
-      const pdfs = list.filter((f) => f.type === 'application/pdf');
-      const images = list.filter((f) => IMAGE_TYPES.includes(f.type));
-      if (pdfs.length + images.length !== list.length) throw new ValidationError('אפשר להעלות PDF או תמונות (JPG, PNG)');
-      if (pdfs.length > 1 || (pdfs.length === 1 && images.length > 0)) throw new ValidationError('העלו קובץ PDF אחד, או תמונות');
-      if (images.length > MAX_SOLUTION_IMAGES) throw new ValidationError(`עד ${MAX_SOLUTION_IMAGES} תמונות`);
-      if (list.reduce((sum, f) => sum + f.size, 0) > MAX_SOLUTION_BYTES) throw new ValidationError('הקבצים גדולים מ-20MB');
-      const submission = await this.homework.check(assignment, student, await Promise.all(list.map(toInput)));
+      const submission = await this.homework.check(assignment, student, await solutionFiles(await c.req.parseBody({ all: true })));
       return c.json(submissionDto(submission), 202);
+    });
+
+    // Multipart files[]: the final hand-in, kept for the lecturer and graded by the AI in the background.
+    app.post('/assignments/:id/handin', async (c) => {
+      const student = participant(c.get('user'));
+      const assignment = await this.homework.getAssignment(c.req.param('id'));
+      const submission = await this.homework.handIn(assignment, student, await solutionFiles(await c.req.parseBody({ all: true })));
+      return c.json(submissionDto(submission), 202);
+    });
+
+    app.post('/submissions/:id/final/retry', requireLecturer, async (c) => {
+      const submission = await this.homework.getSubmission(c.req.param('id'));
+      await this.ownedAssignment(submission.assignmentId, c.get('user').id);
+      return c.json(submissionDto(await this.homework.retryFinal(submission), true));
+    });
+
+    // The lecturer's table: every student's row with the AI's grade of their hand-in.
+    app.get('/assignments/:id/submissions', requireLecturer, async (c) => {
+      const assignment = await this.ownedAssignment(c.req.param('id'), c.get('user').id);
+      return c.json((await this.homework.listSubmissions(assignment.id)).map((s) => submissionDto(s, true)));
     });
 
     // A student may read only their own submission; the lecturer any submission in their course.
     app.get('/submissions/:id', async (c) => {
       const user = c.get('user');
       const submission = await this.homework.getSubmission(c.req.param('id'));
-      if (submission.studentId !== user.id) {
+      const lecturer = submission.studentId !== user.id;
+      if (lecturer) {
         if (user.role !== 'lecturer') throw new ForbiddenError('Not your submission');
         await this.ownedAssignment(submission.assignmentId, user.id);
       }
-      const view = await this.homework.view(submission);
-      return c.json({ ...view, submission: submissionDto(view.submission) });
+      const view = await this.homework.view(submission, { lecturer });
+      return c.json({ ...view, submission: submissionDto(view.submission, lecturer) });
     });
 
-    // Course members see anonymous rows (their own marked); the course's lecturer sees names.
-    app.get('/assignments/:id/chart', async (c) => {
-      const user = c.get('user');
-      const assignment = await this.homework.getAssignment(c.req.param('id'));
-      const lecturer = user.role === 'lecturer';
-      if (lecturer) await this.sessions.getOwnedCourse(assignment.courseId, user.id);
-      else await this.homework.requireMember(assignment, participant(user));
-      return c.json(await this.homework.chart(assignment, { lecturer, studentNumber: user.studentNumber }));
+    // Lecturer only: the graded hand-ins with names. Students get no ranking.
+    app.get('/assignments/:id/chart', requireLecturer, async (c) => {
+      const assignment = await this.ownedAssignment(c.req.param('id'), c.get('user').id);
+      return c.json(await this.homework.chart(assignment));
     });
 
     app.post('/assignments/:id/insights', requireLecturer, async (c) => {
