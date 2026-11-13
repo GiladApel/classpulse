@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Button, Card, ErrorText, Field, inputClass, Screen } from '../components/ui';
+import { chromeIntent, inAppBrowser, isAndroid } from '../lib/inAppBrowser';
 import { pb } from '../lib/pb';
 
 export default function LoginPage() {
@@ -10,6 +11,17 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const embedded = inAppBrowser();
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      setCopied(true);
+    } catch {
+      prompt('העתיקו את הקישור:', location.href);
+    }
+  };
 
   const done = () => navigate(next, { replace: true });
 
@@ -20,7 +32,7 @@ export default function LoginPage() {
       await pb.collection('users').authWithOAuth2({ provider: 'google' });
       done();
     } catch {
-      setError('ההתחברות עם Google נכשלה. נסו שוב.');
+      setError(embedded ? `Google לא מאפשר התחברות מתוך ${embedded}. פתחו את הקישור בדפדפן (הוראות למעלה).` : 'ההתחברות עם Google נכשלה. אם לא נפתח חלון של Google, אפשרו חלונות קופצים ונסו שוב.');
     } finally {
       setBusy(false);
     }
@@ -45,8 +57,26 @@ export default function LoginPage() {
     <Screen>
       <div className="text-center">
         <h1 className="text-3xl font-bold text-indigo-700">ClassPulse</h1>
-        <p className="mt-1 text-slate-600">התחברו פעם אחת — מהפעם הבאה סריקה אחת מספיקה</p>
+        <p className="mt-1 text-slate-600">נרשמים פעם אחת עם Google וממלאים מספר סטודנט / ת.ז. — הקורסים שהמרצה רשם אתכם אליהם יופיעו מיד.</p>
       </div>
+      {embedded && (
+        <div className="flex flex-col gap-2 rounded-2xl bg-amber-50 p-5 ring-1 ring-amber-300">
+          <p className="font-semibold text-amber-900">הקישור נפתח בתוך {embedded}</p>
+          <p className="text-sm text-amber-900">
+            Google לא מאפשר להתחבר מכאן. {isAndroid() ? 'פתחו את האתר ב-Chrome:' : 'הקישו על ⋯ או על סמל המצפן ובחרו "פתיחה ב-Safari", או העתיקו את הקישור והדביקו אותו ב-Safari.'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {isAndroid() && (
+              <a href={chromeIntent()} className="rounded-xl bg-indigo-600 px-4 py-2 font-medium text-white">
+                פתיחה ב-Chrome
+              </a>
+            )}
+            <Button variant="secondary" onClick={copyLink}>
+              {copied ? '✓ הקישור הועתק' : 'העתקת הקישור'}
+            </Button>
+          </div>
+        </div>
+      )}
       <Card className="flex flex-col gap-3">
         <Button onClick={google} disabled={busy} className="py-3 text-lg">
           התחברות עם Google
