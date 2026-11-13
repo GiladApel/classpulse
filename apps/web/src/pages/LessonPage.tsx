@@ -49,7 +49,7 @@ export default function LessonPage() {
   const mine = useLiveRecords<MyRecord>('attendance_records', pb.filter('session = {:s} && student = {:u}', { s: id, u: user.id }), '', !lecturer && !!session);
   const record = mine.find((r) => r.status !== 'removed');
 
-  const fallback: LessonTab = lecturer ? 'attendance' : active && session?.status === 'active' ? (record ? 'forum' : 'attendance') : 'materials';
+  const fallback: LessonTab = lecturer ? 'attendance' : active && session?.status === 'active' ? 'forum' : 'materials';
   const [tab, setTab] = useTab<LessonTab>(TABS, fallback);
 
   useEffect(() => {

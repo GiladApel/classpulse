@@ -15,7 +15,10 @@ interface Props {
   goToAttendance: () => void;
 }
 
-/** The class conversation: questions, polls and "I'm lost" while live; answers, poll results and feedback afterwards. */
+/**
+ * The class conversation, open to everyone in the course, in the room or at home: questions, polls and "I'm lost" while
+ * live; answers, poll results and feedback afterwards. Attendance alone still needs the QR in the room.
+ */
 export default function ForumTab({ sessionId, lecturer, live, attended, goToAttendance }: Props) {
   if (lecturer)
     return (
@@ -25,21 +28,26 @@ export default function ForumTab({ sessionId, lecturer, live, attended, goToAtte
       </>
     );
 
-  if (live && attended) return <StudentLivePanel sessionId={sessionId} active />;
+  if (live)
+    return (
+      <>
+        {!attended && (
+          <Card className="flex flex-wrap items-center justify-between gap-3 border-s-4 border-indigo-300 py-3">
+            <p className="text-sm">אפשר לשאול ולהצביע גם מהבית. בכיתה? סמנו נוכחות בסריקת הקוד שעל הלוח.</p>
+            <Button variant="ghost" onClick={goToAttendance} className="text-sm">
+              לנוכחות
+            </Button>
+          </Card>
+        )}
+        <StudentLivePanel sessionId={sessionId} active />
+      </>
+    );
 
   return (
     <>
-      {live && (
-        <Card className="flex flex-wrap items-center justify-between gap-3 border-s-4 border-amber-400">
-          <p>כדי לשאול ולהצביע בסקרים, סמנו קודם נוכחות בכיתה.</p>
-          <Button variant="secondary" onClick={goToAttendance}>
-            לסימון נוכחות
-          </Button>
-        </Card>
-      )}
-      {!live && attended && <FeedbackCard sessionId={sessionId} ended />}
-      {!live && <ClosedPolls sessionId={sessionId} />}
-      <Feed sessionId={sessionId} canPost={attended && live} />
+      {attended && <FeedbackCard sessionId={sessionId} ended />}
+      <ClosedPolls sessionId={sessionId} />
+      <Feed sessionId={sessionId} canPost={false} />
     </>
   );
 }
