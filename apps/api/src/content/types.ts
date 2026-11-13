@@ -92,7 +92,7 @@ export interface QuestionScore {
 
 export type GuideStatus = 'generating' | 'ready' | 'failed';
 
-/** A homework published as a PDF; the AI's review guide is stored apart (hidden), the outline is public. */
+/** A homework published as a PDF. The rubric (guide, outline) and the lecturer's notes are hidden: only the API reads them. */
 export interface Assignment {
   id: string;
   courseId: string;
@@ -104,6 +104,8 @@ export interface Assignment {
   guideStatus: GuideStatus;
   guideError: string;
   outline: GuideOutline | null;
+  /** The lecturer's instructions to the AI for the rubric; never shown to students. */
+  notes: string;
 }
 
 export interface HomeworkReport {
@@ -115,7 +117,10 @@ export interface HomeworkReport {
 
 export type SubmissionStatus = 'processing' | 'done' | 'failed';
 
-/** One per student per homework: the latest successful check. The solution file is never kept. */
+/**
+ * One per student per homework: the latest successful practice check (its files are never kept) and, once the student
+ * hands in, the handed-in files and the AI's grading draft of them, which only the lecturer sees.
+ */
 export interface Submission {
   id: string;
   assignmentId: string;
@@ -132,6 +137,14 @@ export interface Submission {
   late: boolean;
   submittedAt: Date;
   reviewedAt?: Date;
+  handedInAt?: Date;
+  /** Stored file names of the hand-in. */
+  files: string[];
+  finalStatus?: SubmissionStatus;
+  finalError: string;
+  finalReport: HomeworkReport | null;
+  /** 1–100 once the hand-in is graded. */
+  finalTotal: number | null;
 }
 
 export interface CommonMistake {

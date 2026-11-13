@@ -57,6 +57,7 @@ export class InMemoryAssignmentRepository extends InMemoryRepository<Assignment>
 
 export class InMemorySubmissionRepository extends InMemoryRepository<Submission> implements SubmissionRepository {
   readonly sketches = new Map<string, number[]>();
+  readonly handedIn = new Map<string, FileInput[]>();
 
   async create(data: Omit<Submission, 'id'>) {
     // Mirrors the unique index (assignment, student_number); synchronous so it is atomic.
@@ -85,11 +86,25 @@ export class InMemorySubmissionRepository extends InMemoryRepository<Submission>
     return this.all().filter((s) => s.status === status);
   }
 
+  async listByFinalStatus(status: Submission['status']) {
+    return this.all().filter((s) => s.finalStatus === status);
+  }
+
+  async handIn(id: string, data: Partial<Omit<Submission, 'id'>>, files: FileInput[]) {
+    this.handedIn.set(id, files);
+    return this.update(id, { ...data, files: files.map((f) => f.filename) });
+  }
+
+  async getFiles(id: string) {
+    return this.handedIn.get(id) ?? [];
+  }
+
   /** Cascade of an assignment delete. */
   removeByAssignment(assignmentId: string) {
     for (const s of this.all().filter((x) => x.assignmentId === assignmentId)) {
       this.items.delete(s.id);
       this.sketches.delete(s.id);
+      this.handedIn.delete(s.id);
     }
   }
 }

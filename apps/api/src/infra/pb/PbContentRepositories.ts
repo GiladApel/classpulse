@@ -118,6 +118,7 @@ export class PbAssignmentRepository extends PbRepository<Assignment> implements 
       guideStatus: r.guide_status,
       guideError: r.guide_error ?? '',
       outline: (r.outline as GuideOutline | null) || null,
+      notes: r.rubric_notes ?? '',
     };
   }
 
@@ -131,6 +132,7 @@ export class PbAssignmentRepository extends PbRepository<Assignment> implements 
       guide_status: d.guideStatus,
       guide_error: d.guideError,
       outline: d.outline === null ? undefined : d.outline,
+      rubric_notes: d.notes,
     });
   }
 }
@@ -161,6 +163,28 @@ export class PbSubmissionRepository extends PbRepository<Submission> implements 
     return (await this.col.getFullList({ filter: this.pb.filter('status = {:s}', { s: status }) })).map((r) => this.toEntity(r));
   }
 
+  async listByFinalStatus(status: Submission['status']) {
+    return (await this.col.getFullList({ filter: this.pb.filter('final_status = {:s}', { s: status }) })).map((r) => this.toEntity(r));
+  }
+
+  async handIn(id: string, data: Partial<Omit<Submission, 'id'>>, files: FileInput[]) {
+    return this.toEntity(await this.col.update(id, { ...this.toRecord(data), files: files.map(toFile) }));
+  }
+
+  /** The files are protected, so the API (superuser) downloads them with a file token. */
+  async getFiles(id: string) {
+    const r = await this.col.getOne(id);
+    const token = await this.pb.files.getToken();
+    const names: string[] = r.files ?? [];
+    return Promise.all(
+      names.map(async (name) => {
+        const res = await fetch(this.pb.files.getURL(r, name, { token }));
+        if (!res.ok) throw new Error(`hand-in file ${id}/${name}: HTTP ${res.status}`);
+        return { data: Buffer.from(await res.arrayBuffer()), filename: name, mimeType: res.headers.get('content-type')?.split(';')[0] ?? '' };
+      }),
+    );
+  }
+
   protected toEntity(r: RecordModel): Submission {
     return {
       id: r.id,
@@ -177,6 +201,12 @@ export class PbSubmissionRepository extends PbRepository<Submission> implements 
       late: r.late,
       submittedAt: toDate(r.submitted_at)!,
       reviewedAt: toDate(r.reviewed_at),
+      handedInAt: toDate(r.handed_in_at),
+      files: r.files ?? [],
+      finalStatus: r.final_status || undefined,
+      finalError: r.final_error ?? '',
+      finalReport: (r.final_report as HomeworkReport | null) || null,
+      finalTotal: r.final_status === 'done' ? r.final_total : null,
     };
   }
 
@@ -194,6 +224,11 @@ export class PbSubmissionRepository extends PbRepository<Submission> implements 
       late: d.late,
       submitted_at: d.submittedAt?.toISOString(),
       reviewed_at: d.reviewedAt?.toISOString(),
+      handed_in_at: d.handedInAt?.toISOString(),
+      final_status: d.finalStatus,
+      final_error: d.finalError,
+      final_report: d.finalReport === null ? undefined : d.finalReport,
+      final_total: d.finalTotal === null ? undefined : d.finalTotal,
     });
   }
 }

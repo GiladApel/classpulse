@@ -84,6 +84,7 @@ export class HomeworkAnalysisService {
         guideStatus: 'generating',
         guideError: '',
         outline: null,
+        notes: '',
       },
       pdf,
     );
@@ -128,7 +129,7 @@ export class HomeworkAnalysisService {
     const submission = existing
       ? await this.submissions.update(existing.id, started)
       : await this.submissions
-          .create({ ...started, assignmentId: assignment.id, studentId: student.id, studentNumber: student.studentNumber, studentName: student.name, checkCount: 0, report: null, total: null })
+          .create({ ...started, assignmentId: assignment.id, studentId: student.id, studentNumber: student.studentNumber, studentName: student.name, checkCount: 0, report: null, total: null, files: [], finalError: '', finalReport: null, finalTotal: null })
           .catch(() => {
             // Double-click: the unique index (assignment, student) rejected the second concurrent create.
             throw new ConflictError('CHECK_IN_PROGRESS', 'הבדיקה הקודמת עדיין רצה');

@@ -383,7 +383,7 @@ describe('HomeworkAnalysisService', () => {
 
     // As if the server stopped mid-way: a check and a guide still marked as running.
     await subs.update(late.id, { status: 'processing' });
-    const reading = await assignments.create({ courseId: 'c1', title: 'שנייה', createdAt: T0, guideStatus: 'generating', guideError: '', outline: null });
+    const reading = await assignments.create({ courseId: 'c1', title: 'שנייה', createdAt: T0, guideStatus: 'generating', guideError: '', outline: null, notes: '' });
     expect(await svc.recoverInterrupted()).toBe(2);
     expect(await svc.getSubmission(late.id)).toMatchObject({ status: 'failed', checkCount: 1 });
     expect((await svc.getAssignment(reading.id)).guideStatus).toBe('failed');

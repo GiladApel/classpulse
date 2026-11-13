@@ -25,6 +25,10 @@ export interface SubmissionRepository extends Repository<Submission> {
   saveFingerprint(id: string, fingerprint: number[]): Promise<void>;
   getFingerprints(assignmentId: string): Promise<Map<string, number[]>>;
   listByStatus(status: Submission['status']): Promise<Submission[]>;
+  listByFinalStatus(status: Submission['status']): Promise<Submission[]>;
+  /** Stores the handed-in files with the hand-in fields. */
+  handIn(id: string, data: Partial<Omit<Submission, 'id'>>, files: FileInput[]): Promise<Submission>;
+  getFiles(id: string): Promise<FileInput[]>;
 }
 
 export interface InsightsRepository {
