@@ -67,7 +67,8 @@ flowchart TB
 2. **Read and write split.** Clients **read and subscribe** to PocketBase directly; collection rules filter what each user may see. Every **write that carries a business rule** goes through the API. Those collections have `createRule = null`, so only the superuser-authenticated API can write.
 3. **Observer via PocketBase realtime.** PocketBase is the subject. Each client subscribes to the collections it displays, and an API write automatically notifies them. No custom websocket server is needed.
 4. **Composition root.** `container.ts` builds every object once and injects its dependencies. Swapping Gemini for Mock or Claude changes only configuration (`LLM_PROVIDER`).
-5. **Secrets stay server-side:** QR secrets, LLM keys and Google service-account credentials.
+5. **Persistence behind Repositories.** Why PocketBase was chosen, its limits, and the migration path to PostgreSQL/Supabase are recorded in [ADR-001](10-adr-database.md).
+6. **Secrets stay server-side:** QR secrets, LLM keys and Google service-account credentials.
 
 ## 4. Deployment
 ```
