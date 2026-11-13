@@ -125,4 +125,25 @@ describe('Integration: backchannel + polls against real PocketBase', () => {
     expect(await home.pb.collection('attendance_records').getFullList({ filter: `session = "${sessionId}"` })).toEqual([]);
     await h.call(h.lecturer, 'POST', `/polls/${poll.id}/close`);
   });
+
+  it('course forum: members read general questions, outsiders do not; the author stays hidden; lecturer sees votes; no direct writes', async () => {
+    const home = await h.makeUser('student', h.studentNo());
+    await h.container.courses.enroll(await h.container.sessions.getCourse(h.course.id), home.record.student_id, 'בבית');
+    const post = (await h.call(home, 'POST', `/courses/${h.course.id}/posts`, { text: 'שאלה כללית', anonymous: true })).body;
+    expect(post).toMatchObject({ courseId: h.course.id, sessionId: null });
+
+    for (const u of [a, h.lecturer, home]) {
+      const r = await u.pb.collection('feed_posts').getOne(post.id);
+      expect([r.text, r.author, r.author_number, r.session]).toEqual(['שאלה כללית', undefined, undefined, '']);
+    }
+    await expect(outsider.pb.collection('feed_posts').getOne(post.id)).rejects.toMatchObject({ status: 404 });
+    expect((await h.call(outsider, 'POST', `/courses/${h.course.id}/posts`, { text: 'x' })).body.code).toBe('NOT_IN_COURSE');
+
+    await h.call(a, 'POST', `/posts/${post.id}/votes`);
+    expect(await a.pb.collection('post_votes').getFullList({ filter: `post = "${post.id}"` })).toHaveLength(1);
+    expect(await h.lecturer.pb.collection('post_votes').getFullList({ filter: `post = "${post.id}"` })).toHaveLength(1);
+    expect(await home.pb.collection('post_votes').getFullList({ filter: `post = "${post.id}"` })).toHaveLength(0);
+    await expect(home.pb.collection('feed_posts').create({ course: h.course.id, text: 'direct', posted_at: new Date().toISOString() })).rejects.toMatchObject({ status: 403 });
+    expect((await h.call(h.lecturer, 'POST', `/posts/${post.id}/answer`, { text: 'תשובה' })).body.answered).toBe(true);
+  });
 });
