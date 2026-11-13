@@ -30,6 +30,7 @@ test('7b · homework: the lecturer publishes a PDF with notes; a student gets fe
   // The student sees the homework PDF, not the rubric, and gets feedback twice.
   const sp = await phone(browser, shai, 0);
   await checkIn(sp, await qrToken(lp, sessionId));
+  await expect(sp.getByRole('button', { name: 'לשיעורי הבית של השיעור' })).toContainText('מטלה להגשה');
   await openTab(sp, 'שיעורי בית');
   await sp.getByRole('link', { name: /תרגיל 2 — Strategy/ }).click();
   await expect(sp.getByText('נותרו 2 מתוך 2 בדיקות', { exact: false })).toBeVisible();
@@ -53,6 +54,8 @@ test('7b · homework: the lecturer publishes a PDF with notes; a student gets fe
   await expect(sp.getByText(/✓ הוגש ב-/)).toBeVisible({ timeout: 15_000 });
   await expect(sp.getByText('המטלה הוגשה — אין עוד בדיקות.', { exact: false })).toBeVisible();
   await expect(sp.getByRole('button', { name: '📎 קובץ 1' })).toBeVisible();
+  await sp.goBack();
+  await expect(sp.getByRole('button', { name: 'לשיעורי הבית של השיעור' })).toContainText('✓ מטלה הוגשה');
 
   // The lecturer sees the hand-in, the AI grade, the chart with the name, and the rubric is now locked.
   await lp.reload();
