@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import AppShell from '../components/AppShell';
 import AssignmentManager from '../components/AssignmentManager';
+import HomeworkBadge from '../components/HomeworkBadge';
 import ChallengeOverlay from '../components/ChallengeOverlay';
 import AttendanceTab from '../components/lesson/AttendanceTab';
 import ForumTab from '../components/lesson/ForumTab';
@@ -11,6 +12,7 @@ import StudentAssignments from '../components/StudentAssignments';
 import { Button, ErrorText, type TabItem, Tabs } from '../components/ui';
 import { api, ApiError } from '../lib/api';
 import { formatTime, parseDate } from '../lib/device';
+import { useLessonHomework } from '../lib/lessonHomework';
 import { pb, useSessionActive, useUser } from '../lib/pb';
 import type { CourseRecord, SessionRecord } from '../lib/timetable';
 import { useLiveRecords } from '../lib/useLiveRecords';
@@ -48,6 +50,7 @@ export default function LessonPage() {
   const lecturer = !!course && course.lecturer === user.id;
   const mine = useLiveRecords<MyRecord>('attendance_records', pb.filter('session = {:s} && student = {:u}', { s: id, u: user.id }), '', !lecturer && !!session);
   const record = mine.find((r) => r.status !== 'removed');
+  const homework = useLessonHomework(session?.course ?? '', lecturer).get(id);
 
   const fallback: LessonTab = lecturer ? 'attendance' : active && session?.status === 'active' ? 'forum' : 'materials';
   const [tab, setTab] = useTab<LessonTab>(TABS, fallback);
@@ -95,6 +98,11 @@ export default function LessonPage() {
           <h1 className="text-2xl font-bold">{session?.title ?? ' '}</h1>
           {session && (
             <span className={`rounded-full px-2.5 py-0.5 text-sm ${live ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`}>{live ? '● פעיל עכשיו' : 'הסתיים'}</span>
+          )}
+          {homework && (
+            <button onClick={() => setTab('homework')} aria-label="לשיעורי הבית של השיעור">
+              <HomeworkBadge hw={homework} lecturer={lecturer} />
+            </button>
           )}
         </div>
         {session && <p className="text-sm text-slate-500">{parseDate(session.started_at).toLocaleDateString('he-IL', { dateStyle: 'full' })}</p>}
