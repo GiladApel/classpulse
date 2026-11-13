@@ -720,7 +720,7 @@ classDiagram
 - `PracticeService` publishes open review questions: trimmed text, no options and nothing for students to submit. `draftFromLecture` returns AI drafts only; the lecturer publishes the ones they tick. Both sides read the questions straight from PocketBase.
 - `MaterialService` accepts http(s) links and files up to 50 MB (stored as protected PocketBase files, so downloading needs a short-lived file token).
 - `FeedService.answer` stores a written answer and marks the post answered, during or after the lecture.
-- Access, all in PocketBase rules: course participants read questions and answers, review questions and materials, and every non-draft poll. While the lecture is live they may also post, upvote, vote and signal "I'm lost" without checking in.
+- Access, all in PocketBase rules: course participants read questions and answers, review questions and materials, and every non-draft poll. They may ask and upvote questions during the lecture or after it, and vote and signal "I'm lost" while it is live, without checking in.
 
 **Lecture feedback (`engagement/`, M9):** `FeedbackService` opens when the session ends and closes 24 h later (`FEEDBACK_WINDOW_MS`). Only students checked in to that lecture may answer, once each (`ALREADY_SENT`, plus a unique index). The `lesson_feedback` collection has **no** list or view rule, so no one, the lecturer included, can read a single answer through PocketBase. `summary` returns only the count until there are 3 answers (`MIN_FEEDBACK_RESPONSES`), then counts per option and the comments ordered by option and text, never by time, so their order cannot reveal who wrote them.
 

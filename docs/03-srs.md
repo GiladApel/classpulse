@@ -86,7 +86,7 @@
 ### F7: Lecture page
 | ID | Requirement |
 |----|-------------|
-| FR-LP-01 | Every lecture has a page for every course member (on the roster, or attended any lesson of the course), including students who missed it: published summary, materials, practice questions, the closed polls with results, and the questions with answers. While the lecture is live, every course member may also post, upvote and vote (FR-BC-05). |
+| FR-LP-01 | Every lecture has a page for every course member (on the roster, or attended any lesson of the course), including students who missed it: published summary, materials, practice questions, the closed polls with results, and the questions with answers. Every course member may also ask and upvote questions, during the lecture or after it, and vote while it is live (FR-BC-05). |
 | FR-LP-02 | During or after the lecture, the lecturer publishes open review questions (no answer options), written by hand or drafted by the AI from the lecture's slide deck (PDF or image, ≤50 MB): up to 8 drafts, of which the lecturer publishes the ones they select. Students read them on the lecture page; there is nothing to submit. |
 | FR-LP-03 | During or after the lecture, the lecturer attaches files or images (≤50 MB; one button opens the file picker and uploads at once) and links. Files are downloadable only by course participants. |
 | FR-LP-04 | The lecturer can write an answer under a student's question, during or after the lecture; it marks the question answered. |
