@@ -78,7 +78,7 @@ export default function LessonPage() {
     attendance: course && (
       <AttendanceTab sessionId={id} courseId={course.id} lecturer={lecturer} active={!!live} record={record} />
     ),
-    forum: <ForumTab sessionId={id} lecturer={lecturer} live={!!live} attended={!!record} goToAttendance={() => setTab('attendance')} />,
+    forum: course && <ForumTab sessionId={id} courseId={course.id} lecturer={lecturer} live={!!live} attended={!!record} goToAttendance={() => setTab('attendance')} />,
     materials: <MaterialsTab sessionId={id} lecturer={lecturer} />,
     homework: course && (lecturer ? <AssignmentManager courseId={course.id} sessionId={id} /> : <StudentAssignments courseId={course.id} sessionId={id} />),
   };

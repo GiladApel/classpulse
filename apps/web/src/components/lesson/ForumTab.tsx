@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { pb } from '../../lib/pb';
 import { type PollRecord, useLiveRecords } from '../../lib/useLiveRecords';
 import EngagementPanel from '../EngagementPanel';
@@ -8,6 +9,7 @@ import { Button, Card } from '../ui';
 
 interface Props {
   sessionId: string;
+  courseId: string;
   lecturer: boolean;
   live: boolean;
   /** The student has a (not removed) attendance record for this lesson. */
@@ -17,9 +19,10 @@ interface Props {
 
 /**
  * The class conversation, open to everyone in the course, in the room or at home: questions, polls and "I'm lost" while
- * live; questions, answers, poll results and feedback afterwards. Attendance alone still needs the QR in the room.
+ * live; afterwards the questions with their answers, poll results and feedback, read-only: new questions go to the
+ * course forum. Attendance alone still needs the QR in the room.
  */
-export default function ForumTab({ sessionId, lecturer, live, attended, goToAttendance }: Props) {
+export default function ForumTab({ sessionId, courseId, lecturer, live, attended, goToAttendance }: Props) {
   if (lecturer)
     return (
       <>
@@ -46,8 +49,14 @@ export default function ForumTab({ sessionId, lecturer, live, attended, goToAtte
   return (
     <>
       {attended && <FeedbackCard sessionId={sessionId} ended />}
+      <Card className="flex flex-wrap items-center justify-between gap-3 py-3">
+        <p className="text-sm">השיעור הסתיים. יש שאלה? שאלו בפורום של הקורס.</p>
+        <Link to={`/course/${courseId}?tab=forum`} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+          לפורום הקורס
+        </Link>
+      </Card>
       <ClosedPolls sessionId={sessionId} />
-      <Feed sessionId={sessionId} canPost />
+      <Feed scope={{ sessionId }} canPost={false} />
     </>
   );
 }
