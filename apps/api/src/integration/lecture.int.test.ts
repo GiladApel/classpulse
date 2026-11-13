@@ -35,15 +35,17 @@ describe('Integration: lecture page access against real PocketBase', () => {
     expect(await list(outsider, 'feed_posts')).toEqual([]);
   });
 
-  it('polls: a student who missed the lecture sees closed polls with results, never open ones', async () => {
+  it('polls: a student of the course who missed the lecture sees open and closed polls, never drafts', async () => {
     const closed = (await h.call(h.lecturer, 'POST', `/sessions/${s1}/polls`, { question: 'Q1', options: ['a', 'b'], correctIndex: 1, open: true })).body;
     await h.call(attended, 'POST', `/polls/${closed.id}/votes`, { optionIndex: 1 });
     await h.call(h.lecturer, 'POST', `/polls/${closed.id}/close`);
     const open = (await h.call(h.lecturer, 'POST', `/sessions/${s1}/polls`, { question: 'Q2', options: ['a', 'b'], open: true })).body;
+    const draft = (await h.call(h.lecturer, 'POST', `/sessions/${s1}/polls`, { question: 'Q3', options: ['a', 'b'] })).body;
 
     const seen = await list(missed, 'polls');
-    expect(seen.map((p) => p.id)).toEqual([closed.id]);
-    expect(seen[0]).toMatchObject({ answer_index: 1, results: { counts: [0, 1], total: 1 } });
+    expect(seen.map((p) => p.id).sort()).toEqual([closed.id, open.id].sort());
+    expect(seen.map((p) => p.id)).not.toContain(draft.id);
+    expect(seen.find((p) => p.id === closed.id)).toMatchObject({ answer_index: 1, results: { counts: [0, 1], total: 1 } });
     expect((await list(attended, 'polls')).map((p) => p.id).sort()).toEqual([closed.id, open.id].sort());
     expect(await list(outsider, 'polls')).toEqual([]);
     await h.call(h.lecturer, 'POST', `/polls/${open.id}/close`);

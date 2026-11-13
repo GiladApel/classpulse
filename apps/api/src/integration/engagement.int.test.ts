@@ -85,7 +85,7 @@ describe('Integration: backchannel + polls against real PocketBase', () => {
     await a.pb.collection('polls').unsubscribe();
 
     await expect(outsider.pb.collection('polls').getOne(poll.id)).rejects.toMatchObject({ status: 404 });
-    expect((await h.call(outsider, 'POST', `/polls/${poll.id}/votes`, { optionIndex: 0 })).body.code).toBe('NOT_CHECKED_IN');
+    expect((await h.call(outsider, 'POST', `/polls/${poll.id}/votes`, { optionIndex: 0 })).body.code).toBe('NOT_IN_COURSE');
 
     await h.call(a, 'POST', `/polls/${poll.id}/votes`, { optionIndex: 2 });
     await h.call(b, 'POST', `/polls/${poll.id}/votes`, { optionIndex: 0 });
@@ -106,5 +106,23 @@ describe('Integration: backchannel + polls against real PocketBase', () => {
     const r = (await h.call(h.lecturer, 'POST', `/polls/${p1.id}/close`)).body;
     expect(r).toEqual({ counts: [0, 0], total: 0, correctIndex: null });
     expect((await h.admin.collection('polls').getOne(p1.id)).answer_index).toBe(-1);
+  });
+
+  it('a student enrolled but not checked in sees the open poll and takes part through the API; attendance is untouched', async () => {
+    const home = await h.makeUser('student', h.studentNo());
+    await h.container.courses.enroll(await h.container.sessions.getCourse(h.course.id), home.record.student_id, 'מהבית');
+    const poll = (await h.call(h.lecturer, 'POST', `/sessions/${sessionId}/polls`, { question: 'מהבית?', options: ['כן', 'לא'], correctIndex: 0 })).body;
+    await expect(home.pb.collection('polls').getOne(poll.id)).rejects.toMatchObject({ status: 404 }); // a draft
+    await h.call(h.lecturer, 'POST', `/polls/${poll.id}/open`);
+    expect((await home.pb.collection('polls').getOne(poll.id)).status).toBe('open');
+    await expect(outsider.pb.collection('polls').getOne(poll.id)).rejects.toMatchObject({ status: 404 });
+
+    expect((await h.call(home, 'POST', `/polls/${poll.id}/votes`, { optionIndex: 0 })).status).toBe(201);
+    const post = await h.call(home, 'POST', `/sessions/${sessionId}/posts`, { text: 'שאלה מהבית', anonymous: false });
+    expect(post.status).toBe(201);
+    expect((await home.pb.collection('feed_posts').getOne(post.body.id)).text).toBe('שאלה מהבית');
+    expect((await h.call(home, 'POST', `/sessions/${sessionId}/lost`)).body.accepted).toBe(true);
+    expect(await home.pb.collection('attendance_records').getFullList({ filter: `session = "${sessionId}"` })).toEqual([]);
+    await h.call(h.lecturer, 'POST', `/polls/${poll.id}/close`);
   });
 });
