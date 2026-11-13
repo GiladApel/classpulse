@@ -28,10 +28,22 @@ export interface Timeline {
   spikes: { t: number; count: number; chapter: string | null }[];
 }
 
+/** For a student the requirements come empty: the rubric is the lecturer's. */
 export interface GuideOutline {
   questions: { id: string; title: string; sections: { id: string; asked: string; requirements: string[] }[] }[];
 }
 
+/** The whole rubric, lecturer only (API). */
+export interface Rubric {
+  guide: {
+    instructions: string;
+    questions: { id: string; title: string; sections: { id: string; asked: string; requirements: string[]; expected: string; givingAway: string }[] }[];
+  } | null;
+  notes: string;
+  locked: boolean;
+}
+
+/** The rubric, its outline and the lecturer's notes are hidden fields: PocketBase never returns them. */
 export type AssignmentRecord = RecordModel & {
   course: string;
   session: string;
@@ -39,9 +51,23 @@ export type AssignmentRecord = RecordModel & {
   due_at: string;
   created_at: string;
   file: string;
-  outline: GuideOutline | null;
   guide_status: 'generating' | 'ready' | 'failed';
   guide_error: string;
+};
+
+export type SubmissionRecord = RecordModel & {
+  student: string;
+  student_name: string;
+  student_number: string;
+  status: 'processing' | 'done' | 'failed';
+  error: string;
+  check_count: number;
+  total: number;
+  late: boolean;
+  submitted_at: string;
+  handed_in_at: string;
+  files: string[];
+  final_status: '' | 'processing' | 'done' | 'failed';
 };
 
 export interface SectionMark {
@@ -72,26 +98,34 @@ export interface SubmissionDto {
   late: boolean;
   submittedAt: string;
   reviewedAt: string | null;
+  handedInAt: string | null;
+  files: string[];
+  /** Lecturer only: the AI's grade of the hand-in. */
+  finalStatus?: 'processing' | 'done' | 'failed' | null;
+  finalError?: string;
+  finalReport?: HomeworkReport | null;
+  finalTotal?: number | null;
 }
 
 export interface SubmissionView {
   submission: SubmissionDto;
   outline: GuideOutline | null;
-  place: number | null;
-  checked: number;
   checksLeft: number;
   commonMistakes: { title: string; description: string; count: number }[];
 }
 
-export const MAX_CHECKS = 3;
+export const MAX_CHECKS = 2;
 
-/** The homework PDF is protected; the tab opens first because mobile Safari blocks window.open after an await. */
-export async function openHomeworkPdf(a: AssignmentRecord) {
+/** Protected files open with a file token; the tab opens first because mobile Safari blocks window.open after an await. */
+export async function openProtectedFile(record: { id: string; collectionName: string }, filename: string) {
   const tab = window.open('about:blank', '_blank');
-  const url = pb.files.getURL(a, a.file, { token: await pb.files.getToken() });
+  const url = pb.files.getURL(record, filename, { token: await pb.files.getToken() });
   if (tab) tab.location.href = url;
   else location.href = url;
 }
+
+export const openHomeworkPdf = (a: AssignmentRecord) => openProtectedFile(a, a.file);
+export const openHandInFile = (submissionId: string, filename: string) => openProtectedFile({ id: submissionId, collectionName: 'submissions' }, filename);
 
 export const formatSec = (s: number) => {
   const sign = s < 0 ? '-' : '';
