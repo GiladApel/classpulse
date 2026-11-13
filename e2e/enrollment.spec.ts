@@ -49,10 +49,14 @@ test('10 · a new lecturer sets up a course; an enrolled student finds the live 
   await lp.waitForURL(/\/lesson\/\w+/);
   const sessionId = lessonId(lp);
 
-  // Yael's home shows the live lesson; it opens on attendance, which asks her to scan the code in the room.
+  // Yael's home shows the live lesson; it opens on the forum, where she can ask and vote even before checking in.
   await expect(yp.getByText('שיעור פעיל עכשיו')).toBeVisible({ timeout: 10_000 });
   await yp.getByRole('link', { name: /כניסה לשיעור/ }).click();
-  await expect(yp.getByText('סרקו עם מצלמת הטלפון את הקוד שמוקרן על הלוח בכיתה.')).toBeVisible();
+  await expect(yp.getByText('אפשר לשאול ולהצביע גם מהבית', { exact: false })).toBeVisible();
+  await expect(yp.getByRole('button', { name: '🤯 הלכתי לאיבוד' })).toBeVisible();
+  await yp.getByPlaceholder('שאלה, הערה או הצעה למרצה…').fill('שאלה מהבית');
+  await yp.getByRole('button', { name: 'שליחה', exact: true }).click();
+  await expect(yp.getByText('שאלה מהבית', { exact: true })).toBeVisible({ timeout: 10_000 });
   await checkIn(yp, await qrToken(lp, sessionId));
   await expect(yp.getByRole('button', { name: '🤯 הלכתי לאיבוד' })).toBeVisible();
 
