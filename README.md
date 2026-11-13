@@ -61,8 +61,6 @@ docs/         design artifacts (see below)
 8. [Testing strategy](docs/08-testing.md)
 9. Conclusion *(after demo)*
 
-[Demo script](docs/demo-script.md): the 10-minute run sheet, fallbacks, and the field tests to run during the dry run.
-
 ## Run locally
 
 ```bash
