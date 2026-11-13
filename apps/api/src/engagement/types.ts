@@ -26,9 +26,11 @@ export interface TimePoint {
   count: number;
 }
 
+/** A question in a lesson's forum, or in the course forum when it has no lesson. */
 export interface FeedPost {
   id: string;
-  sessionId: string;
+  courseId: string;
+  sessionId?: string;
   authorId?: string;
   authorNumber: string;
   /** null when anonymous. */

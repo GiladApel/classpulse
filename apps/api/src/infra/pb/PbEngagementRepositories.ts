@@ -56,7 +56,8 @@ export class PbFeedPostRepository extends PbRepository<FeedPost> implements Feed
   protected toEntity(r: RecordModel): FeedPost {
     return {
       id: r.id,
-      sessionId: r.session,
+      courseId: r.course,
+      sessionId: r.session || undefined,
       authorId: r.author || undefined,
       authorNumber: r.author_number,
       displayName: r.anonymous ? null : r.display_name,
@@ -71,6 +72,7 @@ export class PbFeedPostRepository extends PbRepository<FeedPost> implements Feed
 
   protected toRecord(d: Partial<Omit<FeedPost, 'id'>>) {
     return compact({
+      course: d.courseId,
       session: d.sessionId,
       author: d.authorId,
       author_number: d.authorNumber,
