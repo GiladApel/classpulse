@@ -5,10 +5,11 @@ KISS, LLM-backed teaching tool for live lectures. Ariel University, *Introductio
 UI is **Hebrew RTL**. Code, comments, docs and commit messages are **English**. User-facing API error messages (`DomainError` messages) are Hebrew.
 
 ## Workflow with Gilad
-- Work in milestones; each ends with a summary, then Gilad says "go" for the next. **Commit/push only when he asks.**
-- Before every commit: `git add -A`, then scan the staged diff for secrets (`AIza…`, `GOCSPX`, private keys, `.env`, `secrets/`, `pb_data`). Never print `.env` values or the service-account key.
-- Web layout: `/` home (live-now cards + weekly timetable), `/course/:id` (tabs: lessons, homework; lecturer also students = roster upload, timetable), `/lesson/:id` (tabs: attendance, forum, materials, homework). Old `/dash/:id`, `/lecture/:id`, `/dash/course/:id` redirect.
-- Status: M1–M6 done. M7 in progress: deployed to `do-server`, Playwright E2E + k6 load test + coverage done. Left: public hostname check through Cloudflare, demo rehearsal (`docs/demo-script.md`), `docs/09-conclusion`.
+- Work in milestones. Gilad approves a plan first; after approval, **commit every small part separately** (one class + its tests, one migration, one page, one doc), message `<type>(<area>): <what>` (`feat`, `fix`, `refactor`, `test`, `docs`; areas `api`, `web`, `db`, `e2e`, `srs`, `usecases`, `edd`, `sdd`, `tests`, `tools`, `demo`, `readme`), and push after each step. The commit history is part of the grade.
+- Before every commit: scan the **added lines** of the staged diff for secrets (`AIza…`, `GOCSPX`, private keys) and forbidden paths (`.env`, `secrets/`, `pb_data`). Never print `.env` values or the service-account key.
+- **Deploy only on Gilad's go.** If a migration converts or deletes production rows, tell him which and how many (read-only `sqlite3 -readonly` check on the server) before deploying.
+- Status (2026-11-13): M1–M11 built. Live on prod: up to M10 (roster, timetable, lesson tabs). **Pushed, not deployed: M11** — remote attendance removed (migration `1794600000` turns prod's 1 remote record into a manual approval) and the homework rework (migration `1794700000` deletes old rubric-format assignments: prod has 1 test assignment, 0 submissions). Ask before deploying.
+- Left: run the homework reviewer on 2–3 real solutions with Gemini (only mock-tested so far), demo rehearsal (`docs/demo-script.md`), `docs/09-conclusion`, field tests below. Planned next (M11 docs format): requirements as "The system shall…" with IDs and priorities, a traceability matrix, ADRs and a risk register, test cases with TC IDs, use-case include/extend + activity diagram + Given/When/Then stories, SoW cost section, README in 8 sections, GitHub Actions CI.
 - T3 is measured on a 5–10 min clip (free-tier quota); docs say full lectures work subject to API quota. Don't re-pitch a 90-min run.
 - Open field tests in `docs/01-tools-report.md`: T1, T4–T7 not measured; T2 (headcount, 1/8 photos) and T3 (full 75–90 min lecture) partial. They need Gilad's classroom, phones and a real recording.
 
@@ -16,15 +17,24 @@ UI is **Hebrew RTL**. Code, comments, docs and commit messages are **English**. 
 npm workspaces, Node 24, TypeScript everywhere.
 ```
 apps/api    Hono API (NodeNext ESM, imports end in .js). The OOP domain layer.
-  src/attendance  QR tokens, check-in rule chain, geofence policies, sessions, export
+  src/admin       UserAdminService (ADMIN_EMAILS decides admins; they make users lecturers)
+  src/attendance  QR tokens, check-in rule chain, geofence policies, sessions, export,
+                  CourseService (roster, weekly timetable, membership), RosterParser (paste / CSV / Excel)
   src/challenge   headcount, roll-call / visual-ping challenges, SeatHitTester
   src/engagement  ConfusionMeter, FeedService, PollService
-  src/content     RecordingPipeline, HomeworkAnalysisService, Fingerprinter, TextExtractor
+  src/content     RecordingPipeline, PracticeService, MaterialService, HomeworkAnalysisService,
+                  ScoreCalculator, Fingerprinter, SimilarityAnalyzer, TextExtractor
   src/ai          LLMProvider strategy (Gemini, Mock) + one class per AI task (prompt + JSON schema + validation)
   src/infra       Clock, repositories (pb/ and memory/), exporters, ImageProcessor, UploadStore, BackgroundQueue, KeyedLock
   src/http        Controllers, auth middleware, DTOs, validation, error mapping
   src/container.ts  Composition root: the ONLY place that knows concrete classes
-apps/web    React 19 + Vite 8 + Tailwind 4 + react-router PWA (student, lecturer dashboard, projector)
+apps/web    React 19 + Vite 8 + Tailwind 4 + react-router PWA. Every page sits in AppShell (top bar) except the projector.
+  /                home: live-now cards + weekly timetable (lecturer home is /dash, with a one-tap "start now")
+  /course/:id      tabs: lessons, homework; the lecturer also gets students (roster upload) and timetable
+  /lesson/:id      tabs: attendance, forum, materials, homework (?tab=); /c/:token checks in and opens the forum tab
+  /a/:id           student homework: check a solution (≤3), per-section report, class chart
+  /dash/assignment/:id, /hw/:id   lecturer homework page and one student's report;  /admin  user roles
+  Old /dash/:id, /lecture/:id, /dash/course/:id redirect.
 pocketbase/pb_migrations   Schema as code (JSVM migrations), PocketBase 0.40.6 in Docker
 docs/       01 tools report … 08 testing (Mermaid diagrams)
 ```
@@ -69,7 +79,8 @@ deploy/deploy.sh                       # build locally → do-server:/opt/classp
 - Unit tests sit next to the code (`*.test.ts`), using `FixedClock`, `MockProvider` (fixtures keyed by `task`; a fixture may be a function of the request) and `InMemory*` repositories. In-memory unique checks are **synchronous** so they behave like the DB's unique index under concurrency.
 - HTTP tests: `createApp(makeTestPorts().container)` + `app.request()`; await `container.queue.idle()` for background jobs.
 - Integration (`src/integration/*.int.test.ts`, `vitest.int.config.ts`) hits real PocketBase. Use it for rules, hidden fields, realtime and concurrency.
-- Browser E2E so far: Puppeteer scripts outside the repo, real Gemini. Reload pages mid-flow: realtime alone hides initial-load bugs.
+- Browser E2E: Playwright in `e2e/` (9 specs, mock AI, Edge); helpers in `e2e/support.ts` (`makeClass`, `lecturerPage`, `phone`, `startSession`, `checkIn`, `qrToken`, `openTab`). The older real-Gemini Puppeteer scripts live outside the repo. Reload pages mid-flow: realtime alone hides initial-load bugs.
+- Unit-test baseline: 180 unit (≥98% lines), 28 integration, 9 E2E. To change a `MockProvider` fixture in a test, pass your own copy (`new MockProvider({ ...DEFAULT_FIXTURES })`): the default object is shared.
 
 ## Gotchas learned the hard way
 - **PB number fields default to 0** and can't be null. Use -1 for "none" (`distance_m`, challenge tap `x/y`, `people_count`, poll `correct_index`/`answer_index`, submission `total`) and always write it explicitly.
@@ -82,7 +93,12 @@ deploy/deploy.sh                       # build locally → do-server:/opt/classp
 - **Gemini:** `gemini-2.5-*` is closed to new keys. The default is `gemini-3.1-flash-lite` (bigger flash models returned 503 "high demand"). The SDK retries only when `httpOptions.retryOptions` is set. Media over ~15 MB, or any `{path}` attachment, goes through the Files API (upload → poll until ACTIVE → delete). `gemini-embedding-2` merges a multi-item `contents` into one vector; embeddings are no longer used.
 - Cloudflare caps requests at 100 MB, so recordings upload in 50 MB offset-addressed chunks (`UploadStore`).
 - Puppeteer: `locator.fill()` can miss long text on React-controlled inputs (use `page.type`); `::-p-text()` can fail on mixed Hebrew/Latin text; full-page screenshots of RTL pages look shifted (artifact).
-- Bash heredocs containing Hebrew quote marks (״ ׳) break. Write such files with the Write tool or a script file.
+- Bash heredocs containing Hebrew quote marks (״ ׳) or backticks break. Write such files with the Write tool or a Python script file.
+- Test names with an apostrophe (`course's`) need double quotes in TS.
+- Playwright: a tab's accessible name includes its badge (the live dot makes it "פורום פעיל"), so `openTab` matches the start of the name; layouts rendered twice (phone + desktop, one hidden by CSS) need `.first()`.
+- A PB write refused by a null create/update rule returns 403 ("Only superusers"); a record hidden by the view rule returns 404.
+- Hebrew CSV from Excel is UTF-8 ("CSV UTF-8") or Windows-1255 (plain "CSV"); `RosterParser` decodes both, and pads IDs that lost leading zeros back to 9 digits.
+- Mermaid check: extract each ```mermaid block to a `.mmd` file and run mermaid-cli with a puppeteer config pointing at Edge (`PUPPETEER_SKIP_DOWNLOAD=1` when installing).
 
 ## Env (names only; values live in the gitignored `.env`)
-`PB_URL`, `PB_SUPERUSER_EMAIL`, `PB_SUPERUSER_PASSWORD`, `QR_WINDOW_SEC`, `LLM_PROVIDER` (`gemini`|`mock`), `GEMINI_API_KEY`, `GEMINI_MODEL`, `GOOGLE_SERVICE_ACCOUNT_FILE` (→ `secrets/google-sa.json`), `GOOGLE_SHEETS_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. Web: `apps/web/.env` → `VITE_PB_URL`. Without a Gemini key, set `LLM_PROVIDER=mock`; the demo must still work then (NFR-08).
+`PB_URL`, `PB_SUPERUSER_EMAIL`, `PB_SUPERUSER_PASSWORD`, `QR_WINDOW_SEC`, `ADMIN_EMAILS`, `LLM_PROVIDER` (`gemini`|`mock`), `GEMINI_API_KEY`, `GEMINI_MODEL`, `GOOGLE_SERVICE_ACCOUNT_FILE` (→ `secrets/google-sa.json`), `GOOGLE_SHEETS_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. Web: `apps/web/.env` → `VITE_PB_URL`. Without a Gemini key, set `LLM_PROVIDER=mock`; the demo must still work then (NFR-08).
