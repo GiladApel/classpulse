@@ -7,7 +7,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => klass?.cleanup());
 
-test('lecture page: after the lecture ends, a student who missed it sees the answer, materials and practice, and can still ask', async ({ browser }) => {
+test('lecture page: after the lecture ends, a student who missed it sees the answer, materials and practice, and asks in the course forum', async ({ browser }) => {
   const [shiran, ido] = klass.students;
   const lp = await lecturerPage(browser, klass.lecturer);
 
@@ -68,8 +68,17 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
 
   await openTab(ip, 'פורום');
   await expect(ip.getByText('Strategy בוחר אלגוריתם; State משנה התנהגות לפי מצב.')).toBeVisible();
-  // He missed it but is in the course, so he can still ask about it.
-  await ip.getByPlaceholder('שאלה, הערה או הצעה למרצה…').fill('שאלה אחרי השיעור');
+  // The lesson is over, so its forum is read-only; he asks in the course forum, and the lecturer answers there.
+  await expect(ip.getByPlaceholder('שאלה, הערה או הצעה למרצה…')).toHaveCount(0);
+  await ip.getByRole('link', { name: 'לפורום הקורס' }).click();
+  await ip.getByPlaceholder('שאלה לקורס…').fill('שאלה אחרי השיעור');
   await ip.getByRole('button', { name: 'שליחה', exact: true }).click();
   await expect(ip.getByText('שאלה אחרי השיעור', { exact: true })).toBeVisible();
+
+  await lp.goto(`/course/${klass.courseId}?tab=forum`);
+  await expect(lp.getByText('שאלה אחרי השיעור', { exact: true })).toBeVisible();
+  await lp.getByRole('button', { name: 'כתיבת תשובה' }).click();
+  await lp.getByLabel('תשובה', { exact: true }).fill('נעבור על זה בשיעור הבא');
+  await lp.getByRole('button', { name: 'שמירת תשובה' }).click();
+  await expect(ip.getByText('נעבור על זה בשיעור הבא')).toBeVisible({ timeout: 10_000 });
 });
