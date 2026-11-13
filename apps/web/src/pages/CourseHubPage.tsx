@@ -3,18 +3,20 @@ import { useParams } from 'react-router';
 import AppShell from '../components/AppShell';
 import AssignmentManager from '../components/AssignmentManager';
 import CourseLessons from '../components/CourseLessons';
+import { FeedBoard } from '../components/EngagementPanel';
 import RosterPanel from '../components/RosterPanel';
 import StudentAssignments from '../components/StudentAssignments';
+import { Feed } from '../components/StudentLivePanel';
 import TimetableEditor from '../components/TimetableEditor';
 import { ErrorText, type TabItem, Tabs } from '../components/ui';
 import { pb, useUser } from '../lib/pb';
 import type { CourseRecord } from '../lib/timetable';
 import { useTab } from '../lib/useTab';
 
-const TABS = ['lessons', 'homework', 'students', 'timetable'] as const;
+const TABS = ['lessons', 'forum', 'homework', 'students', 'timetable'] as const;
 type Tab = (typeof TABS)[number];
 
-/** One page per course, for the lecturer and the students: its lessons and homework; the lecturer also manages the roster and the timetable. */
+/** One page per course, for the lecturer and the students: its lessons, the course forum and homework; the lecturer also manages the roster and the timetable. */
 export default function CourseHubPage() {
   const { id = '' } = useParams();
   const user = useUser()!;
@@ -29,6 +31,7 @@ export default function CourseHubPage() {
 
   const tabs: TabItem<Tab>[] = [
     { id: 'lessons', label: 'שיעורים' },
+    { id: 'forum', label: 'פורום' },
     { id: 'homework', label: 'שיעורי בית' },
     ...(lecturer ? [{ id: 'students' as const, label: 'סטודנטים' }, { id: 'timetable' as const, label: 'מערכת שעות' }] : []),
   ];
@@ -41,6 +44,7 @@ export default function CourseHubPage() {
         <>
           <Tabs tabs={tabs} value={tab} onChange={setTab} />
           {tab === 'lessons' && <CourseLessons courseId={id} lecturer={lecturer} />}
+          {tab === 'forum' && (lecturer ? <FeedBoard scope={{ courseId: id }} /> : <Feed scope={{ courseId: id }} canPost />)}
           {tab === 'homework' && (lecturer ? <AssignmentManager courseId={id} /> : <StudentAssignments courseId={id} />)}
           {tab === 'students' && lecturer && <RosterPanel courseId={id} />}
           {tab === 'timetable' && lecturer && <TimetableEditor course={course} />}
