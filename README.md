@@ -38,7 +38,7 @@ Lecturers need **one simple tool** that students open with a phone camera and th
 | Frontend | React + Vite + TypeScript + Tailwind, PWA, Hebrew RTL |
 | Data / auth / realtime | PocketBase (SQLite, Google OAuth, SSE realtime, file storage) |
 | Domain API | Node + Hono + TypeScript (all business rules, OOP domain layer) |
-| AI | Gemini by default, behind an `LLMProvider` strategy (Claude, n8n webhook and Mock are interchangeable) |
+| AI | Gemini, behind an `LLMProvider` strategy (a Mock for tests; another vendor is one new class) |
 
 ## Repository layout
 

@@ -10,7 +10,7 @@
 | Load | k6 | 80 check-ins within 30 s; 80 realtime subscribers | Milestone 3 and before the demo |
 | Manual / field | Real phones in a classroom | QR from the back row, GPS, blur, the whole demo script | Dry run one week before the demo |
 
-**Coverage target:** ≥80% of lines in `attendance/`, `challenge/`, `engagement/` and `content/` (NFR-07). Measured with `npm run coverage -w apps/api` (the threshold fails the run below 80%): **99.1% of lines**, 96.6% of statements, 88.5% of branches (2026-11-05). AI vendor adapters (`GeminiProvider`, `ClaudeProvider`) are covered by contract tests, not unit tests.
+**Coverage target:** ≥80% of lines in `attendance/`, `challenge/`, `engagement/` and `content/` (NFR-07). Measured with `npm run coverage -w apps/api` (the threshold fails the run below 80%): **99.1% of lines**, 96.6% of statements, 88.5% of branches (2026-11-05). The AI vendor adapter (`GeminiProvider`) is not unit-tested; it was exercised against the real model in the field tests (tools report).
 
 ## 2. Test design per class
 
