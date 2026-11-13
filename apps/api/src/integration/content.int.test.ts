@@ -49,10 +49,11 @@ describe('Integration: recordings + homework against real PocketBase', () => {
     await expect(attendedS1.pb.collection('recordings').update(rec.id, { published: false })).rejects.toMatchObject({ status: 403 });
   });
 
-  it('homework: the guide is hidden from everyone, the PDF and outline are for members, a student reads only their own check', async () => {
+  it('homework: the rubric and notes are hidden from everyone, the PDF is for members; a hand-in is kept for the student and the lecturer, its grade API-only', async () => {
     const publish = new FormData();
     publish.set('title', 'HW');
     publish.set('sessionId', s1);
+    publish.set('notes', 'grade the diagram strictly');
     publish.set('file', new File([new Uint8Array(minimalPdf('Homework 2: explain Strategy'))], 'hw.pdf', { type: 'application/pdf' }));
     const a = (await h.call(h.lecturer, 'POST', `/courses/${h.course.id}/assignments`, publish)).body;
     expect(a).toMatchObject({ guideStatus: 'generating', sessionId: s1 });
@@ -60,34 +61,47 @@ describe('Integration: recordings + homework against real PocketBase', () => {
 
     const seen = await attendedS2Only.pb.collection('assignments').getOne(a.id);
     expect(seen).toMatchObject({ guide_status: 'ready', session: s1 });
-    expect(seen.outline.questions[0].sections[0].requirements.length).toBeGreaterThan(0);
-    expect(seen.guide).toBeUndefined();
-    expect((await h.lecturer.pb.collection('assignments').getOne(a.id)).guide).toBeUndefined();
-    expect((await h.admin.collection('assignments').getOne(a.id)).guide.questions.length).toBe(2);
+    for (const u of [attendedS2Only, h.lecturer]) {
+      const r = await u.pb.collection('assignments').getOne(a.id);
+      expect([r.guide, r.outline, r.rubric_notes]).toEqual([undefined, undefined, undefined]);
+    }
+    const full = await h.admin.collection('assignments').getOne(a.id);
+    expect([full.guide.questions.length, full.rubric_notes]).toEqual([2, 'grade the diagram strictly']);
     expect(await outsider.pb.collection('assignments').getFullList({ filter: `course = "${h.course.id}"` })).toEqual([]);
     // The homework PDF is protected: members download it with a file token.
     const token = await attendedS2Only.pb.files.getToken();
     expect((await fetch(attendedS2Only.pb.files.getURL(seen, seen.file, { token }))).status).toBe(200);
     expect((await fetch(attendedS2Only.pb.files.getURL(seen, seen.file))).status).toBe(404);
 
-    const check = async (u: TestUser, text: string) => {
+    const send = async (u: TestUser, route: 'checks' | 'handin', text: string) => {
       const form = new FormData();
       form.append('files', new File([new Uint8Array(minimalPdf(text))], 'sol.pdf', { type: 'application/pdf' }));
-      return h.call(u, 'POST', `/assignments/${a.id}/checks`, form);
+      return h.call(u, 'POST', `/assignments/${a.id}/${route}`, form);
     };
-    expect((await check(outsider, 'an outsider trying to check a solution')).body.code).toBe('NOT_IN_COURSE');
+    expect((await send(outsider, 'checks', 'an outsider trying to check a solution')).body.code).toBe('NOT_IN_COURSE');
     const text = 'Strategy lets the algorithm change at runtime instead of a long if else chain';
-    const mine = (await check(attendedS1, text)).body;
-    const theirs = (await check(attendedS2Only, text)).body;
+    const mine = (await send(attendedS1, 'checks', text)).body;
+    await h.container.queue.idle();
+    const practice = await attendedS1.pb.collection('submissions').getOne(mine.id);
+    expect(practice).toMatchObject({ status: 'done', check_count: 1, files: [] }); // a practice file is never stored
+    expect(practice.report.marks.length).toBe(3);
+
+    await send(attendedS1, 'handin', text);
+    const theirs = (await send(attendedS2Only, 'handin', text)).body;
     await h.container.queue.idle();
 
     const own = await attendedS1.pb.collection('submissions').getOne(mine.id);
-    expect(own).toMatchObject({ status: 'done', check_count: 1 });
-    expect(own.report.marks.length).toBe(3);
-    expect(own.fingerprint).toBeUndefined();
-    expect(own.file).toBeUndefined(); // the solution is never stored
+    expect(own).toMatchObject({ final_status: 'done', files: [expect.stringMatching(/^sol.*\.pdf$/)] });
+    expect([own.final_report, own.final_total, own.fingerprint]).toEqual([undefined, undefined, undefined]);
+    const lecturerRow = await h.lecturer.pb.collection('submissions').getOne(mine.id);
+    expect([lecturerRow.final_report, lecturerRow.final_total]).toEqual([undefined, undefined]); // the grade leaves only through the API
+    expect((await h.admin.collection('submissions').getOne(mine.id)).final_total).toBe(36);
+    // The handed-in file: the student and the lecturer download it with a file token; a classmate cannot see the row.
+    const fileUrl = async (u: TestUser) => u.pb.files.getURL(own, own.files[0], { token: await u.pb.files.getToken() });
+    expect((await fetch(await fileUrl(attendedS1))).status).toBe(200);
+    expect((await fetch(await fileUrl(h.lecturer))).status).toBe(200);
+    expect((await fetch(await fileUrl(attendedS2Only))).status).toBe(404);
     await expect(attendedS1.pb.collection('submissions').getOne(theirs.id)).rejects.toMatchObject({ status: 404 });
-    expect((await h.admin.collection('submissions').getOne(mine.id)).fingerprint.length).toBeGreaterThan(0);
     await expect(attendedS1.pb.collection('submissions').update(mine.id, { total: 100 })).rejects.toMatchObject({ status: 403 });
     await expect(attendedS1.pb.collection('assignments').create({ course: h.course.id, title: 'x', guide_status: 'ready', created_at: new Date().toISOString() })).rejects.toMatchObject({ status: 403 });
 
@@ -99,7 +113,12 @@ describe('Integration: recordings + homework against real PocketBase', () => {
     const asLecturer = await h.lecturer.pb.collection('assignment_insights').getFirstListItem(`assignment = "${a.id}"`);
     expect(asLecturer.similar_pairs).toBeUndefined(); // the lecturer reads pairs only through the API, with names attached
 
-    // Deleting the homework removes its checks and insights.
+    // Restart recovery finds an interrupted grading through the real status query.
+    await h.admin.collection('submissions').update(theirs.id, { final_status: 'processing' });
+    expect(await h.container.homework.recoverInterrupted()).toBeGreaterThanOrEqual(1);
+    expect((await h.admin.collection('submissions').getOne(theirs.id)).final_status).toBe('failed');
+
+    // Deleting the homework removes its rows and insights.
     expect((await h.call(h.lecturer, 'DELETE', `/assignments/${a.id}`)).body).toEqual({ ok: true });
     await expect(h.admin.collection('submissions').getOne(mine.id)).rejects.toMatchObject({ status: 404 });
   });
