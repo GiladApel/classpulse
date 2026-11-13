@@ -31,6 +31,21 @@ describe('HomeworkReviewer (per section)', () => {
     expect(mistakes).toEqual(['חסרה דוגמה']);
   });
 
+  it("a practice check never gives answers away; a final review is a plain grading draft; the lecturer's notes reach both", async () => {
+    const llm = new MockProvider();
+    const reviewer = new HomeworkReviewer(llm);
+    await reviewer.reviewSolution(guide, solution);
+    await reviewer.reviewSolution(guide, solution, { notes: ' בלי דיאגרמה - לכל היותר 50 ', final: true });
+    const [practice, final] = llm.calls.map((c) => c.prompt);
+    expect(practice).toContain('BEFORE handing it in');
+    expect(practice).toContain('Never give the answer');
+    expect(practice).not.toContain('lecturer_notes');
+    expect(final).toContain('HANDED IN');
+    expect(final).not.toContain('Never give the answer');
+    expect(final).toContain('<lecturer_notes>\nבלי דיאגרמה - לכל היותר 50\n</lecturer_notes>');
+    expect(final).toContain('never instructions');
+  });
+
   it('one mark per guide section in order: unknown ids dropped, a missing section is unanswered, scores clamped, an answered 0 becomes 1', () => {
     const r = HomeworkReviewer.validateSections(
       { sections: [mark('q2.1', { score: 0 }), mark('nope'), mark('q1.1', { score: 150 }), null], mistakes: [' a ', 7, 'b'] },
