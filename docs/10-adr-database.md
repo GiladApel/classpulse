@@ -105,17 +105,17 @@ The decision is cheap to reverse because of how the system is built, not because
 
 ## 7. Migration path to PostgreSQL / Supabase
 
-| Area | What changes | What stays | Effort |
-|---|---|---|---|
-| Schema | 15 migrations become SQL tables, indexes and constraints | Entities and field meanings | ~1 day |
-| Server persistence | New `infra/postgres/` Repositories implementing the same interfaces; `container.ts` rewired | All domain services, controllers and API routes | 1–2 days |
-| Authentication | Google OAuth and roles move to Supabase Auth; users sign in again once | `UserIdentity`, roles, admin logic | ~1 day |
-| Access rules | PocketBase rules become Postgres row-level security; hidden fields become views or API-only columns | The privacy contract (same integration assertions) | 2–3 days, highest risk |
-| Client reads and realtime | About 30 live subscriptions in 34 web files move from the PocketBase SDK to the Supabase client, behind one small data hook | Pages and components | 2–3 days |
-| Files | Homework PDFs and hand-ins move to Supabase Storage with matching policies | Upload limits and flows | ~1 day |
-| Data | One-off export and import script | — | ~1 day |
+| Area | What changes | What stays |
+|---|---|---|
+| Schema | 15 migrations become SQL tables, indexes and constraints | Entities and field meanings |
+| Server persistence | New `infra/postgres/` Repositories implementing the same interfaces; `container.ts` rewired | All domain services, controllers and API routes |
+| Authentication | Google OAuth and roles move to Supabase Auth; users sign in again once | `UserIdentity`, roles, admin logic |
+| Access rules | PocketBase rules become Postgres row-level security; hidden fields become views or API-only columns | The privacy contract (same integration assertions) |
+| Client reads and realtime | About 30 live subscriptions in 34 web files move from the PocketBase SDK to the Supabase client, behind one small data hook | Pages and components |
+| Files | Homework PDFs and hand-ins move to Supabase Storage with matching policies | Upload limits and flows |
+| Data | One-off export and import script | — |
 
-**Total: about 1.5–2 weeks for one developer.**
+**This is a bounded, contained change, not a rewrite.** Because the domain is separated from the platform (Repositories, an API-only write path, a single composition root and schema as code), none of the business logic has to change. The work is limited to the infrastructure layer and the client's data access. The highest-risk part is re-expressing the access rules as row-level security, and the existing integration assertions cover exactly that.
 
 **Sequence:**
 1. Server Repositories behind the existing tests.
