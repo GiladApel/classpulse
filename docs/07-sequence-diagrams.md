@@ -228,7 +228,7 @@ sequenceDiagram
   Note over PB: list rule now lets every course participant read the summary
 ```
 
-## SD6: Homework: publish, check, report (UC11, UC10)
+## SD6: Homework: publish, check, hand in, grade (UC11, UC10, UC21)
 
 ```mermaid
 sequenceDiagram
@@ -243,32 +243,43 @@ sequenceDiagram
   participant SC as ScoreCalculator
   participant PB as PocketBase
 
-  L->>API: POST /courses/:id/assignments (title, PDF, lesson)
+  L->>API: POST /courses/:id/assignments (title, PDF, lesson, notes)
   API->>HA: publish(course, input, pdf)
-  HA->>PB: create assignment {file, guide_status: generating}
+  HA->>PB: create assignment {file, notes (hidden), guide_status: generating}
   HA->>Q: add(generateGuide)
-  Q->>GG: fromHomework(pdf)
-  GG-->>HA: ReviewGuide (questions, sections, requirements, expected answers)
-  HA->>PB: save guide (hidden) and outline, guide_status ready
-  PB--)S: realtime, the homework is open for checking
+  Q->>GG: fromHomework(pdf, notes)
+  GG-->>HA: rubric (questions, sections, requirements, expected answers)
+  HA->>PB: save guide and outline (both hidden), guide_status ready
+  PB--)S: realtime, the homework is open
+  L->>API: GET /assignments/:id/rubric
+  API-->>L: the whole rubric with the notes
 
   S->>API: POST /assignments/:id/checks (PDF or photos)
   API->>HA: check(assignment, student, files)
-  HA->>HA: course member? guide ready? checks left? none running?
+  HA->>HA: course member? rubric ready? not handed in? checks left? none running?
   HA->>PB: upsert submission {status: processing}
   HA->>Q: add(review), the files stay in memory only
   API-->>S: 202 "checking"
-  Q->>HR: reviewSolution(guide, files)
+  Q->>HR: reviewSolution(guide, files, notes)
   HR-->>HA: one mark per section (answered, score, meets, missing, direction)
   HA->>SC: questions(outline, marks), total(outline, marks)
-  HA->>PB: update {report, total, check_count + 1, status: done}
-  HA->>PB: save the text fingerprint (hidden), the files are dropped
-  PB--)S: realtime, status done
-  S->>API: GET /submissions/:id and GET /assignments/:id/chart
-  API-->>S: report, checks left, place, anonymous chart (from 3 checked)
+  HA->>PB: update {report, total, check_count + 1, status: done}, the files are dropped
+  S->>API: GET /submissions/:id
+  API-->>S: feedback, questions without requirements, checks left
 
-  L->>API: GET /assignments/:id/chart, POST /assignments/:id/insights
-  API-->>L: chart with names, common mistakes, similar pairs for review by hand
+  S->>API: POST /assignments/:id/handin (PDF or photos, after confirming)
+  API->>HA: handIn(assignment, student, files)
+  HA->>PB: update {files (protected), handed_in_at, late, final_status: processing}
+  HA->>Q: add(gradeFinal)
+  API-->>S: 202 "handed in"
+  Q->>HR: reviewSolution(guide, stored files, notes, final)
+  HR-->>HA: one mark per section
+  HA->>PB: update {final_report, final_total (hidden), final_status: done}, text fingerprint (hidden)
+
+  L->>API: GET /assignments/:id/submissions, GET /assignments/:id/chart
+  API-->>L: checks, hand-ins with the AI grade, chart with names
+  L->>API: POST /assignments/:id/insights
+  API-->>L: common mistakes, similar hand-ins for review by hand
 ```
 
 ## SD7: "I'm lost" and the questions feed (UC6)
