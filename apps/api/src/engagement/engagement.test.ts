@@ -33,6 +33,14 @@ const attendance = {
   },
 };
 
+/** Course members: Dana, Avi and Rina, who is enrolled but never checked in. */
+const courses = {
+  async requireMember(_courseId: string, studentNumber: string) {
+    if (!['111', '222', '333'].includes(studentNumber)) throw new DomainError('NOT_IN_COURSE', 'not in course');
+  },
+};
+const rina: Participant = { id: 'u3', studentNumber: '333', name: 'רינה' };
+
 const code = (p: Promise<unknown>) => p.then(() => 'ok', (e: DomainError) => e.code);
 
 describe('ConfusionMeter', () => {
@@ -78,7 +86,7 @@ describe('FeedService', () => {
   beforeEach(() => {
     posts = new InMemoryFeedPostRepository();
     llm = new MockProvider({ cluster_feed: { themes: [] } });
-    feed = new FeedService(posts, new InMemoryPostVoteRepository(), attendance, new FeedClusterer(llm), new FixedClock(T0));
+    feed = new FeedService(posts, new InMemoryPostVoteRepository(), attendance, courses, new FeedClusterer(llm), new FixedClock(T0));
   });
 
   it('anonymous posts keep the author for the API but hide the name', async () => {
@@ -86,6 +94,22 @@ describe('FeedService', () => {
     expect(p).toMatchObject({ displayName: null, anonymous: true, authorNumber: '111', votes: 0, answered: false });
     expect((await feed.post(session, avi, 'שאלה', false)).displayName).toBe('אבי');
     expect(await code(feed.post(session, outsider, 'x', false))).toBe('NOT_CHECKED_IN');
+  });
+
+  it("a lesson's questions are asked while it is live; afterwards in the course forum, open to any course member", async () => {
+    const p = await feed.post(session, dana, 'בשיעור', false);
+    expect(p).toMatchObject({ courseId: session.courseId, sessionId: session.id });
+    expect(await code(feed.post(makeSession({ status: 'ended' }), dana, 'אחרי', false))).toBe('SESSION_ENDED');
+
+    const course = { id: session.courseId, code: 'I2SE', name: 'x', lecturerId: 'lect1' };
+    const general = await feed.postToCourse(course, rina, '  שאלה כללית על הקורס ', true);
+    expect(general).toMatchObject({ courseId: course.id, sessionId: undefined, displayName: null });
+    expect(await code(feed.postToCourse(course, outsider, 'x', false))).toBe('NOT_IN_COURSE');
+    await feed.upvote(general.id, dana);
+    expect((await feed.get(general.id)).votes).toBe(1);
+    expect(await code(feed.upvote(general.id, outsider))).toBe('NOT_IN_COURSE');
+    expect(await feed.answer(general.id, 'תשובה')).toMatchObject({ answer: 'תשובה', answered: true });
+    expect((await feed.clusterOpen(session.id)).flatMap((t) => t.postIds)).toEqual([p.id]); // a lesson's themes skip the course forum
   });
 
   it('one upvote per participant; concurrent duplicates count once', async () => {
@@ -115,7 +139,7 @@ describe('FeedService', () => {
     const c = await feed.post(session, avi, 'c', false);
     await feed.markAnswered(c.id, true);
     llm = new MockProvider({ cluster_feed: { themes: [{ title: 'T', summary: 's', postIds: [a.id, b.id, c.id, 'ghost'] }] } });
-    feed = new FeedService(posts, new InMemoryPostVoteRepository(), attendance, new FeedClusterer(llm), new FixedClock(T0));
+    feed = new FeedService(posts, new InMemoryPostVoteRepository(), attendance, courses, new FeedClusterer(llm), new FixedClock(T0));
     expect(await feed.clusterOpen(session.id)).toEqual([{ title: 'T', summary: 's', postIds: [a.id, b.id] }]);
     expect(llm.calls[0].prompt).not.toContain(`${c.id}:`);
   });

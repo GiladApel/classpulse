@@ -1,6 +1,7 @@
 import type { FeedClusterer } from '../ai/FeedClusterer.js';
+import type { CourseService } from '../attendance/CourseService.js';
 import type { LessonParticipation } from '../attendance/LessonAccess.js';
-import type { Session } from '../attendance/types.js';
+import type { Course, Session } from '../attendance/types.js';
 import type { Clock } from '../infra/Clock.js';
 import { DomainError, NotFoundError } from '../shared/errors.js';
 import type { FeedPostRepository, PostVoteRepository } from './repositories.js';
@@ -11,15 +12,28 @@ export class FeedService {
     private readonly posts: FeedPostRepository,
     private readonly votes: PostVoteRepository,
     private readonly attendance: LessonParticipation,
+    private readonly courses: Pick<CourseService, 'requireMember'>,
     private readonly clusterer: FeedClusterer,
     private readonly clock: Clock,
   ) {}
 
-  /** Allowed during and after the lecture (FR-BC-02), so the session may already be ended. */
+  /** A lesson's questions are asked while it is live; afterwards questions go to the course forum (FR-BC-02). */
   async post(session: Session, author: Participant, text: string, anonymous: boolean): Promise<FeedPost> {
+    if (session.status !== 'active') throw new DomainError('SESSION_ENDED', 'השיעור הסתיים — אפשר לשאול בפורום של הקורס');
     await this.attendance.requireParticipant(session.id, author.studentNumber);
+    return this.create(session.courseId, session.id, author, text, anonymous);
+  }
+
+  /** The course forum: any course member, at any time. */
+  async postToCourse(course: Course, author: Participant, text: string, anonymous: boolean): Promise<FeedPost> {
+    await this.courses.requireMember(course.id, author.studentNumber);
+    return this.create(course.id, undefined, author, text, anonymous);
+  }
+
+  private create(courseId: string, sessionId: string | undefined, author: Participant, text: string, anonymous: boolean): Promise<FeedPost> {
     return this.posts.create({
-      sessionId: session.id,
+      courseId,
+      sessionId,
       authorId: author.id,
       authorNumber: author.studentNumber,
       displayName: anonymous ? null : author.name,
@@ -34,7 +48,8 @@ export class FeedService {
 
   async upvote(postId: string, voter: Participant): Promise<void> {
     const post = await this.get(postId);
-    await this.attendance.requireParticipant(post.sessionId, voter.studentNumber);
+    if (post.sessionId) await this.attendance.requireParticipant(post.sessionId, voter.studentNumber);
+    else await this.courses.requireMember(post.courseId, voter.studentNumber);
     if (await this.votes.exists(postId, voter.studentNumber)) throw new DomainError('ALREADY_VOTED', 'כבר הצבעת לשאלה הזו');
     try {
       await this.votes.create({ postId, voterId: voter.id, voterNumber: voter.studentNumber });

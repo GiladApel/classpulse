@@ -173,7 +173,7 @@ export function buildContainer(p: Ports): Container {
       p.challengeOptions,
     ),
     confusion,
-    feed: new FeedService(p.postRepo, p.postVoteRepo, lesson, new FeedClusterer(p.llm), p.clock),
+    feed: new FeedService(p.postRepo, p.postVoteRepo, lesson, courses, new FeedClusterer(p.llm), p.clock),
     feedback: new FeedbackService(p.feedbackRepo, attendance, p.clock),
     polls: new PollService(p.pollRepo, p.pollVoteRepo, lesson, new McqGenerator(p.llm), p.clock),
     recordings: new RecordingPipeline(p.recordingRepo, p.uploads, new LectureSummarizer(p.llm), confusion, attendance, queue, p.clock),
