@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
 import { api, ApiError } from '../lib/api';
-import type { AssignmentRecord } from '../lib/content';
+import { type AssignmentRecord, MAX_CHECKS } from '../lib/content';
 import { parseDate } from '../lib/device';
 import { pb } from '../lib/pb';
 import { useLiveRecords } from '../lib/useLiveRecords';
@@ -9,13 +9,13 @@ import { Button, Card, ErrorText, Field, inputClass } from './ui';
 
 export const GUIDE_LABEL = {
   generating: { text: 'ה-AI קורא…', className: 'bg-indigo-50 text-indigo-800' },
-  ready: { text: 'פתוח לבדיקה', className: 'bg-emerald-50 text-emerald-800' },
+  ready: { text: 'פתוח להגשה', className: 'bg-emerald-50 text-emerald-800' },
   failed: { text: 'נכשל — לנסות שוב', className: 'bg-red-50 text-red-700' },
 } as const;
 
 /**
  * Lecturer: the homework of a course (or of one lesson, when `sessionId` is given) and publishing a new one:
- * a title, an optional due date and the homework PDF, which the AI turns into a review guide.
+ * a title, an optional due date, the homework PDF and optional instructions, from which the AI builds a hidden rubric.
  */
 export default function AssignmentManager({ courseId, sessionId }: { courseId: string; sessionId?: string }) {
   const filter = sessionId ? pb.filter('course = {:c} && session = {:s}', { c: courseId, s: sessionId }) : pb.filter('course = {:c}', { c: courseId });
@@ -37,6 +37,8 @@ export default function AssignmentManager({ courseId, sessionId }: { courseId: s
       const due = String(f.get('dueAt') ?? '');
       if (due) body.set('dueAt', new Date(due).toISOString());
       if (sessionId) body.set('sessionId', sessionId);
+      const notes = String(f.get('notes') ?? '').trim();
+      if (notes) body.set('notes', notes);
       body.set('file', file);
       await api.upload(`/courses/${courseId}/assignments`, body);
       form.reset();
@@ -72,7 +74,7 @@ export default function AssignmentManager({ courseId, sessionId }: { courseId: s
       <Card>
         <h2 className="mb-1 font-semibold">פרסום שיעורי בית</h2>
         <p className="mb-3 text-sm text-slate-500">
-          מעלים את המטלה כ-PDF. ה-AI מחלק אותה לשאלות ולסעיפים ומכין לכל סעיף דרישות, והסטודנטים יכולים לקבל משוב על הפתרון לפני ההגשה (עד 3 פעמים).
+          מעלים את המטלה כ-PDF. ה-AI בונה ממנה מחוון בדיקה (לכל סעיף: דרישות ותשובה מצופה) שרק אתם רואים. כל סטודנט מקבל משוב על הפתרון עד {MAX_CHECKS} פעמים, ואז מגיש; ה-AI בודק את ההגשה לפי המחוון וההערכה מוצגת רק לכם.
         </p>
         <form onSubmit={publish} className="grid gap-3 md:grid-cols-2">
           <Field label="כותרת">
@@ -84,6 +86,17 @@ export default function AssignmentManager({ courseId, sessionId }: { courseId: s
           <Field label="קובץ המטלה (PDF, עד 20MB)">
             <input name="file" type="file" accept="application/pdf" required aria-label="קובץ המטלה" className={`${inputClass} file:me-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-1 file:text-indigo-700`} />
           </Field>
+          <div className="md:col-span-2">
+          <Field label="הנחיות ל-AI למחוון (לא חובה, לא מוצגות לסטודנטים)">
+            <textarea
+              name="notes"
+              maxLength={3000}
+              rows={3}
+              placeholder="למשל: בשאלה 2 חובה דיאגרמת מחלקות; להוריד על חוסר בבדיקות יחידה; לא לדרוש קוד מלא בשאלה 3"
+              className={inputClass}
+            />
+          </Field>
+          </div>
           <div className="flex items-end">
             <Button type="submit" disabled={busy} className="w-full">
               {busy ? 'מעלה…' : 'פרסום'}
