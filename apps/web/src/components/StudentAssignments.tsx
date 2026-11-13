@@ -7,7 +7,7 @@ import { pb } from '../lib/pb';
 import { useLiveRecords } from '../lib/useLiveRecords';
 import { Card } from './ui';
 
-/** Student: the homework of a course (or of one lesson), with my latest score and how many checks I have left. */
+/** Student: the homework of a course (or of one lesson): handed in or not, my latest feedback score and the checks used. */
 export default function StudentAssignments({ courseId, sessionId }: { courseId: string; sessionId?: string }) {
   const userId = pb.authStore.record?.id ?? '';
   const filter = sessionId ? pb.filter('course = {:c} && session = {:s}', { c: courseId, s: sessionId }) : pb.filter('course = {:c}', { c: courseId });
@@ -25,7 +25,7 @@ export default function StudentAssignments({ courseId, sessionId }: { courseId: 
   return (
     <Card>
       <h2 className="mb-1 font-semibold">שיעורי בית</h2>
-      <p className="mb-2 text-sm text-slate-500">לפני שמגישים: מעלים את הפתרון ומקבלים משוב לכל סעיף — עד {MAX_CHECKS} פעמים לכל מטלה.</p>
+      <p className="mb-2 text-sm text-slate-500">לפני שמגישים: מעלים את הפתרון ומקבלים משוב לכל סעיף — עד {MAX_CHECKS} פעמים לכל מטלה, ואז מגישים.</p>
       {assignments.length === 0 && <p className="text-sm text-slate-500">אין שיעורי בית עדיין.</p>}
       <ul className="divide-y divide-slate-100">
         {sorted.map((a) => {
@@ -38,9 +38,11 @@ export default function StudentAssignments({ courseId, sessionId }: { courseId: 
                   {a.due_at && <span className="ms-2 text-xs text-slate-500">עד {parseDate(a.due_at).toLocaleDateString('he-IL')}</span>}
                 </span>
                 <span className="text-sm">
-                  {s && s.total >= 0 ? (
+                  {s?.handed_in_at ? (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-800">✓ הוגש</span>
+                  ) : s && s.total >= 0 ? (
                     <span className="text-slate-700">
-                      <b className="tabular-nums">{s.total}</b> · {s.check_count}/{MAX_CHECKS} בדיקות
+                      <b className="tabular-nums">{s.total}</b> · {s.check_count}/{MAX_CHECKS} בדיקות · <span className="text-amber-700">לא הוגש</span>
                     </span>
                   ) : a.guide_status === 'ready' ? (
                     <span className="text-indigo-600">לקבלת משוב ←</span>
