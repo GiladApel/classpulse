@@ -21,7 +21,7 @@ Lecturers need **one simple tool** that students open with a phone camera and th
 | F3 | **Live backchannel**: "I'm lost" confusion meter + questions feed (anonymous option) | High |
 | F4 | **KISS polls**: AI-generated MCQ from a photographed or uploaded slide; live results | High |
 | F5 | **Lecture summary**: AI summary, chapters and review questions from a recording, with confusion spikes on the timeline | Medium |
-| F6 | **Homework review**: rubric-based AI review, percentiles and class-wide common mistakes (peers' work never shown) | Medium |
+| F6 | **Homework review**: the AI builds a hidden rubric from the homework PDF and the lecturer's instructions; students get 2 feedback checks, then hand in; the AI grades hand-ins for the lecturer; class-wide common mistakes (peers' work never shown) | Medium |
 | F7 | **Lecture page**: per-lecture page for the whole course (also for those who missed it): summary, materials, practice questions, poll results, questions with the lecturer's answers | Medium |
 | F8 | **Lecture feedback**: when the lecture ends, students get an optional anonymous form (4 options + comment); the lecturer sees the aggregate from 3 answers | Medium |
 
@@ -90,7 +90,7 @@ SSH_HOST=do-server PB_ADMIN_URL=http://127.0.0.1:18092/pb loadtest/run.sh https:
 
 ### Lecture summary and homework (M6)
 - **Summary:** on the session dashboard, upload the recording (video/audio up to 2 GB, sent in 50 MB chunks) or a transcript (vtt/srt/txt), and set how many minutes after the session start the recording began. Gemini returns a TL;DR, timestamped chapters, key concepts and 5 review questions. The timeline marks "I'm lost" spikes inside the chapter where they happened. The recording itself is deleted after processing. **Publish** makes the summary visible to every student who attended any session of the course.
-- **Homework:** the lecturer creates an assignment with a weighted rubric (*מטלות לפי קורס*, "assignments by course", on the home page). Students submit a PDF or code file from *הקורסים שלי* ("my courses"). The AI scores each criterion with strengths and fixes; percentiles appear from 5 reviewed submissions. **✨ ניתוח הכיתה** ("analyse class") shows the score distribution, class-wide common mistakes (which students also see, without names) and near-identical submission pairs for the lecturer to check by hand.
+- **Homework:** in a lesson's (or the course's) homework tab the lecturer uploads the homework PDF, optionally with instructions to the AI for the rubric. The AI builds a rubric (requirements and expected answer per section) that only the lecturer sees, and can rebuild it with new instructions until the first hand-in. A student gets per-section feedback on a solution (PDF or photos) up to 2 times, then hands in once; the files are kept for the lecturer and the AI grades them as a draft only the lecturer sees, with a chart of the grades by name. **✨ ניתוח ההגשות** ("analyse hand-ins") shows class-wide common mistakes (which students also see, without names) and near-identical hand-ins for the lecturer to check by hand.
 
 ### Live class flow (M5)
 After checking in, the student's page stays open and shows:
