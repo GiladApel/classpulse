@@ -10,6 +10,7 @@ flowchart LR
   S --- UC7[UC7 Vote in poll]
   S --- UC10[UC10 Check a homework solution]
   S --- UC21[UC21 Hand in homework]
+  S --- UC22[UC22 Ask in the course forum]
   S --- UC12[UC12 Review a lecture]
   S --- UC14[UC14 Give lecture feedback]
   S --- UC20[UC20 Enter a live lesson from home]
@@ -55,6 +56,7 @@ flowchart LR
 | UC19 | As a **lecturer**, I set the course's weekly days and hours, so everyone sees it in their timetable and I can start the lesson in one tap. | TT-01..03 |
 | UC20 | As a **student**, I open the app and see the lesson that is live now and my week, and I enter the lesson in one tap. | EN-03, TT-02..04 |
 | UC21 | As a **student**, when my solution is ready I hand it in once from the same page, and see that it was handed in. | HW-07, 08 |
+| UC22 | As a **student**, between lessons I ask in the course's forum and read the lecturer's answer there. | BC-06 |
 
 ## Detailed use cases
 
@@ -125,6 +127,7 @@ flowchart LR
 - **Alternate flows:**
   - 1a. Offline: the post is queued in IndexedDB and sent when the connection returns.
   - 1b. After "I'm lost", the student writes what is unclear (optional); it is posted anonymously to the feed, where classmates can upvote it.
+  - 1c. The lesson has ended: its forum is read-only and links to the course forum (UC22).
 
 ### UC7: Vote
 - **Actor:** Student.
@@ -265,3 +268,13 @@ flowchart LR
   2. The student taps the live lesson; it opens on its attendance tab.
   3. The attendance tab asks them to scan the QR in the room (UC1); after scanning they land on the forum tab.
 - **Alternate flow:** 1a. No live lesson: the timetable shows the next meetings; each course opens its lessons, including past ones (UC12).
+
+### UC22: Ask in the course forum (student)
+- **Actor:** Student who is a course member. **Secondary:** Lecturer.
+- **Main flow:**
+  1. The student opens the course page, "Forum" tab (or "To the course forum" on a past lesson).
+  2. The student writes a question, optionally anonymously, and sends it.
+  3. Classmates see it live and upvote it.
+  4. The lecturer, on the same tab, writes an answer; the question shows "answered" with the answer under it.
+- **Alternate flows:**
+  - 2a. Not a course member: rejected.
