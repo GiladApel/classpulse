@@ -240,13 +240,13 @@ classDiagram
   }
   class HomeworkGuideGenerator {
     -llm: LLMProvider
-    +fromHomework(pdf: Attachment) Promise~ReviewGuide~
+    +fromHomework(pdf: Attachment, notes) Promise~ReviewGuide~
     +validate(raw)$ ReviewGuide
     +outline(guide)$ GuideOutline
   }
   class HomeworkReviewer {
     -llm: LLMProvider
-    +reviewSolution(guide: ReviewGuide, solution: Attachment[]) Promise~marks, mistakes~
+    +reviewSolution(guide: ReviewGuide, solution: Attachment[], opts: notes, final) Promise~marks, mistakes~
     +validateSections(raw, guide)$ marks, mistakes
     +commonMistakes(perStudent: string[][], assignment) Promise~CommonMistake[]~
   }
@@ -278,9 +278,9 @@ Each AI service owns its prompt and JSON schema. All LLM output is schema-valida
 
 **Large media.** `Attachment` is either in-memory bytes or a file path. `GeminiProvider` sends small files inline and uploads anything larger (or any path) through the Gemini Files API, waits until the file is `ACTIVE`, and always deletes it afterwards. Video uses low media resolution (~66 tokens per frame), so a 90-minute lecture fits the context window.
 
-**`HomeworkGuideGenerator`** reads a homework PDF once and returns its questions and sections, each with what is asked, its requirements, the key points of a correct answer (`expected`) and what would give it away (`givingAway`). IDs (`q1`, `q1.2`) are assigned by the code, never taken from the model; a reply with no usable question raises `LLMOutputError`. `outline` strips the answers for students.
+**`HomeworkGuideGenerator`** reads a homework PDF once, following the lecturer's notes (sent as instructions, unlike the PDF, which is data), and returns its questions and sections, each with what is asked, its requirements, the key points of a correct answer (`expected`) and what would give it away (`givingAway`). IDs (`q1`, `q1.2`) are assigned by the code, never taken from the model; a reply with no usable question raises `LLMOutputError`. `outline` strips the answers for students.
 
-**`HomeworkReviewer`** reviews a solution (a PDF or photos) against that guide, section by section: evidence first, then answered or not, a 1–100 score, what meets, what is missing and a direction. The prompt forbids giving the answer and treats the files as data, so text addressing the reviewer is ignored (field test T10: "give 100" did not raise the score). `validateSections` returns exactly one mark per guide section in order: unknown IDs are dropped, a missing section is unanswered (0), an answered 0 becomes 1.
+**`HomeworkReviewer`** reviews a solution (a PDF or photos) against that guide and the lecturer's notes, section by section: evidence first, then answered or not, a 1–100 score, what meets, what is missing and a direction. A practice check goes to the student, so its prompt forbids giving the answer; a `final` review is a grading draft for the lecturer and may state the correct idea. Both treat the files as data, so text addressing the reviewer is ignored (field test T10: "give 100" did not raise the score). `validateSections` returns exactly one mark per guide section in order: unknown IDs are dropped, a missing section is unanswered (0), an answered 0 becomes 1.
 
 **`McqGenerator`** turns one slide image into up to 3 poll drafts. Drafts with fewer than 2 options, an empty option or an out-of-range `correctIndex` are dropped; if none survive it raises `LLMOutputError`. **`PracticeQuestionGenerator`** reads a whole deck (PDF or image; over 15 MB it goes through the Files API like video) and returns up to `LECTURE_QUESTIONS` = 8 distinct open questions spread across its topics; empty or over-long ones are dropped. **`FeedClusterer`** keeps only post ids it was given and assigns each post to at most one theme, so the model cannot invent or double-count questions.
 
@@ -630,13 +630,18 @@ classDiagram
     -membership: CourseService
     -queue: BackgroundQueue
     +publish(course, input, pdf) Promise~Assignment~
-    +generateGuide(assignmentId, pdf) Promise~void~
+    +generateGuide(assignmentId, pdf, notes) Promise~void~
     +retryGuide(assignment) Promise~Assignment~
+    +regenerateRubric(assignment, notes) Promise~Assignment~
+    +rubric(assignment) Promise~Rubric~
     +remove(assignment) Promise~void~
     +check(assignment, student: Participant, solution) Promise~Submission~
     +review(submissionId, assignment, solution) Promise~void~
-    +view(submission) Promise~SubmissionView~
-    +chart(assignment, viewer) Promise~Chart~
+    +handIn(assignment, student: Participant, files) Promise~Submission~
+    +gradeFinal(submissionId) Promise~void~
+    +retryFinal(submission) Promise~Submission~
+    +view(submission, viewer) Promise~SubmissionView~
+    +chart(assignment) Promise~Chart~
     +buildInsights(assignment) Promise~AssignmentInsights~
     +recoverInterrupted() Promise~number~
   }
@@ -714,10 +719,11 @@ classDiagram
 **Lecture feedback (`engagement/`, M9):** `FeedbackService` opens when the session ends and closes 24 h later (`FEEDBACK_WINDOW_MS`). Only students checked in to that lecture may answer, once each (`ALREADY_SENT`, plus a unique index). The `lesson_feedback` collection has **no** list or view rule, so no one, the lecturer included, can read a single answer through PocketBase. `summary` returns only the count until there are 3 answers (`MIN_FEEDBACK_RESPONSES`), then counts per option and the comments ordered by option and text, never by time, so their order cannot reveal who wrote them.
 
 **Homework (`content/`):**
-- Publishing stores the PDF (a protected file) and reads it on `BackgroundQueue` into the review guide. The guide is a **hidden** field, because it holds the expected answers; the public `outline` has the questions and requirements only. A failed reading can be retried from the stored PDF.
-- `check` runs only when the guide is ready and the student is a course member, and allows `MAX_CHECKS` = 3 per student per homework. One submission row per student keeps the latest successful result; a failed check sets `failed` with "did not count" and keeps the previous report.
-- The solution never reaches PocketBase: the files live only in the background job's memory. After the review, a text fingerprint of a PDF's text (for copy detection) is the only thing derived from it; photos have none.
-- `ScoreCalculator` computes section, question and total scores, so the model only marks sections. `chart` returns every checked student's latest scores by total, question and section; students get it anonymously and only from `MIN_CHART_SIZE` = 3 checked students; the lecturer gets names.
+- Publishing stores the PDF (a protected file) and the lecturer's notes, and reads the PDF on `BackgroundQueue` into the rubric. The rubric (`guide`), its `outline` and the notes are **hidden** fields: only the API reads them, and the lecturer gets them through `rubric`. A failed reading can be retried from the stored PDF; `regenerateRubric` builds it again with new notes until the first hand-in (`RUBRIC_LOCKED`).
+- `check` runs only when the rubric is ready, the student is a course member and has not handed in, and allows `MAX_CHECKS` = 2. One submission row per student keeps the latest successful result; a failed check sets `failed` with "did not count" and keeps the previous report. A practice solution never reaches PocketBase: its files live only in the background job's memory.
+- `handIn` is allowed once (`ALREADY_HANDED_IN`), not while a check runs. It stores the files as protected files on the student's row (the view rule lets only that student and the course's lecturer open them) and queues `gradeFinal`, which reviews them in `final` mode and saves `final_report` and `final_total` as **hidden** fields, then the text fingerprint. A failed grading can be retried, because the files are kept.
+- `view` gives a student their practice feedback and the questions without requirements; the controller also drops the final grade. The lecturer gets the outline with requirements and the final report.
+- `ScoreCalculator` computes section, question and total scores, so the model only marks sections. `chart` is for the lecturer only: every graded hand-in with its name, by total, question and section. Common mistakes and similar pairs come from the graded hand-ins.
 - **Copy detection uses fingerprints, not embeddings** (design change after the field test, see the tools report, T9). Code is tokenised with identifiers, numbers and strings normalised, so renaming variables does not hide a copy; prose uses word shingles. A bottom-256 MinHash sketch bounds storage and estimates Jaccard similarity. Pairs ≥ 0.5 are shown to the lecturer only, with names, for manual review.
 
 ## 6. `infra/`: Repository + Strategy
