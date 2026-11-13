@@ -1,4 +1,5 @@
 import type { RecordModel } from 'pocketbase';
+import { type FeedScope, feedFilter } from '../lib/feed';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { pb } from '../lib/pb';
@@ -27,7 +28,7 @@ export default function EngagementPanel({ sessionId, active }: { sessionId: stri
         {active && <ConfusionCard sessionId={sessionId} />}
         <PollManager sessionId={sessionId} active={active} />
       </div>
-      <FeedBoard sessionId={sessionId} />
+      <FeedBoard scope={{ sessionId }} />
     </div>
   );
 }
@@ -198,8 +199,10 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
   );
 }
 
-function FeedBoard({ sessionId }: { sessionId: string }) {
-  const posts = useLiveRecords<PostRecord>('feed_posts', pb.filter('session = {:s}', { s: sessionId }));
+/** The lecturer's view of a forum (a lesson's or the course's): answer, mark answered and, for a lesson, group into themes. */
+export function FeedBoard({ scope }: { scope: FeedScope }) {
+  const sessionId = 'sessionId' in scope ? scope.sessionId : '';
+  const posts = useLiveRecords<PostRecord>('feed_posts', feedFilter(scope));
   const [themes, setThemes] = useState<Theme[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -232,11 +235,13 @@ function FeedBoard({ sessionId }: { sessionId: string }) {
     <Card>
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="font-semibold">
-          שאלות מהכיתה <span className="text-sm font-normal text-slate-500">({open} פתוחות)</span>
+          {sessionId ? 'שאלות מהכיתה' : 'פורום הקורס'} <span className="text-sm font-normal text-slate-500">({open} פתוחות)</span>
         </h2>
-        <Button variant="secondary" disabled={busy || open < 2} onClick={cluster}>
-          {busy ? 'מקבץ…' : '✨ קיבוץ לנושאים'}
-        </Button>
+        {sessionId && (
+          <Button variant="secondary" disabled={busy || open < 2} onClick={cluster}>
+            {busy ? 'מקבץ…' : '✨ קיבוץ לנושאים'}
+          </Button>
+        )}
       </div>
       <ErrorText>{error}</ErrorText>
 

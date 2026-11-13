@@ -1,4 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type FeedScope, feedFilter, myVotesFilter, postUrl } from '../lib/feed';
 import { api, ApiError } from '../lib/api';
 import { pb } from '../lib/pb';
 import { useCountdown } from '../lib/useChallenge';
@@ -15,7 +16,7 @@ export default function StudentLivePanel({ sessionId, active }: { sessionId: str
       <FeedbackCard sessionId={sessionId} ended={!active} />
       <PollCard sessionId={sessionId} />
       {active && <LostButton sessionId={sessionId} />}
-      <Feed sessionId={sessionId} canPost />
+      <Feed scope={{ sessionId }} canPost />
     </div>
   );
 }
@@ -147,11 +148,15 @@ function PollCard({ sessionId }: { sessionId: string }) {
   );
 }
 
-/** Questions with the lecturer's answers. Every course member may post or upvote, during the lesson or after it (`canPost`). */
-export function Feed({ sessionId, canPost }: { sessionId: string; canPost: boolean }) {
+/**
+ * Questions with the lecturer's answers, of a lesson or of the course forum. Course members post and upvote in a lesson
+ * while it is live, and in the course forum at any time (`canPost`).
+ */
+export function Feed({ scope, canPost }: { scope: FeedScope; canPost: boolean }) {
   const userId = pb.authStore.record?.id ?? '';
-  const posts = useLiveRecords<PostRecord>('feed_posts', pb.filter('session = {:s}', { s: sessionId }));
-  const myVotes = useLiveRecords<PostRecord & { post: string }>('post_votes', pb.filter('voter = {:u} && post.session = {:s}', { u: userId, s: sessionId }));
+  const course = 'courseId' in scope;
+  const posts = useLiveRecords<PostRecord>('feed_posts', feedFilter(scope));
+  const myVotes = useLiveRecords<PostRecord & { post: string }>('post_votes', myVotesFilter(scope, userId));
   const voted = useMemo(() => new Set(myVotes.map((v) => v.post)), [myVotes]);
   const [anonymous, setAnonymous] = useState(true);
   const [sending, setSending] = useState(false);
@@ -166,7 +171,7 @@ export function Feed({ sessionId, canPost }: { sessionId: string; canPost: boole
     setError('');
     setSending(true);
     try {
-      await api.post(`/sessions/${sessionId}/posts`, { text, anonymous });
+      await api.post(postUrl(scope), { text, anonymous });
       form.reset();
     } catch (err) {
       setError(message(err));
@@ -186,10 +191,10 @@ export function Feed({ sessionId, canPost }: { sessionId: string; canPost: boole
 
   return (
     <Card>
-      <h2 className="mb-3 font-semibold">שאלות והערות</h2>
+      <h2 className="mb-3 font-semibold">{course ? 'פורום הקורס' : 'שאלות והערות'}</h2>
       {canPost && (
         <form onSubmit={submit} className="flex flex-col gap-2">
-          <textarea name="text" required maxLength={500} rows={2} placeholder="שאלה, הערה או הצעה למרצה…" className={inputClass} />
+          <textarea name="text" required maxLength={500} rows={2} placeholder={course ? 'שאלה לקורס…' : 'שאלה, הערה או הצעה למרצה…'} className={inputClass} />
           <div className="flex items-center justify-between gap-2">
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" checked={anonymous} onChange={(e) => setAnonymous(e.target.checked)} className="h-4 w-4" />
