@@ -7,7 +7,7 @@ test.beforeAll(async () => {
 });
 test.afterAll(async () => klass?.cleanup());
 
-test('lecture page: after the lecture ends, a student who missed it sees the answer, materials and practice', async ({ browser }) => {
+test('lecture page: after the lecture ends, a student who missed it sees the answer, materials and practice, and can still ask', async ({ browser }) => {
   const [shiran, ido] = klass.students;
   const lp = await lecturerPage(browser, klass.lecturer);
 
@@ -68,5 +68,8 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
 
   await openTab(ip, 'פורום');
   await expect(ip.getByText('Strategy בוחר אלגוריתם; State משנה התנהגות לפי מצב.')).toBeVisible();
-  await expect(ip.getByPlaceholder('שאלה, הערה או הצעה למרצה…')).toHaveCount(0); // he missed it: read-only
+  // He missed it but is in the course, so he can still ask about it.
+  await ip.getByPlaceholder('שאלה, הערה או הצעה למרצה…').fill('שאלה אחרי השיעור');
+  await ip.getByRole('button', { name: 'שליחה', exact: true }).click();
+  await expect(ip.getByText('שאלה אחרי השיעור', { exact: true })).toBeVisible();
 });
