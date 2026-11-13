@@ -18,7 +18,7 @@ import {
 import { UploadStore } from '../infra/UploadStore.js';
 import { DomainError } from '../shared/errors.js';
 import { makeSession, minimalPdf, T0 } from '../test/fixtures.js';
-import { HomeworkAnalysisService, MAX_CHECKS, MIN_CHART_SIZE } from './HomeworkAnalysisService.js';
+import { HomeworkAnalysisService, MAX_CHECKS } from './HomeworkAnalysisService.js';
 import { RecordingPipeline } from './RecordingPipeline.js';
 import { SimilarityAnalyzer } from './SimilarityAnalyzer.js';
 import { TextExtractor } from './TextExtractor.js';
@@ -276,7 +276,34 @@ describe('HomeworkAnalysisService', () => {
     expect(await code(svc.retryGuide(await svc.getAssignment(a.id)))).toBe('GUIDE_NOT_FAILED');
   });
 
-  it('a check gives a per-section report and the server-side scores; the solution file is not kept', async () => {
+  it("the lecturer's notes go to the AI; the rubric can be rebuilt with new notes until someone hands in", async () => {
+    const a = await svc.publish(course, { title: 'תרגיל', notes: '  בלי דיאגרמה - עד 50  ' }, homeworkPdf);
+    expect(a.notes).toBe('בלי דיאגרמה - עד 50');
+    expect(await code(svc.regenerateRubric(a, 'x'))).toBe('GUIDE_IN_PROGRESS');
+    await queue.idle();
+    expect(llm.calls[0].prompt).toContain('בלי דיאגרמה - עד 50');
+
+    const ready1 = await svc.getAssignment(a.id);
+    const rubric = await svc.rubric(ready1);
+    expect(rubric).toMatchObject({ notes: 'בלי דיאגרמה - עד 50', locked: false });
+    expect(rubric.guide?.questions[0].sections[1].expected).toBe('Context מחזיק הפניה לממשק');
+
+    expect((await svc.regenerateRubric(ready1, ' להקפיד על SOLID ')).guideStatus).toBe('generating');
+    await queue.idle();
+    expect(llm.calls.at(-1)!.prompt).toContain('להקפיד על SOLID');
+    const ready2 = await svc.getAssignment(a.id);
+    expect(ready2).toMatchObject({ guideStatus: 'ready', notes: 'להקפיד על SOLID' });
+
+    await svc.check(ready2, student('1'), solution());
+    await queue.idle();
+    expect(llm.calls.at(-1)!.prompt).toContain('להקפיד על SOLID'); // the reviewer follows the notes too
+    await svc.handIn(ready2, student('1'), solution());
+    await queue.idle();
+    expect((await svc.rubric(ready2)).locked).toBe(true);
+    expect(await code(svc.regenerateRubric(ready2, 'אחר'))).toBe('RUBRIC_LOCKED');
+  });
+
+  it('a check gives a per-section report and the server-side scores; the practice file is not kept', async () => {
     const a = await ready();
     const started = await svc.check(a, student('1'), solution());
     expect(started).toMatchObject({ status: 'processing', checkCount: 0, report: null, total: null });
@@ -297,11 +324,13 @@ describe('HomeworkAnalysisService', () => {
     const call = llm.calls.at(-1)!;
     expect(call.task).toBe('review_homework_solution');
     expect(call.prompt).toContain('Context מחזיק הפניה לממשק'); // the reviewer sees the expected answers
+    expect(call.prompt).toContain('BEFORE handing it in');
     expect(JSON.stringify(done)).not.toContain('Strategy lets the algorithm');
-    expect(subs.sketches.get(done.id)?.length).toBeGreaterThan(0);
+    expect(done.files).toEqual([]);
+    expect(subs.handedIn.has(done.id)).toBe(false);
   });
 
-  it('photos are reviewed too (no fingerprint); non-members and a running check are rejected', async () => {
+  it('photos are reviewed too; non-members and a running check are rejected', async () => {
     const a = await ready();
     expect(await code(svc.check(a, student('9'), photo))).toBe('NOT_IN_COURSE');
     const s = await svc.check(a, student('2'), photo);
@@ -309,7 +338,8 @@ describe('HomeworkAnalysisService', () => {
     await queue.idle();
     expect((await svc.getSubmission(s.id)).status).toBe('done');
     expect(llm.calls.at(-1)!.files).toEqual([{ mimeType: 'image/jpeg', data: photo[0].data }]);
-    expect(subs.sketches.has(s.id)).toBe(false);
+    await subs.update(s.id, { status: 'processing' });
+    expect(await code(svc.handIn(a, student('2'), photo))).toBe('CHECK_IN_PROGRESS');
   });
 
   it(`${MAX_CHECKS} checks per homework; a failed check does not count and keeps the previous result`, async () => {
@@ -330,43 +360,86 @@ describe('HomeworkAnalysisService', () => {
     expect(await code(svc.check(a, student('1'), solution()))).toBe('NO_CHECKS_LEFT');
   });
 
-  it(`the chart: students see anonymous rows with their own marked, from ${MIN_CHART_SIZE} checked students; the lecturer sees names`, async () => {
+  it('hand-in: once, the files are kept and graded as a draft for the lecturer; no checks after it', async () => {
     const a = await ready();
-    for (const n of ['1', '2']) {
-      await svc.check(a, student(n), solution());
-      await queue.idle();
-    }
-    expect(await svc.chart(a, { lecturer: false, studentNumber: '1' })).toEqual({ visible: false, checked: 2, rows: [] });
-    const mine = (await svc.view((await subs.findByAssignmentAndStudent(a.id, '1'))!));
-    expect(mine).toMatchObject({ place: null, checked: 2, checksLeft: MAX_CHECKS - 1 });
-
-    await svc.check(a, student('3'), solution());
+    await svc.check(a, student('1'), solution());
     await queue.idle();
-    const chart = await svc.chart(a, { lecturer: false, studentNumber: '1' });
-    expect(chart.visible).toBe(true);
-    expect(chart.rows).toHaveLength(3);
-    expect(chart.rows.filter((r) => r.mine)).toHaveLength(1);
-    expect(JSON.stringify(chart)).not.toContain('סטודנט');
-    expect(chart.rows[0]).toMatchObject({ total: 36, questions: { q1: 73, q2: 0 }, sections: { 'q1.1': 85, 'q1.2': 60, 'q2.1': 0 } });
-    expect((await svc.view((await subs.findByAssignmentAndStudent(a.id, '1'))!)).place).toBe(1); // all tied
+    const handed = await svc.handIn(a, student('1'), solution());
+    expect(handed).toMatchObject({ checkCount: 1, total: 36, finalStatus: 'processing', files: ['sol.pdf'], handedInAt: T0 });
+    await queue.idle();
+    const graded = await svc.getSubmission(handed.id);
+    expect(graded).toMatchObject({ finalStatus: 'done', finalTotal: 36 });
+    expect(graded.finalReport!.marks).toHaveLength(3);
+    expect(llm.calls.at(-1)!.prompt).toContain('HANDED IN');
+    expect(llm.calls.at(-1)!.files).toEqual([{ mimeType: 'application/pdf', data: solution()[0].data }]);
+    expect(subs.sketches.get(handed.id)?.length).toBeGreaterThan(0);
 
-    const lecturer = await svc.chart(a, { lecturer: true, studentNumber: '' });
-    expect(lecturer.rows.map((r) => r.studentName).sort()).toEqual(['סטודנט 1', 'סטודנט 2', 'סטודנט 3']);
+    expect(await code(svc.handIn(a, student('1'), solution()))).toBe('ALREADY_HANDED_IN');
+    expect(await code(svc.check(a, student('1'), solution()))).toBe('ALREADY_HANDED_IN');
+    expect(await code(svc.handIn(a, student('9'), solution()))).toBe('NOT_IN_COURSE');
+
+    // Handing in without any practice check is allowed.
+    const direct = await svc.handIn(a, student('2'), photo);
+    await queue.idle();
+    expect(await svc.getSubmission(direct.id)).toMatchObject({ checkCount: 0, report: null, finalStatus: 'done' });
   });
 
-  it('insights: common mistakes from the reports and the copied pair; delete removes the homework and its checks', async () => {
+  it('a failed grading keeps the files and the lecturer can run it again', async () => {
+    const a = await ready();
+    fx.review_homework_solution = { sections: [] };
+    const handed = await svc.handIn(a, student('1'), solution());
+    await queue.idle();
+    const failed = await svc.getSubmission(handed.id);
+    expect(failed).toMatchObject({ finalStatus: 'failed', finalError: expect.stringContaining('לנסות שוב'), finalTotal: null });
+    expect(await code(svc.check(a, student('1'), solution()))).toBe('ALREADY_HANDED_IN');
+
+    fx.review_homework_solution = DEFAULT_FIXTURES.review_homework_solution;
+    expect((await svc.retryFinal(failed)).finalStatus).toBe('processing');
+    await queue.idle();
+    const done = await svc.getSubmission(handed.id);
+    expect(done).toMatchObject({ finalStatus: 'done', finalTotal: 36 });
+    expect(await code(svc.retryFinal(done))).toBe('FINAL_NOT_FAILED');
+  });
+
+  it('a student sees the questions without the requirements and checks left; the lecturer sees the rubric outline', async () => {
+    const a = await ready();
+    await svc.check(a, student('1'), solution());
+    await queue.idle();
+    const mine = (await subs.findByAssignmentAndStudent(a.id, '1'))!;
+    const asStudent = await svc.view(mine, { lecturer: false });
+    expect(asStudent.checksLeft).toBe(MAX_CHECKS - 1);
+    expect(asStudent.outline!.questions[0].sections.map((s) => s.requirements)).toEqual([[], []]);
+    expect(asStudent.outline!.questions[0].sections[0].asked).toBe(a.outline!.questions[0].sections[0].asked);
+    const asLecturer = await svc.view(mine, { lecturer: true });
+    expect(asLecturer.outline).toEqual(a.outline);
+
+    await svc.handIn(a, student('1'), solution());
+    await queue.idle();
+    expect((await svc.view((await svc.getSubmission(mine.id)), { lecturer: false })).checksLeft).toBe(0);
+  });
+
+  it('the chart is for the lecturer: graded hand-ins with names, highest first; practice checks are not in it', async () => {
+    const a = await ready();
+    await svc.check(a, student('3'), solution());
+    for (const n of ['1', '2']) await svc.handIn(a, student(n), solution());
+    await queue.idle();
+    const chart = await svc.chart(a);
+    expect(chart.graded).toBe(2);
+    expect(chart.rows.map((r) => r.studentName).sort()).toEqual(['סטודנט 1', 'סטודנט 2']);
+    expect(chart.rows[0]).toMatchObject({ total: 36, questions: { q1: 73, q2: 0 }, sections: { 'q1.1': 85, 'q1.2': 60, 'q2.1': 0 } });
+  });
+
+  it('insights: common mistakes from the graded hand-ins and the copied pair; delete removes the homework and its rows', async () => {
     const a = await ready();
     const text = 'Strategy lets the algorithm change at runtime, unlike a long if/else chain in the client code';
-    for (const n of ['1', '2']) {
-      await svc.check(a, student(n), solution(text));
-      await queue.idle();
-    }
-    await svc.check(a, student('3'), solution('Observer pushes updates to subscribers so nobody has to poll the server again and again'));
+    for (const n of ['1', '2']) await svc.handIn(a, student(n), solution(text));
+    await svc.handIn(a, student('3'), solution('Observer pushes updates to subscribers so nobody has to poll the server again and again'));
+    await svc.check(a, student('4'), solution(text)); // practice only: not in the insights
     await queue.idle();
     const built = await svc.buildInsights(a);
     expect(built.submissionCount).toBe(3);
     expect(built.commonMistakes[0].title).toBe('חסרות בדיקות יחידה');
-    const ids = (await svc.listSubmissions(a.id)).filter((s) => s.studentNumber !== '3').map((s) => s.id).sort();
+    const ids = (await svc.listSubmissions(a.id)).filter((s) => ['1', '2'].includes(s.studentNumber)).map((s) => s.id).sort();
     expect(built.similarPairs.map((p) => [p.a, p.b].sort())).toEqual([ids]);
 
     await svc.remove(a);
@@ -374,18 +447,22 @@ describe('HomeworkAnalysisService', () => {
     expect(await svc.listSubmissions(a.id)).toEqual([]);
   });
 
-  it('a late check is marked; restart recovery fails a running check and a guide being read', async () => {
+  it('a late hand-in is marked; restart recovery fails a running check, a running grading and a guide being read', async () => {
     const a = await svc.getAssignment((await ready()).id);
     await assignments.update(a.id, { dueAt: new Date(T0.getTime() - 1000) });
     const late = await svc.check(await svc.getAssignment(a.id), student('1'), solution());
     expect(late.late).toBe(true);
+    const handed = await svc.handIn(await svc.getAssignment(a.id), student('2'), solution());
+    expect(handed.late).toBe(true);
     await queue.idle();
 
-    // As if the server stopped mid-way: a check and a guide still marked as running.
+    // As if the server stopped mid-way: a check, a grading and a guide still marked as running.
     await subs.update(late.id, { status: 'processing' });
+    await subs.update(handed.id, { finalStatus: 'processing' });
     const reading = await assignments.create({ courseId: 'c1', title: 'שנייה', createdAt: T0, guideStatus: 'generating', guideError: '', outline: null, notes: '' });
-    expect(await svc.recoverInterrupted()).toBe(2);
+    expect(await svc.recoverInterrupted()).toBe(3);
     expect(await svc.getSubmission(late.id)).toMatchObject({ status: 'failed', checkCount: 1 });
+    expect(await svc.getSubmission(handed.id)).toMatchObject({ finalStatus: 'failed' });
     expect((await svc.getAssignment(reading.id)).guideStatus).toBe('failed');
   });
 });
