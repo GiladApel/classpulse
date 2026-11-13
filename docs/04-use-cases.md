@@ -9,6 +9,7 @@ flowchart LR
   S --- UC6[UC6 Signal lost / post question]
   S --- UC7[UC7 Vote in poll]
   S --- UC10[UC10 Check a homework solution]
+  S --- UC21[UC21 Hand in homework]
   S --- UC12[UC12 Review a lecture]
   S --- UC14[UC14 Give lecture feedback]
   S --- UC20[UC20 Enter a live lesson from home]
@@ -28,6 +29,7 @@ flowchart LR
   UC8 --- AI
   UC9 --- AI
   UC10 --- AI
+  UC21 --- AI
 ```
 
 ## User stories
@@ -42,8 +44,8 @@ flowchart LR
 | UC7 | As a **student**, the poll appears on my phone and I vote with one tap. | PL-03 |
 | UC8 | As a **lecturer**, I generate a question from my current slide and launch it in seconds. | PL-01..04 |
 | UC9 | As a **lecturer**, I upload last week's recording and get chapters, review questions and the moments students got lost. | VS-01..05 |
-| UC10 | As a **student**, before handing in my homework I upload my solution and get feedback on every section, up to 3 times, and see where I stand in the class. | HW-02..07 |
-| UC11 | As a **lecturer**, I publish the homework PDF in the lesson and follow how the class is doing: each student's report, common mistakes and suspiciously similar solutions. | HW-01, 07, 08, BC-04 |
+| UC10 | As a **student**, before handing in my homework I upload my solution and get feedback on every section, up to 2 times, so I can fix it first. | HW-02, 04..06 |
+| UC11 | As a **lecturer**, I publish the homework PDF with my instructions for the rubric, and follow the class: each student's checks and hand-in with the AI's grade, common mistakes and suspiciously similar hand-ins. | HW-01..03, 08..10, BC-04 |
 | UC12 | As a **student**, I open a lecture's page (even one I missed) to get the materials and review questions and read the answers to the class's questions. | LP-01..03 |
 | UC13 | As a **lecturer**, after the lecture I answer open questions, publish review questions and upload the slides. | LP-02..04 |
 | UC14 | As a **student**, when the lecture ends I tell the lecturer anonymously how it went, in one tap, so the next lecture can improve. | FB-01..03 |
@@ -52,6 +54,7 @@ flowchart LR
 | UC18 | As a **lecturer**, I upload the course list I already have (Excel or CSV) once, so my students see the course without any link. | EN-01..04 |
 | UC19 | As a **lecturer**, I set the course's weekly days and hours, so everyone sees it in their timetable and I can start the lesson in one tap. | TT-01..03 |
 | UC20 | As a **student**, I open the app and see the lesson that is live now and my week, and I enter the lesson in one tap. | EN-03, TT-02..04 |
+| UC21 | As a **student**, when my solution is ready I hand it in once from the same page, and see that it was handed in. | HW-07, 08 |
 
 ## Detailed use cases
 
@@ -152,28 +155,43 @@ flowchart LR
 
 ### UC10: Check a homework solution (student)
 - **Actor:** Student who is a course member.
-- **Preconditions:** the homework's guide is ready.
+- **Preconditions:** the homework's rubric is ready; the student has not handed in.
 - **Main flow:**
-  1. The student opens the homework from the lesson's (or the course's) homework tab, reads the PDF and what each section requires.
+  1. The student opens the homework from the lesson's (or the course's) homework tab and reads the PDF.
   2. The student taps "Get feedback" and uploads one PDF or photos of a handwritten solution.
-  3. The AI reviews it against the guide in the background; the server computes the question and total scores.
-  4. The student sees the report (score, what meets, what is missing, direction for each section; the sections not answered on top), how many checks are left and, from 3 checked students, their place in the class chart.
+  3. The AI reviews it against the rubric (and the lecturer's instructions) in the background; the server computes the question and total scores.
+  4. The student sees the feedback (score, what meets, what is missing, direction for each section, named by what it asks; the sections not answered on top) and how many checks are left.
 - **Alternate flows:**
   - 2a. Not a course member: rejected.
   - 2b. Wrong file type, more than 10 photos or over 20 MB: rejected with a message.
   - 3a. The check fails (the model or the server): the student is told it did not count and can try again; the previous result stays.
-  - 4a. The third check was used: the button is disabled and the last result is final.
+  - 4a. Both checks were used: the button is gone; the student fixes the solution by the last feedback and hands in (UC21).
 
 ### UC11: Publish homework and follow the class (lecturer)
 - **Actor:** Lecturer. **Secondary:** LLM Provider.
 - **Main flow:**
-  1. In the lesson's homework tab the lecturer enters a title, an optional due date and the homework PDF, and publishes.
-  2. The AI reads the PDF and builds the review guide; the homework shows "open for checking" and its questions and sections.
-  3. The lecturer follows the students' checks (name, checks used, score), opens any student's report and the chart with names.
-  4. The lecturer taps "Analyze class" for the common mistakes and the pairs of very similar solutions, and reviews those by hand.
+  1. In the lesson's homework tab the lecturer enters a title, an optional due date, the homework PDF and, optionally, instructions to the AI for the rubric, and publishes.
+  2. The AI reads the PDF and builds the rubric; the homework shows "open for hand-in". On the homework's page the lecturer sees the whole rubric, with the expected answer of each section.
+  3. The lecturer follows the students: checks used, hand-in time, the AI's grade; opens any student's hand-in files and grading report, and the chart with names.
+  4. The lecturer taps "Analyze hand-ins" for the common mistakes and the pairs of very similar hand-ins, and reviews those by hand.
 - **Alternate flows:**
   - 2a. The AI cannot find questions in the PDF: the homework shows "failed" with "Try again".
-  - 3a. The lecturer deletes the homework: its file, guide and the students' checks are removed.
+  - 2b. The rubric is not what the lecturer wanted: they change the instructions and tap "Update rubric"; the AI builds it again. Once someone has handed in, this is locked.
+  - 3a. Grading a hand-in failed: the lecturer taps "Try again" on that row.
+  - 3b. The lecturer deletes the homework: its file, rubric, checks and hand-ins are removed.
+
+### UC21: Hand in homework (student)
+- **Actor:** Student who is a course member. **Secondary:** LLM Provider.
+- **Preconditions:** the homework's rubric is ready; the student has not handed in; no check is running.
+- **Main flow:**
+  1. On the homework page the student taps "Final hand-in" and picks one PDF or photos.
+  2. The app asks to confirm that this is final; the student confirms.
+  3. The files are stored; the page shows "Handed in at …" (late, if after the due date) and links to the files.
+  4. The AI grades the hand-in against the rubric in the background, for the lecturer only.
+- **Alternate flows:**
+  - 1a. Wrong file type, more than 10 photos or over 20 MB: rejected with a message.
+  - 2a. The student cancels: nothing is sent.
+  - 3a. Already handed in: rejected; no more checks either.
 
 ### UC12: Review a lecture (student)
 - **Actor:** Student who attended at least one lecture of the course.
