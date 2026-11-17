@@ -238,6 +238,11 @@ classDiagram
     -llm: LLMProvider
     +summarize(source: LectureSource) Promise~LectureSummary~
   }
+  class LectureCoach {
+    -llm: LLMProvider
+    +review(source: LectureSource, signals: ClassSignals) Promise~LectureCoaching~
+    +validate(raw, heardAudio)$ LectureCoaching
+  }
   class HomeworkGuideGenerator {
     -llm: LLMProvider
     +fromHomework(pdf: Attachment, notes) Promise~ReviewGuide~
@@ -265,6 +270,7 @@ classDiagram
   McqGenerator o-- LLMProvider
   PracticeQuestionGenerator o-- LLMProvider
   LectureSummarizer o-- LLMProvider
+  LectureCoach o-- LLMProvider
   HomeworkGuideGenerator o-- LLMProvider
   HomeworkReviewer o-- LLMProvider
   FeedClusterer o-- LLMProvider
@@ -473,7 +479,7 @@ classDiagram
     -tokens: QrTokenService
     -clock: Clock
     +snapHeadcount(session, photo: Attachment) Promise~HeadcountResult~
-    +launch(session, type: ChallengeType, headcountId) Promise~ChallengeData~
+    +launch(session, type: ChallengeType, headcountId, afterClass) Promise~ChallengeData~
     +submitResponse(challengeId, student, payload) Promise~void~
     +rollcallToken(challenge) QrTicket
     +close(challengeId, force) Promise~Map~
@@ -574,9 +580,10 @@ classDiagram
     +normalizeDraft(draft: McqDraft)$ McqDraft
     +draftFromSlide(slide: Attachment) Promise~McqDraft[]~
     +create(session, draft: McqDraft, source) Promise~Poll~
-    +open(session, pollId) Promise~Poll~
+    +open(session, pollId, durationSec) Promise~Poll~
     +vote(pollId, student: Participant, optionIndex) Promise~void~
     +close(pollId) Promise~PollResults~
+    +closeExpired() Promise~number~
   }
   class LessonAccess {
     +requireParticipant(sessionId, studentNumber) Promise~void~
@@ -587,7 +594,7 @@ classDiagram
   }
   class FeedbackService {
     -feedback: LessonFeedbackRepository
-    -attendance: AttendanceService
+    -courses: CourseService
     -clock: Clock
     +status(session, student: Participant) Promise~FeedbackStatus~
     +submit(session, student: Participant, rating: FeedbackRating, comment) Promise~void~
@@ -615,6 +622,8 @@ classDiagram
     -recordings: RecordingRepository
     -uploads: UploadStore
     -summarizer: LectureSummarizer
+    -coach: LectureCoach
+    -lessons: LessonSignals
     -confusion: ConfusionMeter
     -queue: BackgroundQueue
     +start(session, meta) Promise~Recording~
@@ -623,6 +632,8 @@ classDiagram
     +process(recordingId) Promise~void~
     +timeline(session, recording, bucketSec = 60) Promise~Timeline~
     +publish(recording, published) Promise~Recording~
+    +retryCoaching(recording) Promise~Recording~
+    +coachingTrend(courseId) Promise~CoachingTrendPoint[]~
     +recoverInterrupted() Promise~number~
   }
   class HomeworkAnalysisService {
@@ -687,6 +698,7 @@ classDiagram
   PollService o-- McqGenerator
   FeedService o-- FeedClusterer
   RecordingPipeline o-- LectureSummarizer
+  RecordingPipeline o-- LectureCoach
   RecordingPipeline o-- ConfusionMeter
   RecordingPipeline o-- UploadStore
   RecordingPipeline o-- BackgroundQueue
@@ -711,6 +723,10 @@ classDiagram
 - Every post has a `courseId`; a post with no `sessionId` is in the course forum. `FeedService.post` requires a live lesson (`SESSION_ENDED` otherwise), `postToCourse` only course membership, and `upvote` checks whichever applies. PocketBase decides who reads a post on its `course`. `ConfusionMeter.record` and `PollService.open` require an active session.
 - `PollService.open` closes any other open poll in the session, so phones never show two polls. `close` is idempotent and stores the tally in `results`. The correct answer lives in a hidden field and is copied to `answer_index` only on close.
 - Duplicate votes are stopped twice: an `exists` check gives a friendly `ALREADY_VOTED`, and the unique index on (poll, student) and (post, voter) catches the concurrent case.
+
+**Lecture report for the lecturer (`content/`, M14):** after the summary, `RecordingPipeline` runs `LectureCoach.review` on the same source, before the upload is deleted, with `ClassSignals` from `LessonSignals` (lost spikes, unanswered questions, poll results, the feedback distribution). The report is a **hidden** field (`coaching`): students can read a published recording but never its report. A failed report never fails the summary; `retryCoaching` rebuilds it from the summary text, and `coachingTrend` lists each lesson's scores for the course.
+
+**Polls, comments and the after-class check (M14):** `PollService.open` takes an optional `durationSec` (30 s–30 min) and stores `closesAt`; `closeExpired` runs on the same 2-second timer as challenges. `FeedbackService` admits any course member (`CourseService.requireMember`) for `FEEDBACK_WINDOW_MS` = 7 days. `CommentsExportService` builds one `Table` (questions, then anonymous comments sorted by rating and text, never by time) for the same `SpreadsheetExporter`s as attendance, which now take any table. `ChallengeManager.launch(…, { afterClass })` runs a Visual Ping for `AFTER_CLASS_SEC` = 24 h, also on an ended session. `SessionService.setQuestionsPaused` lets `FeedService.post` refuse lesson questions while live (`QUESTIONS_PAUSED`).
 
 **Lecture recordings (`content/`):**
 - Cloudflare caps a request at 100 MB, so the browser uploads in 50 MB chunks. Each chunk carries its byte offset: a repeated chunk is ignored and a gap is rejected, so retries are safe.
