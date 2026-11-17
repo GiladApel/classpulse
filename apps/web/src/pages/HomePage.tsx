@@ -1,4 +1,5 @@
 import { Link, Navigate } from 'react-router';
+import AfterClassChecks from '../components/AfterClassChecks';
 import AppShell from '../components/AppShell';
 import Timetable from '../components/Timetable';
 import { Card } from '../components/ui';
@@ -20,6 +21,7 @@ function StudentHome({ user }: { user: UserRecord }) {
   return (
     <AppShell wide>
       <h1 className="text-2xl font-bold">שלום {user.name.split(' ')[0]}</h1>
+      <AfterClassChecks />
 
       {live.map((s) => (
         <Link
