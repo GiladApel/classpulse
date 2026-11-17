@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { SessionService } from '../attendance/SessionService.js';
-import type { PollService } from '../engagement/PollService.js';
+import { PollService } from '../engagement/PollService.js';
 import type { Poll } from '../engagement/types.js';
 import { type AppEnv, requireLecturer } from './auth.js';
 import { participant } from './EngagementController.js';
@@ -19,7 +19,10 @@ export const pollDto = (p: Poll) => ({
   status: p.status,
   source: p.source,
   results: p.results,
+  closesAt: p.closesAt?.toISOString() ?? null,
 });
+
+const duration = (b: Record<string, unknown>) => (b.durationSec === undefined || b.durationSec === null ? undefined : num(b, 'durationSec', 1, 100_000));
 
 export class PollController {
   constructor(
@@ -49,15 +52,17 @@ export class PollController {
       }
       const correctIndex = b.correctIndex === undefined || b.correctIndex === null ? null : num(b, 'correctIndex', 0, 5);
       const source = b.source === undefined ? 'manual' : oneOf(b, 'source', ['manual', 'ai'] as const);
+      PollService.checkDuration(duration(b)); // before creating, so a bad duration leaves no draft behind
       let poll = await this.polls.create(session, { question, options: b.options as string[], correctIndex }, source);
-      if (b.open === true) poll = await this.polls.open(session, poll.id);
+      if (b.open === true) poll = await this.polls.open(session, poll.id, duration(b));
       return c.json(pollDto(poll), 201);
     });
 
     app.post('/polls/:id/open', requireLecturer, async (c) => {
       const poll = await this.polls.get(c.req.param('id'));
       const session = await this.sessions.getOwned(poll.sessionId, c.get('user').id);
-      return c.json(pollDto(await this.polls.open(session, poll.id)));
+      const b = await jsonBody(c.req).catch(() => ({}));
+      return c.json(pollDto(await this.polls.open(session, poll.id, duration(b as Record<string, unknown>))));
     });
 
     app.post('/polls/:id/close', requireLecturer, async (c) => {

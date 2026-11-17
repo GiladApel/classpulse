@@ -78,6 +78,8 @@ export interface Poll {
   createdAt: Date;
   openedAt?: Date;
   closedAt?: Date;
+  /** When an open poll closes by itself; none for a poll the lecturer closes by hand. */
+  closesAt?: Date;
 }
 
 export interface PollVote {

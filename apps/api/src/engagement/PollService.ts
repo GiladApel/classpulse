@@ -7,6 +7,9 @@ import { DomainError, NotFoundError } from '../shared/errors.js';
 import type { PollRepository, PollVoteRepository } from './repositories.js';
 import type { McqDraft, Participant, Poll, PollResults, PollSource } from './types.js';
 
+export const MIN_POLL_SEC = 30;
+export const MAX_POLL_SEC = 30 * 60;
+
 export class PollService {
   constructor(
     private readonly polls: PollRepository,
@@ -45,14 +48,32 @@ export class PollService {
     });
   }
 
-  /** One open poll per session: opening a new one closes the previous one, so phones never show two. */
-  async open(session: Session, pollId: string): Promise<Poll> {
+  /**
+   * One open poll per session: opening a new one closes the previous one, so phones never show two. With `durationSec`
+   * the poll closes by itself (closeExpired), like a quiz timer.
+   */
+  async open(session: Session, pollId: string, durationSec?: number): Promise<Poll> {
     if (session.status !== 'active') throw new DomainError('SESSION_ENDED', 'השיעור כבר הסתיים');
+    PollService.checkDuration(durationSec);
     const poll = await this.get(pollId);
     if (poll.status !== 'draft') throw new DomainError('POLL_STATE', 'אפשר לפתוח רק סקר שעוד לא נפתח');
     const current = await this.polls.findOpenBySession(poll.sessionId);
     if (current) await this.close(current.id);
-    return this.polls.update(pollId, { status: 'open', openedAt: this.clock.now() });
+    const now = this.clock.now();
+    return this.polls.update(pollId, { status: 'open', openedAt: now, closesAt: durationSec ? new Date(now.getTime() + durationSec * 1000) : undefined });
+  }
+
+  static checkDuration(durationSec: number | undefined): void {
+    if (durationSec !== undefined && (!Number.isInteger(durationSec) || durationSec < MIN_POLL_SEC || durationSec > MAX_POLL_SEC)) {
+      throw new DomainError('INVALID_DURATION', `משך הסקר צריך להיות בין ${MIN_POLL_SEC} שניות ל-${MAX_POLL_SEC / 60} דקות`);
+    }
+  }
+
+  /** Called by a timer; returns how many polls it closed. */
+  async closeExpired(): Promise<number> {
+    const due = await this.polls.listOpenExpired(this.clock.now());
+    for (const p of due) await this.close(p.id);
+    return due.length;
   }
 
   async vote(pollId: string, student: Participant, optionIndex: number): Promise<void> {

@@ -104,6 +104,10 @@ describe('HTTP: backchannel + polls', () => {
     expect((await call('avi', 'POST', `/polls/${poll.body.id}/votes`, { optionIndex: 1 })).body.code).toBe('ALREADY_VOTED');
     expect((await call('rina', 'POST', `/polls/${poll.body.id}/votes`, { optionIndex: 1 })).body.code).toBe('NOT_IN_COURSE');
 
+    // A timed poll: the closing time is set and returned.
+    const timed = await call('lect', 'POST', `/sessions/${sessionId}/polls`, { question: 'מהר?', options: ['כן', 'לא'], open: true, durationSec: 120 });
+    expect(new Date(timed.body.closesAt).getTime() - clock.now().getTime()).toBe(120_000);
+    expect((await call('lect', 'POST', `/sessions/${sessionId}/polls`, { question: 'x', options: ['a', 'b'], open: true, durationSec: 5 })).body.code).toBe('INVALID_DURATION');
     expect((await call('dana', 'POST', `/polls/${poll.body.id}/close`)).status).toBe(403);
     expect((await call('lect', 'POST', `/polls/${poll.body.id}/close`)).body).toEqual({ counts: [1, 0, 1, 0], total: 2, correctIndex: 0 });
   });

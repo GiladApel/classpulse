@@ -14,7 +14,7 @@ import { DomainError } from '../shared/errors.js';
 import { makeSession, T0 } from '../test/fixtures.js';
 import { ConfusionMeter } from './ConfusionMeter.js';
 import { FeedService } from './FeedService.js';
-import { PollService } from './PollService.js';
+import { MAX_POLL_SEC, PollService } from './PollService.js';
 import type { Participant } from './types.js';
 
 const dana: Participant = { id: 'u1', studentNumber: '111', name: 'דנה' };
@@ -148,10 +148,27 @@ describe('FeedService', () => {
 
 describe('PollService', () => {
   let polls: PollService;
+  let clock: FixedClock;
   const session = makeSession();
 
   beforeEach(() => {
-    polls = new PollService(new InMemoryPollRepository(), new InMemoryPollVoteRepository(), attendance, new McqGenerator(new MockProvider()), new FixedClock(T0));
+    clock = new FixedClock(T0);
+    polls = new PollService(new InMemoryPollRepository(), new InMemoryPollVoteRepository(), attendance, new McqGenerator(new MockProvider()), clock);
+  });
+
+  it('a timed poll closes by itself when its time is up; an invalid duration is refused', async () => {
+    const draft = await polls.create(session, { question: 'מי הבין?', options: ['כן', 'לא'], correctIndex: null }, 'manual');
+    expect(await code(polls.open(session, draft.id, 10))).toBe('INVALID_DURATION');
+    expect(await code(polls.open(session, draft.id, MAX_POLL_SEC + 1))).toBe('INVALID_DURATION');
+    const opened = await polls.open(session, draft.id, 120);
+    expect(opened.closesAt).toEqual(new Date(T0.getTime() + 120_000));
+    await polls.vote(draft.id, dana, 0);
+    clock.advance(119_000);
+    expect(await polls.closeExpired()).toBe(0);
+    clock.advance(1_000);
+    expect(await polls.closeExpired()).toBe(1);
+    expect(await polls.get(draft.id)).toMatchObject({ status: 'closed', results: { counts: [1, 0], total: 1 } });
+    expect(await polls.closeExpired()).toBe(0);
   });
 
   it('create → open → vote → close with tallies and reveal', async () => {

@@ -118,6 +118,11 @@ export class PbPollRepository extends PbRepository<Poll> implements PollReposito
     return (await this.col.getFullList({ filter: this.pb.filter('session = {:s}', { s: sessionId }), sort: 'created_at' })).map((r) => this.toEntity(r));
   }
 
+  async listOpenExpired(now: Date) {
+    const filter = this.pb.filter("status = 'open' && closes_at != '' && closes_at <= {:now}", { now: now.toISOString().replace('T', ' ') });
+    return (await this.col.getFullList({ filter })).map((r) => this.toEntity(r));
+  }
+
   protected toEntity(r: RecordModel): Poll {
     return {
       id: r.id,
@@ -131,6 +136,7 @@ export class PbPollRepository extends PbRepository<Poll> implements PollReposito
       createdAt: toDate(r.created_at)!,
       openedAt: toDate(r.opened_at),
       closedAt: toDate(r.closed_at),
+      closesAt: toDate(r.closes_at),
     };
   }
 
@@ -149,6 +155,7 @@ export class PbPollRepository extends PbRepository<Poll> implements PollReposito
       created_at: d.createdAt?.toISOString(),
       opened_at: d.openedAt?.toISOString(),
       closed_at: d.closedAt?.toISOString(),
+      closes_at: d.closesAt?.toISOString(),
     });
   }
 }
