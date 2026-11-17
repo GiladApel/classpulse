@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { type FeedScope, feedFilter, myVotesFilter, postUrl } from '../lib/feed';
 import { api, ApiError } from '../lib/api';
-import { pb } from '../lib/pb';
+import { pb, useQuestionsPaused } from '../lib/pb';
 import { useCountdown } from '../lib/useChallenge';
 import { currentPoll, type PollRecord, type PostRecord, useLiveRecords, useTick } from '../lib/useLiveRecords';
 import FeedbackCard from './FeedbackCard';
@@ -11,12 +11,13 @@ import { Button, Card, ErrorText, inputClass } from './ui';
 const message = (e: unknown) => (e instanceof ApiError && e.status < 500 ? e.message : 'שגיאת רשת — נסו שוב');
 
 export default function StudentLivePanel({ sessionId, active }: { sessionId: string; active: boolean }) {
+  const paused = useQuestionsPaused(sessionId);
   return (
     <div className="flex w-full flex-col gap-4 text-start">
       <FeedbackCard sessionId={sessionId} ended={!active} />
       <PollCard sessionId={sessionId} />
       {active && <LostButton sessionId={sessionId} />}
-      <Feed scope={{ sessionId }} canPost />
+      <Feed scope={{ sessionId }} canPost={!paused} pausedNote={paused} />
     </div>
   );
 }
@@ -152,7 +153,7 @@ function PollCard({ sessionId }: { sessionId: string }) {
  * Questions with the lecturer's answers, of a lesson or of the course forum. Course members post and upvote in a lesson
  * while it is live, and in the course forum at any time (`canPost`).
  */
-export function Feed({ scope, canPost }: { scope: FeedScope; canPost: boolean }) {
+export function Feed({ scope, canPost, pausedNote = false }: { scope: FeedScope; canPost: boolean; pausedNote?: boolean }) {
   const userId = pb.authStore.record?.id ?? '';
   const course = 'courseId' in scope;
   const posts = useLiveRecords<PostRecord>('feed_posts', feedFilter(scope));
@@ -192,6 +193,7 @@ export function Feed({ scope, canPost }: { scope: FeedScope; canPost: boolean })
   return (
     <Card>
       <h2 className="mb-3 font-semibold">{course ? 'פורום הקורס' : 'שאלות והערות'}</h2>
+      {pausedNote && <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900">המרצה ביקש לשאול אחרי השיעור — בפורום של הקורס או בהערות על השיעור.</p>}
       {canPost && (
         <form onSubmit={submit} className="flex flex-col gap-2">
           <textarea name="text" required maxLength={500} rows={2} placeholder={course ? 'שאלה לקורס…' : 'שאלה, הערה או הצעה למרצה…'} className={inputClass} />

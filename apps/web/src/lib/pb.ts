@@ -25,6 +25,21 @@ export function useUser(): UserRecord | null {
 }
 
 /** Live session status: the student's page learns the lecture ended the moment the lecturer ends it. */
+/** Live: the lecturer asked students to hold their questions until after class. */
+export function useQuestionsPaused(sessionId: string | undefined): boolean {
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    if (!sessionId) return;
+    const col = pb.collection('sessions');
+    col.getOne(sessionId).then((s) => setPaused(!!s.questions_paused), () => {});
+    const unsubscribe = col.subscribe(sessionId, ({ record }) => setPaused(!!record.questions_paused));
+    return () => {
+      unsubscribe.then((fn) => fn()).catch(() => {});
+    };
+  }, [sessionId]);
+  return paused;
+}
+
 export function useSessionActive(sessionId: string | undefined): boolean {
   const [active, setActive] = useState(true);
   useEffect(() => {

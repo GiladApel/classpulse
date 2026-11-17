@@ -2,7 +2,7 @@ import type { RecordModel } from 'pocketbase';
 import { type FeedScope, feedFilter } from '../lib/feed';
 import { type ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../lib/api';
-import { pb } from '../lib/pb';
+import { pb, useQuestionsPaused } from '../lib/pb';
 import { type PollRecord, type PostRecord, tally, useLiveRecords } from '../lib/useLiveRecords';
 import PollBars from './PollBars';
 import { Button, Card, ErrorText, inputClass } from './ui';
@@ -28,8 +28,29 @@ export default function EngagementPanel({ sessionId, active }: { sessionId: stri
         {active && <ConfusionCard sessionId={sessionId} />}
         <PollManager sessionId={sessionId} active={active} />
       </div>
-      <FeedBoard scope={{ sessionId }} />
+      <div className="flex flex-col gap-4">
+        {active && <QuestionsSwitch sessionId={sessionId} />}
+        <FeedBoard scope={{ sessionId }} />
+      </div>
     </div>
+  );
+}
+
+/** Some lecturers want phones down during class: students then ask after it, in the course forum or the lecture comments. */
+function QuestionsSwitch({ sessionId }: { sessionId: string }) {
+  const paused = useQuestionsPaused(sessionId);
+  const [error, setError] = useState('');
+  const toggle = () => api.put(`/sessions/${sessionId}/questions`, { paused: !paused }).catch((e) => setError(message(e)));
+  return (
+    <Card className="flex flex-wrap items-center justify-between gap-3 py-3">
+      <p className="text-sm">
+        שאלות בזמן השיעור: <b>{paused ? 'סגור — הסטודנטים ישאלו אחרי השיעור' : 'פתוח'}</b>
+      </p>
+      <Button variant="secondary" onClick={toggle}>
+        {paused ? 'פתיחת שאלות' : 'שאלות רק אחרי השיעור'}
+      </Button>
+      <ErrorText>{error}</ErrorText>
+    </Card>
   );
 }
 
