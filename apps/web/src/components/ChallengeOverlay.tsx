@@ -1,11 +1,14 @@
 import { type MouseEvent, useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { pb } from '../lib/pb';
-import { isRunning, useCountdown, useLatestChallenge, useProtectedFileUrl } from '../lib/useChallenge';
+import { isAfterClass, isRunning, until, useCountdown, useLatestChallenge, useProtectedFileUrl } from '../lib/useChallenge';
 
 type TapState = { kind: 'idle' } | { kind: 'sending'; x: number; y: number } | { kind: 'done'; x?: number; y?: number } | { kind: 'error'; message: string };
 
-/** Full-screen prompt on a checked-in student's phone while a challenge runs. */
+/**
+ * A checked-in student's attendance check: full screen while a live check runs in class, or a card on the lesson page
+ * for an after-class check, which stays open for a day.
+ */
 export default function ChallengeOverlay({ sessionId }: { sessionId: string }) {
   const challenge = useLatestChallenge(sessionId);
   const left = useCountdown(challenge?.expires_at);
@@ -39,6 +42,33 @@ export default function ChallengeOverlay({ sessionId }: { sessionId: string }) {
   };
 
   const dot = state.kind === 'sending' || state.kind === 'done' ? state : null;
+
+  if (isAfterClass(challenge)) {
+    return (
+      <section className="flex flex-col gap-3 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200" aria-label="בדיקת נוכחות">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-semibold text-amber-950">בדיקת נוכחות לשיעור הזה</h2>
+          <span className="text-sm text-amber-900">פתוחה עד {until(challenge.expires_at)}</span>
+        </div>
+        <p className="text-amber-950">{state.kind === 'done' ? 'התקבל ✓ תודה!' : 'מספר הנוכחים לא התאים לתמונת הכיתה. הקישו על המקום שבו ישבתם.'}</p>
+        <div className="relative w-full max-w-xl">
+          {imageUrl ? (
+            <img src={imageUrl} alt="תמונת הכיתה (מטושטשת)" onClick={tap} className="block w-full cursor-crosshair select-none rounded-xl" draggable={false} />
+          ) : (
+            <div className="aspect-video animate-pulse rounded-xl bg-amber-100" />
+          )}
+          {dot && dot.x !== undefined && dot.y !== undefined && (
+            <span
+              className="pointer-events-none absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white bg-emerald-500 shadow-lg"
+              style={{ left: `${dot.x * 100}%`, top: `${dot.y * 100}%` }}
+            />
+          )}
+        </div>
+        {state.kind === 'error' && <p className="rounded-lg bg-red-50 px-3 py-2 text-red-800">{state.message}</p>}
+        <p className="text-xs text-amber-900/80">התמונה מטושטשת בכוונה — אף אחד לא מזוהה בה. מי שלא יענה יסומן לבדיקה של המרצה.</p>
+      </section>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-950/95 p-4 text-white">

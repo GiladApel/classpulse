@@ -58,6 +58,12 @@ export function useCountdown(until: string | undefined): number {
   return left;
 }
 
+/** An after-class check runs for a day (a live one for under a minute), and is answered from the lesson page. */
+export const isAfterClass = (c: Pick<ChallengeRecord, 'started_at' | 'expires_at'> | null): boolean =>
+  !!c && parseDate(c.expires_at).getTime() - parseDate(c.started_at).getTime() > 10 * 60_000;
+
+export const until = (iso: string) => parseDate(iso).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+
 export const isRunning = (c: ChallengeRecord | null, secondsLeft: number): c is ChallengeRecord =>
   !!c && c.status === 'active' && secondsLeft > 0;
 

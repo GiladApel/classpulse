@@ -127,14 +127,14 @@ export default function LessonPage() {
           </button>
         </div>
       )}
+      {!lecturer && record && <ChallengeOverlay sessionId={id} />}
       {session && (
         <>
           <Tabs tabs={tabs} value={tab} onChange={setTab} />
           {panels[tab]}
         </>
       )}
-      {/* Challenges pop up over any tab. */}
-      {!lecturer && live && record && <ChallengeOverlay sessionId={id} />}
+      {/* A live check pops up over any tab; an after-class check is a card at the top of the lesson. */}
     </AppShell>
   );
 }
