@@ -111,6 +111,17 @@ export const qrToken = (lecturer: Page, sessionId: string): Promise<string> =>
     return (await (await fetch(`/api/sessions/${id}/qr`, { headers: { Authorization: `Bearer ${token}` } })).json()).token;
   }, sessionId);
 
+/** Calls the API as the logged-in user of `page` (JSON body). */
+export const apiAs = (page: Page, method: string, path: string, body?: unknown) =>
+  page.evaluate(
+    async ({ method, path, body }) => {
+      const { token } = JSON.parse(localStorage.getItem('pocketbase_auth')!);
+      const res = await fetch(`/api${path}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+      return { status: res.status, body: await res.json().catch(() => null) };
+    },
+    { method, path, body },
+  );
+
 export async function checkIn(student: Page, token: string) {
   await student.goto(`/c/${token}`);
   await expect(student.getByText('הנוכחות נרשמה')).toBeVisible({ timeout: 15_000 });

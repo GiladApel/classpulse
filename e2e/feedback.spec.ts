@@ -1,17 +1,20 @@
 import { expect, type Page, test } from '@playwright/test';
-import { checkIn, lecturerPage, makeClass, openTab, phone, qrToken, startSession } from './support';
+import { apiAs, checkIn, lecturerPage, makeClass, openTab, phone, qrToken, startSession } from './support';
 
 let klass: Awaited<ReturnType<typeof makeClass>>;
 test.beforeAll(async () => {
-  klass = await makeClass('fb', ['מור', 'גל', 'רון']);
+  klass = await makeClass('fb', ['מור', 'גל', 'רון', 'נטע']);
 });
 test.afterAll(async () => klass?.cleanup());
 
-test('feedback appears on open phones when the lecture ends; the lecturer sees it anonymously from 3 answers', async ({ browser }) => {
+test('comments appear on open phones when the lecture ends; a member who missed it comments too; the lecturer sees them anonymously and exports them', async ({ browser }) => {
   const lp = await lecturerPage(browser, klass.lecturer);
   const sessionId = await startSession(lp);
+  const [present, absent] = [klass.students.slice(0, 3), klass.students[3]];
+  // Netta is on the roster but never comes to class.
+  expect((await apiAs(lp, 'POST', `/courses/${klass.courseId}/enrollments`, { studentNumber: absent.student_id, name: absent.name })).status).toBe(201);
   const phones: Page[] = [];
-  for (const [i, s] of klass.students.entries()) {
+  for (const [i, s] of present.entries()) {
     const p = await phone(browser, s, i);
     await checkIn(p, await qrToken(lp, sessionId));
     phones.push(p);
@@ -45,7 +48,24 @@ test('feedback appears on open phones when the lecture ends; the lecturer sees i
   await lp.getByRole('button', { name: 'רענון' }).click();
   await expect(lp.getByText('(3 תשובות · אנונימי)')).toBeVisible();
   await expect(lp.getByText('החלק על Observer היה מהיר')).toBeVisible();
-  const card = lp.getByRole('heading', { name: /משוב על השיעור/ }).locator('xpath=../..');
+  const card = lp.getByRole('heading', { name: /הערות על השיעור/ }).locator('xpath=../..');
   await expect(card).toContainText('החלק על Observer היה מהיר');
   for (const s of klass.students) await expect(card).not.toContainText(s.name);
+
+  // The member who missed the lecture opens it later and leaves a comment.
+  const np = await phone(browser, absent, 3);
+  await np.goto(`/lesson/${sessionId}?tab=forum`);
+  await expect(np.getByText('איך היה השיעור?')).toBeVisible({ timeout: 10_000 });
+  await send(np, 'החומר לא היה ברור', 'צפיתי בהקלטה, חסרה דוגמה');
+  await lp.getByRole('button', { name: 'רענון' }).click();
+  await expect(lp.getByText('(4 תשובות · אנונימי)')).toBeVisible();
+
+  // Export: an anonymous spreadsheet of the comments.
+  const download = lp.waitForEvent('download');
+  await lp.getByRole('button', { name: 'CSV' }).last().click();
+  const file = await download;
+  expect(file.suggestedFilename()).toContain('הערות');
+  const text = (await (await file.createReadStream()).toArray()).join('');
+  expect(text).toContain('צפיתי בהקלטה, חסרה דוגמה');
+  for (const s of klass.students) expect(text).not.toContain(s.name);
 });
