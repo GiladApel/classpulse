@@ -42,6 +42,7 @@
 | FR-AF-06 | When a challenge closes, each response is labelled `ok`, `empty_seat`, `collision` or `no_response` by hit-testing against the person boxes. Every label other than `ok` flags the attendance record. |
 | FR-AF-07 | The lecturer makes the final decision: keep or remove each flagged record. |
 | FR-AF-08 | The clear photo is visible only to the lecturer and is deleted when the session ends. |
+| FR-AF-09 | **After-class check:** from a class photo, the lecturer can also run the Visual Ping for 24 hours, during or after the lesson. Checked-in students see it as a card on the lesson page (and a notice on their home page) and answer with the same single tap; labels and flags are the same as FR-AF-06, and the lecturer still decides (FR-AF-07). |
 
 ### F3: Live backchannel
 | ID | Requirement |
@@ -52,6 +53,7 @@
 | FR-BC-04 | The lecturer can request an AI clustering of open posts into themes. |
 | FR-BC-05 | While a lesson is live, every course member takes part in it ("I'm lost", questions, upvotes, polls) whether or not they checked in, so students at home can follow and ask. Attendance itself is recorded only by the QR in the room. |
 | FR-BC-06 | Every course has a general forum, open to its members at any time: they ask (optionally anonymously) and upvote; the lecturer answers and marks questions answered. |
+| FR-BC-07 | During a live lesson the lecturer can switch students' questions off ("questions only after class"), for lecturers who prefer phones down. Polls and "I'm lost" are not affected; students are told to ask in the course forum or the lecture comments. |
 
 ### F4: Polls
 | ID | Requirement |
@@ -60,8 +62,9 @@
 | FR-PL-02 | The AI returns 3 MCQ drafts for the slide; the lecturer picks one, may edit it, and opens it. |
 | FR-PL-03 | When a poll opens, every connected student's screen switches to it automatically. One vote per student. |
 | FR-PL-04 | Results update live on the projector. The correct answer is revealed when the poll closes. |
+| FR-PL-05 | When opening a poll the lecturer may choose an automatic close (1, 2 or 5 minutes; 2 by default, like a quiz timer). Phones, the projector and the dashboard show the countdown; the poll closes and reveals the answer by itself. |
 
-### F5: Lecture summary
+### F5: Lecture summary and the lecturer's report
 | ID | Requirement |
 |----|-------------|
 | FR-VS-01 | The lecturer can upload a recording (mp4) or transcript (vtt/txt) for a session. |
@@ -69,6 +72,8 @@
 | FR-VS-03 | The output contains a TL;DR, timestamped chapters, key concepts and 5 review questions. |
 | FR-VS-04 | The timeline overlays "I'm lost" spikes, aligned using the recording's offset from the session start. |
 | FR-VS-05 | The lecturer can publish the summary to students. |
+| FR-VS-06 | **Report for the lecturer:** from the same recording or transcript, plus what the class did ("I'm lost" spikes, unanswered questions, poll results, the feedback distribution), the AI writes a short report meant to improve the lecture: clarity, pace and engagement scores (1–5), 3–5 tips each tied to a moment, promises made and not kept, repeated language slips and, for a recording, sound quality. It is short on purpose and is never shown to students. |
+| FR-VS-07 | The lecturer sees the three scores across the course's lessons as a trend, and can rebuild a failed report. |
 
 ### F6: Homework review
 | ID | Requirement |
@@ -93,12 +98,13 @@
 | FR-LP-04 | The lecturer can write an answer under a student's question, during or after the lecture; it marks the question answered. |
 | FR-LP-05 | A lesson with homework shows it next to its title, in the course's lesson list and in the lesson header: "homework to hand in" with the earliest due date, or "homework handed in" once the student handed in all of it. |
 
-### F8: Lecture feedback
+### F8: Lecture comments
 | ID | Requirement |
 |----|-------------|
-| FR-FB-01 | When the lecturer ends the lecture, every student who was checked in is offered optional, anonymous feedback: one of four options (clear and well paced · too fast · too slow · the material was not clear) and an optional comment. It appears at once on phones still open and stays available on the lecture page for 24 hours. |
+| FR-FB-01 | When the lecturer ends the lecture, every course member (checked in or not) is offered an optional, anonymous comment on it: one of four options (clear and well paced · too fast · too slow · the material was not clear) and free text. It appears at once on phones still open and stays on the lecture page for 7 days, so students who watched it later can comment too. |
 | FR-FB-02 | One answer per student. The form states that it is anonymous. |
 | FR-FB-03 | The lecturer sees only the aggregate (count per option and the comments, ordered by option, never by time) and only from 3 answers. No one, the lecturer included, can read a single answer or its author. |
+| FR-FB-04 | The lecturer can export a lecture's questions (with their answers and upvotes; a name only where the student posted with one) and its comments (anonymous, from 3 answers, without times) to Excel, CSV or Google Sheets. |
 
 ### F9: Administration
 | ID | Requirement |
