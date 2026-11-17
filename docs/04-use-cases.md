@@ -43,7 +43,7 @@ flowchart LR
 | UC5 | As a **checked-in student**, I tap my seat on a blurred photo within 45 s to prove I'm in the room. | AF-04, 06 |
 | UC6 | As a **student**, I press "I'm lost" or post a question (anonymously if I want), so the lecturer can react now. | BC-01..03 |
 | UC7 | As a **student**, the poll appears on my phone and I vote with one tap. | PL-03 |
-| UC8 | As a **lecturer**, I generate a question from my current slide and launch it in seconds, and it closes by itself after two minutes, like a Kahoot question. | PL-01..05 |
+| UC8 | As a **lecturer**, I generate a question from my current slide (or write one by hand) and launch it in seconds, and it closes by itself after two minutes, like a Kahoot question. | PL-01..05 |
 | UC9 | As a **lecturer**, I upload last week's recording and get a summary for my students and a short report for me with a few concrete tips to improve the next lecture. | VS-01..07 |
 | UC10 | As a **student**, before handing in my homework I upload my solution and get feedback on every section, up to 2 times, so I can fix it first. | HW-02, 04..06 |
 | UC11 | As a **lecturer**, I publish the homework PDF with my instructions for the rubric, and follow the class: each student's checks and hand-in with the AI's grade, common mistakes and suspiciously similar hand-ins. | HW-01..03, 08..10, BC-04 |
@@ -147,7 +147,9 @@ flowchart LR
   2. The LLM returns 3 MCQ drafts; the lecturer picks one and may edit it.
   3. The lecturer keeps the automatic close (2 minutes by default) or picks 1 or 5 minutes or no limit, and clicks "Open". Phones and the projector show the countdown.
   4. The poll closes by itself and reveals the answer, or the lecturer clicks "Close & reveal" earlier.
-- **Alternate flow:** 1a. The file is not an image or is over 10 MB: rejected.
+- **Alternate flows:**
+  - 1a. The file is not an image or is over 10 MB: rejected.
+  - 1b. No slide: the lecturer taps "Write a question by hand", types the question and 2–6 answers, optionally marks the correct one, and continues at step 3.
 
 ### UC9: Summarize a lecture and get its report
 - **Actor:** Lecturer. **Secondary:** LLM Provider.

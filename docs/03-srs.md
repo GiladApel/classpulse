@@ -58,7 +58,7 @@
 ### F4: Polls
 | ID | Requirement |
 |----|-------------|
-| FR-PL-01 | A poll is created from a slide: the lecturer photographs it (camera) or uploads an image of it (gallery or computer). |
+| FR-PL-01 | A poll is created from a slide: the lecturer photographs it (camera) or uploads an image of it (gallery or computer). The lecturer can also write one by hand (2–6 answers; marking a correct answer is optional, so it can be an opinion poll). |
 | FR-PL-02 | The AI returns 3 MCQ drafts for the slide; the lecturer picks one, may edit it, and opens it. |
 | FR-PL-03 | When a poll opens, every connected student's screen switches to it automatically. One vote per student. |
 | FR-PL-04 | Results update live on the projector. The correct answer is revealed when the poll closes. |
