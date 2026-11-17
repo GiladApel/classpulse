@@ -3,6 +3,7 @@ import { LLMOutputError } from '../ai/LLMProvider.js';
 import { MockProvider } from '../ai/MockProvider.js';
 import type { Session } from '../attendance/types.js';
 import { makeCtx, T0 } from '../test/fixtures.js';
+import { AFTER_CLASS_SEC } from './ChallengeManager.js';
 import { FakeImageProcessor, makeTestPorts } from '../test/testContainer.js';
 
 // Mock detection (DEFAULT_FIXTURES): three people, boxes centred at x ≈ 0.19 / 0.50 / 0.81, y ≈ 0.55.
@@ -97,6 +98,25 @@ describe('ChallengeManager', () => {
 
       const other = await t.container.sessions.start('lect1', { courseId: 'c1', title: 'Other', geofenceMode: 'lenient', geofenceRadiusM: 50 });
       await expect(t.container.challenges.launch(other, 'visual_ping', headcount.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('after class: on an ended lesson, a visual ping runs for a day and closes with the same verdicts', async () => {
+      const [a, b] = [await checkIn('1'), await checkIn('2')];
+      const { headcount } = await t.container.challenges.snapHeadcount(session, photo);
+      const ended = await t.container.sessions.end(session);
+      const m = t.container.challenges;
+      await expect(m.launch(ended, 'visual_ping', headcount.id)).rejects.toMatchObject({ code: 'SESSION_ENDED' });
+      await expect(m.launch(ended, 'rollcall', undefined, { afterClass: true })).rejects.toMatchObject({ code: 'PHOTO_REQUIRED' });
+
+      const ch = await m.launch(ended, 'visual_ping', headcount.id, { afterClass: true });
+      expect(ch.expiresAt.getTime() - ch.startedAt.getTime()).toBe(AFTER_CLASS_SEC * 1000);
+      t.clock.advance(3 * 3600_000); // hours later, from home
+      await m.submitResponse(ch.id, { id: 'u1', studentNumber: '1' }, { tap: SEAT[0] });
+      expect(await m.closeExpired()).toBe(0);
+      t.clock.advance(AFTER_CLASS_SEC * 1000);
+      expect(await m.closeExpired()).toBe(1);
+      expect((await t.container.attendance.get(a.id)).status).toBe('present');
+      expect((await t.container.attendance.get(b.id)).status).toBe('flagged'); // no answer: the lecturer decides
     });
 
     it('lecturer can close early (force)', async () => {

@@ -27,6 +27,9 @@ export interface ChallengeOptions {
   durationSec: Record<ChallengeType, number>;
 }
 
+/** A mismatch check after class: students tap their seat on the class photo any time within a day. */
+export const AFTER_CLASS_SEC = 24 * 60 * 60;
+
 const DEFAULTS: ChallengeOptions = { blurSigma: 30, mismatchTolerance: 0.1, durationSec: { rollcall: 30, visual_ping: 45 } };
 
 const FLAG_REASON: Partial<Record<Verdict, string>> = {
@@ -80,8 +83,14 @@ export class ChallengeManager {
     return { headcount, presentCount, mismatch, detectionFailed: !detection };
   }
 
-  async launch(session: Session, type: ChallengeType, headcountId?: string): Promise<ChallengeData> {
-    if (session.status !== 'active') throw new ConflictError('SESSION_ENDED', 'השיעור הסתיים');
+  /**
+   * `afterClass` runs a visual ping on a class photo for AFTER_CLASS_SEC, also once the lesson has ended, so students
+   * confirm their attendance from the lesson page instead of within 45 seconds in the room.
+   */
+  async launch(session: Session, type: ChallengeType, headcountId?: string, opts: { afterClass?: boolean } = {}): Promise<ChallengeData> {
+    if (opts.afterClass) {
+      if (type !== 'visual_ping' || !headcountId) throw new ConflictError('PHOTO_REQUIRED', 'בדיקה אחרי השיעור צריכה תמונת כיתה');
+    } else if (session.status !== 'active') throw new ConflictError('SESSION_ENDED', 'השיעור הסתיים');
     if (await this.challenges.findActiveBySession(session.id)) throw new ConflictError('CHALLENGE_ACTIVE', 'כבר רצה בדיקה');
 
     const headcount = headcountId ? await this.headcounts.get(headcountId) : null;
@@ -99,7 +108,7 @@ export class ChallengeManager {
       secret: randomBytes(32).toString('base64url'),
     };
     const challenge = ChallengeFactory.create(data, { tokens: this.tokens, headcount });
-    challenge.start(now, this.opts.durationSec[type]);
+    challenge.start(now, opts.afterClass ? AFTER_CLASS_SEC : this.opts.durationSec[type]);
 
     const { id: _, ...toSave } = challenge.state;
     const image = type === 'visual_ping' && headcount ? await this.headcounts.getBlurred(headcount.id) : undefined;

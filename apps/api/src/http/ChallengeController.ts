@@ -56,7 +56,8 @@ export class ChallengeController {
       const b = await jsonBody(c.req);
       const type = oneOf(b, 'type', ['rollcall', 'visual_ping'] as const);
       const headcountId = str(b, 'headcountId', { optional: true }) || undefined;
-      return c.json(challengeDto(await this.challenges.launch(session, type, headcountId)), 201);
+      if (b.afterClass !== undefined && typeof b.afterClass !== 'boolean') throw new ValidationError('afterClass must be a boolean');
+      return c.json(challengeDto(await this.challenges.launch(session, type, headcountId, { afterClass: b.afterClass === true })), 201);
     });
 
     app.get('/challenges/:id/qr', requireLecturer, async (c) => {

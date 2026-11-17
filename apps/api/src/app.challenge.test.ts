@@ -72,6 +72,19 @@ describe('HTTP: headcount + challenges', () => {
     expect(dana.status).toBe('present');
   });
 
+  it('after-class check over HTTP: launched on an ended lesson, answered later, lasts a day', async () => {
+    await checkIn('dana');
+    const hc = (await upload()).body.headcount;
+    await call('lect', 'POST', `/sessions/${sessionId}/end`);
+    expect((await call('lect', 'POST', `/sessions/${sessionId}/challenges`, { type: 'visual_ping', headcountId: hc.id })).body.code).toBe('SESSION_ENDED');
+    expect((await call('lect', 'POST', `/sessions/${sessionId}/challenges`, { type: 'visual_ping', headcountId: hc.id, afterClass: 'yes' })).status).toBe(400);
+    expect((await call('dana', 'POST', `/sessions/${sessionId}/challenges`, { type: 'visual_ping', headcountId: hc.id, afterClass: true })).status).toBe(403);
+    const launched = await call('lect', 'POST', `/sessions/${sessionId}/challenges`, { type: 'visual_ping', headcountId: hc.id, afterClass: true });
+    expect(launched.status).toBe(201);
+    expect(new Date(launched.body.expiresAt).getTime() - new Date(launched.body.startedAt).getTime()).toBe(24 * 3600_000);
+    expect((await call('dana', 'POST', `/challenges/${launched.body.id}/responses`, { tap: { x: 0.19, y: 0.55 } })).status).toBe(201);
+  });
+
   it('roll-call over HTTP: lecturer QR, student scans, wrong-type QR request is refused', async () => {
     await checkIn('dana');
     const ch = (await call('lect', 'POST', `/sessions/${sessionId}/challenges`, { type: 'rollcall' })).body;
