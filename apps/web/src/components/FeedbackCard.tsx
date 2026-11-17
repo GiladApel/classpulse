@@ -107,7 +107,7 @@ export function FeedbackResults({ sessionId }: { sessionId: string }) {
         </button>
       </div>
       {!summary.visible ? (
-        <p className="text-sm text-slate-500">התוצאות יוצגו מ-3 תשובות, כדי שאי אפשר יהיה לזהות מי ענה. המשוב פתוח 24 שעות מסיום השיעור.</p>
+        <p className="text-sm text-slate-500">התוצאות יוצגו מ-3 תשובות, כדי שאי אפשר יהיה לזהות מי ענה. ההערות פתוחות שבוע מסיום השיעור, לכל הרשומים לקורס.</p>
       ) : (
         <>
           <ul className="flex flex-col gap-2">

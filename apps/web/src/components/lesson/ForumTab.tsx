@@ -48,9 +48,9 @@ export default function ForumTab({ sessionId, courseId, lecturer, live, attended
 
   return (
     <>
-      {attended && <FeedbackCard sessionId={sessionId} ended />}
+      <FeedbackCard sessionId={sessionId} ended />
       <Card className="flex flex-wrap items-center justify-between gap-3 py-3">
-        <p className="text-sm">השיעור הסתיים. יש שאלה? שאלו בפורום של הקורס.</p>
+        <p className="text-sm">השיעור הסתיים. יש שאלה? שאלו בפורום של הקורס. הערה על השיעור עצמו אפשר להשאיר כאן עד שבוע אחריו.</p>
         <Link to={`/course/${courseId}?tab=forum`} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
           לפורום הקורס
         </Link>
