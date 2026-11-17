@@ -12,13 +12,13 @@ flowchart LR
   S --- UC21[UC21 Hand in homework]
   S --- UC22[UC22 Ask in the course forum]
   S --- UC12[UC12 Review a lecture]
-  S --- UC14[UC14 Give lecture feedback]
+  S --- UC14[UC14 Comment on a lecture]
   S --- UC20[UC20 Enter a live lesson from home]
   L([Lecturer]) --- UC2[UC2 Run session]
   L --- UC3[UC3 Manage attendance & export]
   L --- UC4[UC4 Snap headcount & launch challenge]
   L --- UC8[UC8 Create poll]
-  L --- UC9[UC9 Summarize lecture]
+  L --- UC9[UC9 Summarize a lecture and get its report]
   L --- UC11[UC11 Publish homework and follow the class]
   L --- UC13[UC13 Add content after the lecture]
   L --- UC17[UC17 Create a course]
@@ -43,13 +43,13 @@ flowchart LR
 | UC5 | As a **checked-in student**, I tap my seat on a blurred photo within 45 s to prove I'm in the room. | AF-04, 06 |
 | UC6 | As a **student**, I press "I'm lost" or post a question (anonymously if I want), so the lecturer can react now. | BC-01..03 |
 | UC7 | As a **student**, the poll appears on my phone and I vote with one tap. | PL-03 |
-| UC8 | As a **lecturer**, I generate a question from my current slide and launch it in seconds. | PL-01..04 |
-| UC9 | As a **lecturer**, I upload last week's recording and get chapters, review questions and the moments students got lost. | VS-01..05 |
+| UC8 | As a **lecturer**, I generate a question from my current slide and launch it in seconds, and it closes by itself after two minutes, like a Kahoot question. | PL-01..05 |
+| UC9 | As a **lecturer**, I upload last week's recording and get a summary for my students and a short report for me with a few concrete tips to improve the next lecture. | VS-01..07 |
 | UC10 | As a **student**, before handing in my homework I upload my solution and get feedback on every section, up to 2 times, so I can fix it first. | HW-02, 04..06 |
 | UC11 | As a **lecturer**, I publish the homework PDF with my instructions for the rubric, and follow the class: each student's checks and hand-in with the AI's grade, common mistakes and suspiciously similar hand-ins. | HW-01..03, 08..10, BC-04 |
 | UC12 | As a **student**, I open a lecture's page (even one I missed) to get the materials and review questions and read the answers to the class's questions. | LP-01..03 |
 | UC13 | As a **lecturer**, after the lecture I answer open questions, publish review questions and upload the slides. | LP-02..04 |
-| UC14 | As a **student**, when the lecture ends I tell the lecturer anonymously how it went, in one tap, so the next lecture can improve. | FB-01..03 |
+| UC14 | As a **student**, after a lecture (even one I watched later) I tell the lecturer anonymously how it went, in one tap and a comment, so the next lecture can improve. | FB-01..04 |
 | UC16 | As the **admin**, I find a registered user and make them a lecturer, without touching the server. | AD-01 |
 | UC17 | As a **lecturer**, I create my course myself. | AD-02 |
 | UC18 | As a **lecturer**, I upload the course list I already have (Excel or CSV) once, so my students see the course without any link. | EN-01..04 |
@@ -108,6 +108,7 @@ flowchart LR
 - **Alternate flows:**
   - **2a. LLM failure or low confidence:** "Count unavailable"; the lecturer can still launch Roll-call.
   - **4a. No mismatch:** done.
+  - **4b. After class:** the lecturer chooses "After-class check (24 hours)", also once the lesson has ended. Students answer it from the lesson page (UC5, 1a); it closes after a day with the same labels.
 
 ### UC5: Answer Visual Ping
 - **Actor:** Student, already checked in.
@@ -116,6 +117,7 @@ flowchart LR
   2. The student taps their seat.
   3. The app confirms "Received".
 - **Alternate flows:**
+  - **1a. After-class check:** instead of a full-screen prompt, a card at the top of the lesson page (and a notice on the home page) shows the blurred photo and the closing time; the student taps there, from anywhere, within 24 hours.
   - **2a. Timeout:** the response becomes `no_response`.
   - **2b. Second tap:** rejected; only the first tap counts.
 
@@ -128,6 +130,7 @@ flowchart LR
   - 1a. Offline: the post is queued in IndexedDB and sent when the connection returns.
   - 1b. After "I'm lost", the student writes what is unclear (optional); it is posted anonymously to the feed, where classmates can upvote it.
   - 1c. The lesson has ended: its forum is read-only and links to the course forum (UC22).
+  - 1d. The lecturer switched questions to "only after class": the question box is replaced by a note pointing to the course forum and the lecture comments; "I'm lost" still works.
 
 ### UC7: Vote
 - **Actor:** Student.
@@ -142,19 +145,22 @@ flowchart LR
 - **Main flow:**
   1. The lecturer taps "Photograph slide" (camera) or "Upload image" (gallery or computer).
   2. The LLM returns 3 MCQ drafts; the lecturer picks one and may edit it.
-  3. The lecturer clicks "Open", then "Close & reveal".
+  3. The lecturer keeps the automatic close (2 minutes by default) or picks 1 or 5 minutes or no limit, and clicks "Open". Phones and the projector show the countdown.
+  4. The poll closes by itself and reveals the answer, or the lecturer clicks "Close & reveal" earlier.
 - **Alternate flow:** 1a. The file is not an image or is over 10 MB: rejected.
 
-### UC9: Summarize a lecture
-- **Actor:** Lecturer.
+### UC9: Summarize a lecture and get its report
+- **Actor:** Lecturer. **Secondary:** LLM Provider.
 - **Main flow:**
   1. The lecturer uploads a recording and sets the offset.
   2. The job is queued.
-  3. The LLM produces the summary.
-  4. The lecturer views the timeline with lost-spikes and clicks "Publish".
+  3. The LLM produces the summary, then the lecturer's report from the same recording and the class signals.
+  4. The lecturer views the timeline with lost-spikes and clicks "Publish" for the students.
+  5. Under the summary, the lecturer reads "Report for the lecturer": three scores, a few tips each tied to a moment, promises not kept, language and sound notes. The course page shows the scores across lessons.
 - **Alternate flows:**
   - **1a. No recording:** the lecturer uploads a transcript (vtt/srt/txt, e.g. from Zoom or Teams) instead.
   - **3a. Processing fails** (e.g. the provider is overloaded): the status becomes `failed` with a message, the temp file is deleted, and the lecturer can upload again or upload a transcript.
+  - **3b. Only the report fails:** the summary is kept; the report shows the error and "Rebuild report", which works from the summary because the recording is not stored.
 
 ### UC10: Check a homework solution (student)
 - **Actor:** Student who is a course member.
@@ -216,16 +222,17 @@ flowchart LR
   - 2b. The deck is not a PDF or an image (e.g. .pptx), or is over 50 MB: rejected; the screen says to save PowerPoint as PDF.
   - 3a. A file over 50 MB or a non-http(s) link: rejected.
 
-### UC14: Give lecture feedback (student)
-- **Actor:** Student who was checked in to the lecture.
+### UC14: Comment on a lecture (student)
+- **Actor:** Student who is a course member (attended or not). **Secondary:** Lecturer.
 - **Main flow:**
   1. The lecturer ends the lecture; the student's open page shows "How was the lecture?" with the note that the feedback is anonymous.
   2. The student picks one of four options and may add a comment.
   3. The student sends it and sees "thanks". The lecturer's dashboard shows the aggregate once 3 students have answered.
+  4. The lecturer exports the lecture's questions and comments to Excel, CSV or Google Sheets.
 - **Alternate flows:**
-  - 1a. The student already closed the page: the form waits on the lecture page for 24 hours.
+  - 1a. The student was not in class or already closed the page: the form waits on the lecture page for 7 days.
   - 2a. The student taps "not now": nothing is sent.
-  - 3a. The student already answered, or 24 hours have passed: the form is not shown.
+  - 3a. The student already answered, or 7 days have passed: the form is not shown.
 
 ### UC16: Make a user a lecturer (admin)
 - **Actor:** Admin (an email listed in the server's `ADMIN_EMAILS`).
