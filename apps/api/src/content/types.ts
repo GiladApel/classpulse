@@ -14,6 +14,34 @@ export interface LectureSummary {
   questions: { question: string; answer: string }[];
 }
 
+export interface CoachingTip {
+  title: string;
+  /** What happened, usually with its mm:ss. */
+  evidence: string;
+  /** Seconds into the recording, when known. */
+  atSec: number | null;
+  suggestion: string;
+}
+
+/** Feature 4: the lecturer's own report on a lecture. Hidden from students. */
+export interface LectureCoaching {
+  scores: { clarity: number; pace: number; engagement: number };
+  verdict: string;
+  tips: CoachingTip[];
+  promises: string[];
+  language: string[];
+  /** Empty for a transcript. */
+  audio: string;
+}
+
+/** What the class did during the lecture, given to the coach as evidence. */
+export interface ClassSignals {
+  lostSpikes: { atSec: number; students: number; chapter: string | null }[];
+  unansweredQuestions: { text: string; upvotes: number }[];
+  polls: { question: string; answered: number; correctPercent: number | null }[];
+  feedback: { responses: number; counts: Record<string, number> | null };
+}
+
 export interface Recording {
   id: string;
   sessionId: string;
@@ -26,6 +54,8 @@ export interface Recording {
   status: RecordingStatus;
   error: string;
   summary: LectureSummary | null;
+  coaching: LectureCoaching | null;
+  coachingError: string;
   published: boolean;
   createdAt: Date;
   processedAt?: Date;

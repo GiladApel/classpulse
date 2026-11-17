@@ -68,6 +68,18 @@ export const DEFAULT_FIXTURES: Record<string, unknown> = {
       { question: 'תנו דוגמה ל-Strategy מהפרויקט.', answer: 'LLMProvider: Gemini או Mock מתחלפים בלי לשנות את השירותים.' },
     ],
   },
+  coach_lecture: {
+    scores: { clarity: 4, pace: 2, engagement: 3 },
+    verdict: 'הסבר ברור על Strategy, אבל החלק על State היה מהיר מדי.',
+    tips: [
+      { title: 'להאט ב-State', evidence: 'ב-21:00 שלושה סטודנטים לחצו "הלכתי לאיבוד".', atSec: 1260, suggestion: 'לעצור אחרי ההגדרה ולתת דוגמה אחת לפני הקוד.' },
+      { title: 'לחזור להבטחה', evidence: 'ב-10:30 נאמר "עוד עשר דקות נראה דוגמה" ולא הוצגה.', atSec: 630, suggestion: 'לרשום על הלוח מה הובטח ולסמן כשבוצע.' },
+      { title: 'שאלה שלא נענתה', evidence: 'השאלה על ההבדל בין State ל-Strategy קיבלה הכי הרבה הצבעות.', atSec: -1, suggestion: 'לפתוח את השיעור הבא בתשובה קצרה.' },
+    ],
+    promises: ['דוגמת קוד ל-State'],
+    language: ['"שלוש דוגמאות" ולא "שלושה דוגמאות"'],
+    audio: 'הקול ברור; בסוף השיעור יש רעש רקע.',
+  },
   // Score follows submission length so mock reviews differ between students (and percentiles are meaningful).
   generate_homework_guide: {
     questions: [
