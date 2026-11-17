@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import AppShell from '../components/AppShell';
 import AssignmentManager from '../components/AssignmentManager';
+import CoachingTrend from '../components/CoachingTrend';
 import CourseLessons from '../components/CourseLessons';
 import { FeedBoard } from '../components/EngagementPanel';
 import RosterPanel from '../components/RosterPanel';
@@ -44,6 +45,7 @@ export default function CourseHubPage() {
         <>
           <Tabs tabs={tabs} value={tab} onChange={setTab} />
           {tab === 'lessons' && <CourseLessons courseId={id} lecturer={lecturer} />}
+          {tab === 'lessons' && lecturer && <CoachingTrend courseId={id} />}
           {tab === 'forum' && (lecturer ? <FeedBoard scope={{ courseId: id }} /> : <Feed scope={{ courseId: id }} canPost />)}
           {tab === 'homework' && (lecturer ? <AssignmentManager courseId={id} /> : <StudentAssignments courseId={id} />)}
           {tab === 'students' && lecturer && <RosterPanel courseId={id} />}
