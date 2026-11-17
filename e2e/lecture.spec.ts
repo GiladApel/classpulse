@@ -21,7 +21,7 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
   await sp.getByPlaceholder('שאלה, הערה או הצעה למרצה…').fill('מה ההבדל בין Strategy ל-State?');
   await sp.getByRole('button', { name: 'שליחה', exact: true }).click();
 
-  // Live poll: only from a slide (camera or gallery); the AI drafts 3 and the lecturer opens one.
+  // Live poll from a slide (camera or gallery): the AI drafts 3 and the lecturer opens one.
   await openTab(lp, 'פורום');
   await lp.getByLabel('🖼️ העלאת תמונה').setInputFiles({ name: 'slide.png', mimeType: 'image/png', buffer: Buffer.from([137, 80, 78, 71]) });
   await lp.getByRole('button', { name: /איזה תבנית עיצוב/ }).click();
@@ -31,6 +31,17 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
   await expect(lp.getByText('פתוח · 0 הצבעות')).toBeVisible();
   await expect(sp.getByText('איזה תבנית עיצוב מפרידה בין יצירת אובייקט לשימוש בו?')).toBeVisible();
   await expect(sp.getByLabel(/נותרו \d+ שניות/)).toContainText(/⏱ [12]:\d\d/);
+
+  // Or written by hand, no slide: a third answer added, no correct answer marked (an opinion poll). It replaces the open one.
+  await lp.getByRole('button', { name: /כתיבת שאלה ידנית/ }).click();
+  await lp.getByLabel('שאלה', { exact: true }).fill('מה הכי קשה עד עכשיו?');
+  await lp.getByLabel('תשובה 1', { exact: true }).fill('Strategy');
+  await lp.getByLabel('תשובה 2', { exact: true }).fill('Observer');
+  await lp.getByRole('button', { name: '+ הוספת תשובה' }).click();
+  await lp.getByLabel('תשובה 3', { exact: true }).fill('State');
+  await lp.getByRole('button', { name: 'פתיחת הסקר' }).click();
+  await expect(sp.getByText('מה הכי קשה עד עכשיו?')).toBeVisible();
+  await expect(sp.getByRole('button', { name: 'State' })).toBeVisible();
 
   lp.once('dialog', (d) => d.accept());
   await lp.getByRole('button', { name: 'סיום שיעור' }).click();
