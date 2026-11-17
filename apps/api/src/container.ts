@@ -156,7 +156,7 @@ export function buildContainer(p: Ports): Container {
   const lesson = new LessonAccess(attendance, p.sessionRepo, courses);
   const confusion = new ConfusionMeter(p.lostRepo, { requireParticipant: (s, n) => lesson.requireParticipant(s, n), presentCount: (s) => attendance.presentCount(s) }, p.clock);
   const queue = new BackgroundQueue();
-  const feedback = new FeedbackService(p.feedbackRepo, attendance, p.clock);
+  const feedback = new FeedbackService(p.feedbackRepo, courses, p.clock);
   const signals = new LessonSignals(p.sessionRepo, p.postRepo, p.pollRepo, feedback);
   return {
     clock: p.clock,

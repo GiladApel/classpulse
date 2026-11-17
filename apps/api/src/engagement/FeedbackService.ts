@@ -1,29 +1,29 @@
-import type { AttendanceService } from '../attendance/AttendanceService.js';
+import type { CourseService } from '../attendance/CourseService.js';
 import type { Session } from '../attendance/types.js';
 import type { Clock } from '../infra/Clock.js';
 import { DomainError } from '../shared/errors.js';
 import type { LessonFeedbackRepository } from './repositories.js';
 import { FEEDBACK_RATINGS, type FeedbackRating, type FeedbackStatus, type FeedbackSummary, type Participant } from './types.js';
 
-/** Feedback opens when the lecture ends and closes this long after. */
-export const FEEDBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** Comments on a lecture open when it ends and close a week later, so students who watched it later can still comment. */
+export const FEEDBACK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 /** Below this the lecturer sees only the count: with one or two answers, the author is easy to guess. */
 export const MIN_FEEDBACK_RESPONSES = 3;
 
 /**
- * Anonymous end-of-lecture feedback (FR-FB-01..03): one optional answer per student who was checked in.
+ * Anonymous comments on a lecture (FR-FB-01..03): one optional answer per course member, whether or not they attended.
  * Nobody can read the records through PocketBase; the lecturer gets only the aggregate from `summary`.
  */
 export class FeedbackService {
   constructor(
     private readonly feedback: LessonFeedbackRepository,
-    private readonly attendance: Pick<AttendanceService, 'requireParticipant'>,
+    private readonly courses: Pick<CourseService, 'requireMember'>,
     private readonly clock: Clock,
   ) {}
 
   async status(session: Session, student: Participant): Promise<FeedbackStatus> {
     const closesAt = this.closesAt(session);
-    const participant = await this.attendance.requireParticipant(session.id, student.studentNumber).then(
+    const participant = await this.courses.requireMember(session.courseId, student.studentNumber).then(
       () => true,
       () => false,
     );
@@ -37,7 +37,7 @@ export class FeedbackService {
     if (!closesAt) throw new DomainError('FEEDBACK_NOT_OPEN', 'המשוב ייפתח בסוף השיעור');
     if (this.clock.now() >= closesAt) throw new DomainError('FEEDBACK_CLOSED', 'זמן המשוב על השיעור הזה הסתיים');
     if (!FEEDBACK_RATINGS.includes(rating)) throw new DomainError('INVALID_OPTION', 'אין תשובה כזו');
-    await this.attendance.requireParticipant(session.id, student.studentNumber);
+    await this.courses.requireMember(session.courseId, student.studentNumber);
     if (await this.feedback.find(session.id, student.studentNumber)) throw new DomainError('ALREADY_SENT', 'כבר שלחת משוב על השיעור הזה');
     try {
       await this.feedback.create({

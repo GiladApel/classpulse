@@ -9,11 +9,10 @@ import type { Participant } from './types.js';
 const code = (p: Promise<unknown>) => p.then(() => 'ok', (e: DomainError) => e.code);
 const student = (n: number): Participant => ({ id: `u${n}`, studentNumber: `${n}${n}${n}`, name: `s${n}` });
 
-/** Students 1–5 were checked in; 9 was not. */
-const attendance = {
-  async requireParticipant(_sessionId: string, studentNumber: string) {
-    if (!['111', '222', '333', '444', '555'].includes(studentNumber)) throw new DomainError('NOT_CHECKED_IN', 'not checked in');
-    return {} as never;
+/** Students 1–5 are in the course (attended or not); 9 is not. */
+const courses = {
+  async requireMember(_courseId: string, studentNumber: string) {
+    if (!['111', '222', '333', '444', '555'].includes(studentNumber)) throw new DomainError('NOT_IN_COURSE', 'not in course');
   },
 };
 
@@ -24,15 +23,19 @@ describe('FeedbackService', () => {
 
   beforeEach(() => {
     clock = new FixedClock(T0);
-    service = new FeedbackService(new InMemoryLessonFeedbackRepository(), attendance, clock);
+    service = new FeedbackService(new InMemoryLessonFeedbackRepository(), courses, clock);
   });
 
-  it('opens when the lecture ends, for those who were checked in, and closes after 24 h', async () => {
+  it('opens when the lecture ends, for every course member, and closes a week later', async () => {
     expect(await code(service.submit(makeSession({ status: 'active' }), student(1), 'clear', ''))).toBe('FEEDBACK_NOT_OPEN');
     expect(await service.status(makeSession({ status: 'active' }), student(1))).toEqual({ open: false, submitted: false, closesAt: null });
     expect(await service.status(ended, student(1))).toEqual({ open: true, submitted: false, closesAt: new Date(T0.getTime() + FEEDBACK_WINDOW_MS) });
     expect((await service.status(ended, student(9))).open).toBe(false);
-    expect(await code(service.submit(ended, student(9), 'clear', ''))).toBe('NOT_CHECKED_IN');
+    expect(await code(service.submit(ended, student(9), 'clear', ''))).toBe('NOT_IN_COURSE');
+    expect(FEEDBACK_WINDOW_MS).toBe(7 * 24 * 3600 * 1000);
+    clock.advance(FEEDBACK_WINDOW_MS - 1000);
+    expect((await service.status(ended, student(1))).open).toBe(true);
+    clock.advance(1000 - FEEDBACK_WINDOW_MS);
 
     clock.advance(FEEDBACK_WINDOW_MS);
     expect((await service.status(ended, student(1))).open).toBe(false);

@@ -87,7 +87,9 @@ describe('Integration: lecture page access against real PocketBase', () => {
     await expect(attended.pb.collection('lesson_feedback').create({ session: s1, rating: 'clear', student_number: '1', submitted_at: new Date().toISOString() })).rejects.toMatchObject({
       status: 403,
     });
-    expect((await h.call(h.lecturer, 'GET', `/sessions/${s1}/feedback`)).body).toEqual({ responses: 1, visible: false, counts: null, comments: [] });
-    expect((await h.call(missed, 'POST', `/sessions/${s1}/feedback`, { rating: 'clear' })).body.code).toBe('NOT_CHECKED_IN');
+    // A course member who missed the lecture comments on it too; an outsider cannot.
+    expect((await h.call(missed, 'POST', `/sessions/${s1}/feedback`, { rating: 'clear' })).status).toBe(201);
+    expect((await h.call(outsider, 'POST', `/sessions/${s1}/feedback`, { rating: 'clear' })).body.code).toBe('NOT_IN_COURSE');
+    expect((await h.call(h.lecturer, 'GET', `/sessions/${s1}/feedback`)).body).toEqual({ responses: 2, visible: false, counts: null, comments: [] });
   });
 });
