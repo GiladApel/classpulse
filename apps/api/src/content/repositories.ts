@@ -5,6 +5,7 @@ export type FileInput = { data: Buffer; filename: string; mimeType: string };
 
 export interface RecordingRepository extends Repository<Recording> {
   listByStatus(statuses: Recording['status'][]): Promise<Recording[]>;
+  listBySessions(sessionIds: string[]): Promise<Recording[]>;
 }
 
 export interface AssignmentRepository extends Repository<Assignment> {

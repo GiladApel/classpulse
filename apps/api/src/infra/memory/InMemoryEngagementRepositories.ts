@@ -47,6 +47,10 @@ export class InMemoryPollRepository extends InMemoryRepository<Poll> implements 
   async findOpenBySession(sessionId: string) {
     return this.all().find((p) => p.sessionId === sessionId && p.status === 'open') ?? null;
   }
+
+  async listBySession(sessionId: string) {
+    return this.all().filter((p) => p.sessionId === sessionId);
+  }
 }
 
 export class InMemoryPollVoteRepository extends InMemoryRepository<PollVote> implements PollVoteRepository {

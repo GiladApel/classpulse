@@ -12,6 +12,7 @@ import type {
 import type {
   Assignment,
   AssignmentInsights,
+  LectureCoaching,
   LectureSummary,
   Material,
   PracticeQuestion,
@@ -29,6 +30,13 @@ const toFile = (f: FileInput) => new File([new Uint8Array(f.data)], f.filename, 
 export class PbRecordingRepository extends PbRepository<Recording> implements RecordingRepository {
   constructor(pb: PocketBase) {
     super(pb, 'recordings');
+  }
+
+  async listBySessions(sessionIds: string[]) {
+    if (sessionIds.length === 0) return [];
+    const filter = sessionIds.map((_, i) => `session = {:s${i}}`).join(' || ');
+    const params = Object.fromEntries(sessionIds.map((s, i) => [`s${i}`, s]));
+    return (await this.col.getFullList({ filter: this.pb.filter(filter, params) })).map((r) => this.toEntity(r));
   }
 
   async listByStatus(statuses: Recording['status'][]) {
@@ -49,6 +57,8 @@ export class PbRecordingRepository extends PbRepository<Recording> implements Re
       status: r.status,
       error: r.error,
       summary: (r.summary as LectureSummary | null) || null,
+      coaching: (r.coaching as LectureCoaching | null) || null,
+      coachingError: r.coaching_error ?? '',
       published: r.published,
       createdAt: toDate(r.created_at)!,
       processedAt: toDate(r.processed_at),
@@ -66,6 +76,8 @@ export class PbRecordingRepository extends PbRepository<Recording> implements Re
       status: d.status,
       error: d.error,
       summary: d.summary,
+      coaching: d.coaching === null ? undefined : d.coaching,
+      coaching_error: d.coachingError,
       published: d.published,
       created_at: d.createdAt?.toISOString(),
       processed_at: d.processedAt?.toISOString(),

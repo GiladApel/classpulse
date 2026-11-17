@@ -21,6 +21,7 @@ export interface PostVoteRepository {
 
 export interface PollRepository extends Repository<Poll> {
   findOpenBySession(sessionId: string): Promise<Poll | null>;
+  listBySession(sessionId: string): Promise<Poll[]>;
 }
 
 export interface PollVoteRepository {

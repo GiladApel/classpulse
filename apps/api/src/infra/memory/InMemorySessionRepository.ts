@@ -6,4 +6,8 @@ export class InMemorySessionRepository extends InMemoryRepository<Session> imple
   async countByCourse(courseId: string) {
     return this.all().filter((s) => s.courseId === courseId).length;
   }
+
+  async listByCourse(courseId: string) {
+    return this.all().filter((s) => s.courseId === courseId);
+  }
 }

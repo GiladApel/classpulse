@@ -11,6 +11,7 @@ export interface AttendanceRepository extends Repository<AttendanceRecord> {
 
 export interface SessionRepository extends Repository<Session> {
   countByCourse(courseId: string): Promise<number>;
+  listByCourse(courseId: string): Promise<Session[]>;
 }
 
 export interface CourseRepository {

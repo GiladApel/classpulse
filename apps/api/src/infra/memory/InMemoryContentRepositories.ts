@@ -11,6 +11,10 @@ import type { Assignment, AssignmentInsights, GuideOutline, GuideStatus, Materia
 import { InMemoryRepository } from '../InMemoryRepository.js';
 
 export class InMemoryRecordingRepository extends InMemoryRepository<Recording> implements RecordingRepository {
+  async listBySessions(sessionIds: string[]) {
+    return this.all().filter((r) => sessionIds.includes(r.sessionId));
+  }
+
   async listByStatus(statuses: Recording['status'][]) {
     return this.all().filter((r) => statuses.includes(r.status));
   }

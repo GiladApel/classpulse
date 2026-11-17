@@ -114,6 +114,10 @@ export class PbPollRepository extends PbRepository<Poll> implements PollReposito
     return this.first("session = {:s} && status = 'open'", { s: sessionId });
   }
 
+  async listBySession(sessionId: string) {
+    return (await this.col.getFullList({ filter: this.pb.filter('session = {:s}', { s: sessionId }), sort: 'created_at' })).map((r) => this.toEntity(r));
+  }
+
   protected toEntity(r: RecordModel): Poll {
     return {
       id: r.id,

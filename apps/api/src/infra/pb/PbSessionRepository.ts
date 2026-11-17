@@ -13,6 +13,10 @@ export class PbSessionRepository extends PbRepository<Session> implements Sessio
     return (await this.col.getList(1, 1, { filter: this.pb.filter('course = {:c}', { c: courseId }), fields: 'id' })).totalItems;
   }
 
+  async listByCourse(courseId: string) {
+    return (await this.col.getFullList({ filter: this.pb.filter('course = {:c}', { c: courseId }), sort: 'started_at', expand: 'course' })).map((r) => this.toEntity(r));
+  }
+
   protected toEntity(r: RecordModel): Session {
     const hasLocation = r.geo_lat !== 0 || r.geo_lng !== 0;
     return {
