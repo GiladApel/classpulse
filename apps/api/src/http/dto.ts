@@ -24,4 +24,5 @@ export const sessionDto = (s: Session) => ({
   hasLocation: !!s.location,
   geofenceMode: s.geofenceMode,
   geofenceRadiusM: s.geofenceRadiusM,
+  questionsPaused: !!s.questionsPaused,
 });

@@ -100,6 +100,7 @@ describe('FeedService', () => {
     const p = await feed.post(session, dana, 'בשיעור', false);
     expect(p).toMatchObject({ courseId: session.courseId, sessionId: session.id });
     expect(await code(feed.post(makeSession({ status: 'ended' }), dana, 'אחרי', false))).toBe('SESSION_ENDED');
+    expect(await code(feed.post(makeSession({ questionsPaused: true }), dana, 'בזמן השיעור', false))).toBe('QUESTIONS_PAUSED');
 
     const course = { id: session.courseId, code: 'I2SE', name: 'x', lecturerId: 'lect1' };
     const general = await feed.postToCourse(course, rina, '  שאלה כללית על הקורס ', true);

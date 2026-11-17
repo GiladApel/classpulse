@@ -20,6 +20,7 @@ export class FeedService {
   /** A lesson's questions are asked while it is live; afterwards questions go to the course forum (FR-BC-02). */
   async post(session: Session, author: Participant, text: string, anonymous: boolean): Promise<FeedPost> {
     if (session.status !== 'active') throw new DomainError('SESSION_ENDED', 'השיעור הסתיים — אפשר לשאול בפורום של הקורס');
+    if (session.questionsPaused) throw new DomainError('QUESTIONS_PAUSED', 'המרצה ביקש לשאול אחרי השיעור — בפורום של הקורס או בהערות על השיעור');
     await this.attendance.requireParticipant(session.id, author.studentNumber);
     return this.create(session.courseId, session.id, author, text, anonymous);
   }

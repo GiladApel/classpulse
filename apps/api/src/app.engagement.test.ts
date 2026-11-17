@@ -61,6 +61,15 @@ describe('HTTP: backchannel + polls', () => {
     const answered = await call('lect', 'POST', `/posts/${post.body.id}/answered`, { answered: true });
     expect(answered.body).toMatchObject({ answered: true, votes: 1 });
 
+    // The lecturer may hold questions until after class; "I'm lost" still works.
+    expect((await call('dana', 'PUT', `/sessions/${sessionId}/questions`, { paused: true })).status).toBe(403);
+    expect((await call('lect', 'PUT', `/sessions/${sessionId}/questions`, { paused: 'yes' })).status).toBe(400);
+    expect((await call('lect', 'PUT', `/sessions/${sessionId}/questions`, { paused: true })).body.questionsPaused).toBe(true);
+    expect((await call('avi', 'POST', `/sessions/${sessionId}/posts`, { text: 'עכשיו?' })).body.code).toBe('QUESTIONS_PAUSED');
+    expect((await call('avi', 'POST', `/sessions/${sessionId}/lost`)).body.accepted).toBe(true);
+    expect((await call('lect', 'PUT', `/sessions/${sessionId}/questions`, { paused: false })).body.questionsPaused).toBe(false);
+    expect((await call('avi', 'POST', `/sessions/${sessionId}/posts`, { text: 'עכשיו?' })).status).toBe(201);
+
     // After class, questions go to the course forum (FR-BC-02); the lecturer still answers the lesson's questions.
     await call('lect', 'POST', `/sessions/${sessionId}/end`);
     expect((await call('avi', 'POST', `/sessions/${sessionId}/posts`, { text: 'שאלה אחרי השיעור' })).body.code).toBe('SESSION_ENDED');

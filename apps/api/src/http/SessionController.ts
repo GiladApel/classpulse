@@ -5,6 +5,7 @@ import type { SessionService } from '../attendance/SessionService.js';
 import type { ExportFormat } from '../infra/export/SpreadsheetExporter.js';
 import { type AppEnv, requireLecturer } from './auth.js';
 import { recordDto, sessionDto } from './dto.js';
+import { ValidationError } from './errors.js';
 import { geo, jsonBody, num, oneOf, str } from './validate.js';
 
 const FORMATS = ['xlsx', 'csv', 'sheets'] as const satisfies readonly ExportFormat[];
@@ -36,6 +37,13 @@ export class SessionController {
     app.post('/:id/end', requireLecturer, async (c) => {
       const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
       return c.json(sessionDto(await this.sessions.end(session)));
+    });
+
+    app.put('/:id/questions', requireLecturer, async (c) => {
+      const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
+      const b = await jsonBody(c.req);
+      if (typeof b.paused !== 'boolean') throw new ValidationError('paused must be a boolean');
+      return c.json(sessionDto(await this.sessions.setQuestionsPaused(session, b.paused)));
     });
 
     app.get('/:id/qr', requireLecturer, async (c) => {

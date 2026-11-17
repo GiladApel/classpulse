@@ -49,6 +49,8 @@ export interface Session {
   geofenceMode: GeofenceMode;
   geofenceRadiusM: number;
   qrSecret: string;
+  /** The lecturer asked students to hold their questions until after class. */
+  questionsPaused?: boolean;
 }
 
 export interface AttendanceRecord {

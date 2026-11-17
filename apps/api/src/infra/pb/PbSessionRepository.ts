@@ -31,6 +31,7 @@ export class PbSessionRepository extends PbRepository<Session> implements Sessio
       geofenceMode: r.geofence_mode,
       geofenceRadiusM: r.geo_radius_m,
       qrSecret: r.qr_secret,
+      questionsPaused: !!r.questions_paused,
     };
   }
 
@@ -46,6 +47,7 @@ export class PbSessionRepository extends PbRepository<Session> implements Sessio
       geofence_mode: d.geofenceMode,
       geo_radius_m: d.geofenceRadiusM,
       qr_secret: d.qrSecret,
+      questions_paused: d.questionsPaused,
     });
   }
 }

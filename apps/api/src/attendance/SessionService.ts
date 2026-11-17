@@ -46,6 +46,12 @@ export class SessionService {
     });
   }
 
+  /** Some lecturers want phones down during class: questions wait for the course forum and the end-of-lecture comments. */
+  async setQuestionsPaused(session: Session, paused: boolean): Promise<Session> {
+    if (session.status !== 'active') throw new DomainError('SESSION_ENDED', 'השיעור כבר הסתיים');
+    return this.sessions.update(session.id, { questionsPaused: paused });
+  }
+
   async end(session: Session): Promise<Session> {
     if (session.status === 'ended') return session;
     const ended = await this.sessions.update(session.id, { status: 'ended', endedAt: this.clock.now() });
