@@ -66,6 +66,23 @@ export class ContentController {
       return c.json(await this.recordings.timeline(await this.sessions.get(recording.sessionId), recording));
     });
 
+    // The lecturer's own report on the lecture; never part of the recording students can read.
+    app.get('/recordings/:id/coaching', requireLecturer, async (c) => {
+      const r = await this.owned(c.req.param('id'), c.get('user').id);
+      return c.json({ coaching: r.coaching, error: r.coachingError, status: r.status });
+    });
+
+    app.post('/recordings/:id/coaching/retry', requireLecturer, async (c) => {
+      const r = await this.recordings.retryCoaching(await this.owned(c.req.param('id'), c.get('user').id));
+      return c.json({ coaching: r.coaching, error: r.coachingError, status: r.status });
+    });
+
+    app.get('/courses/:id/coaching', requireLecturer, async (c) => {
+      const course = await this.sessions.getOwnedCourse(c.req.param('id'), c.get('user').id);
+      const trend = await this.recordings.coachingTrend(course.id);
+      return c.json(trend.map((p) => ({ ...p, startedAt: p.startedAt.toISOString() })));
+    });
+
     app.post('/recordings/:id/publish', requireLecturer, async (c) => {
       const recording = await this.owned(c.req.param('id'), c.get('user').id);
       const b = await jsonBody(c.req);

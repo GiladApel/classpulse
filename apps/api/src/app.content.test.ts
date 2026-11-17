@@ -78,6 +78,17 @@ describe('HTTP: recordings + homework', () => {
     expect(timeline.spikes).toEqual([{ t: 300, count: 2, chapter: 'Strategy' }]);
 
     expect((await request('lect', 'POST', `/recordings/${id}/publish`, { published: true })).body).toMatchObject({ status: 'done', published: true });
+
+    // The lecturer's report: lecturer-only, never inside the recording DTO, and in the course trend.
+    const coaching = await request('lect', 'GET', `/recordings/${id}/coaching`);
+    expect(coaching.body).toMatchObject({ status: 'done', error: '', coaching: { scores: { clarity: 4, pace: 2, engagement: 3 } } });
+    expect(coaching.body.coaching.tips.length).toBeGreaterThanOrEqual(3);
+    expect((await request('dana', 'GET', `/recordings/${id}/coaching`)).status).toBe(403);
+    expect(JSON.stringify((await request('lect', 'POST', `/recordings/${id}/publish`, { published: true })).body)).not.toContain('coaching');
+    expect((await request('lect', 'POST', `/recordings/${id}/coaching/retry`)).body.coaching.scores.pace).toBe(2);
+    const trend = (await request('lect', 'GET', '/courses/c1/coaching')).body;
+    expect(trend).toEqual([expect.objectContaining({ sessionId, scores: { clarity: 4, pace: 2, engagement: 3 } })]);
+    expect((await request('dana', 'GET', '/courses/c1/coaching')).status).toBe(403);
   });
 
   it('homework: the lecturer publishes a PDF with notes in a lesson; members check twice and hand in; the rubric and the grade stay with the lecturer', async () => {
