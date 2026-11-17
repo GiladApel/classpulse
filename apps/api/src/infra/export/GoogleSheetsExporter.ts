@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { auth, sheets, type sheets_v4 } from '@googleapis/sheets';
-import type { AttendanceRecord } from '../../attendance/types.js';
-import { baseFilename, type ExportOutput, HEADERS, type SessionMeta, type SpreadsheetExporter, toRows } from './SpreadsheetExporter.js';
+import { baseFilename, type ExportOutput, type SessionMeta, type SpreadsheetExporter, type Table } from './SpreadsheetExporter.js';
 
 /** Writes each session to its own tab (re-export overwrites it) in one spreadsheet shared with the service account. */
 export class GoogleSheetsExporter implements SpreadsheetExporter {
@@ -16,15 +15,15 @@ export class GoogleSheetsExporter implements SpreadsheetExporter {
     this.client = sheets({ version: 'v4', auth: jwt });
   }
 
-  async export(records: AttendanceRecord[], meta: SessionMeta): Promise<ExportOutput> {
-    const title = baseFilename(meta).slice(0, 90);
+  async export(table: Table, meta: SessionMeta): Promise<ExportOutput> {
+    const title = baseFilename(meta, table).slice(0, 90);
     const sheetId = await this.ensureTab(title);
     await this.client.spreadsheets.values.clear({ spreadsheetId: this.spreadsheetId, range: `'${title}'` });
     await this.client.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
       range: `'${title}'!A1`,
       valueInputOption: 'RAW',
-      requestBody: { values: [HEADERS, ...toRows(records)] },
+      requestBody: { values: [table.headers, ...table.rows] },
     });
     return { kind: 'link', url: `https://docs.google.com/spreadsheets/d/${this.spreadsheetId}/edit#gid=${sheetId}` };
   }

@@ -1,18 +1,17 @@
 import * as XLSX from 'xlsx';
-import type { AttendanceRecord } from '../../attendance/types.js';
-import { baseFilename, type ExportOutput, HEADERS, type SessionMeta, type SpreadsheetExporter, toRows } from './SpreadsheetExporter.js';
+import { baseFilename, type ExportOutput, type SessionMeta, type SpreadsheetExporter, type Table } from './SpreadsheetExporter.js';
 
 export class XlsxExporter implements SpreadsheetExporter {
-  async export(records: AttendanceRecord[], meta: SessionMeta): Promise<ExportOutput> {
-    const sheet = XLSX.utils.aoa_to_sheet([HEADERS, ...toRows(records)]);
-    sheet['!cols'] = [12, 22, 10, 8, 8, 10, 10, 30].map((wch) => ({ wch }));
+  async export(table: Table, meta: SessionMeta): Promise<ExportOutput> {
+    const sheet = XLSX.utils.aoa_to_sheet([table.headers, ...table.rows]);
+    if (table.widths) sheet['!cols'] = table.widths.map((wch) => ({ wch }));
     const book = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(book, sheet, 'נוכחות');
+    XLSX.utils.book_append_sheet(book, sheet, table.name);
     book.Workbook = { Views: [{ RTL: true }] };
     const data = XLSX.write(book, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
     return {
       kind: 'file',
-      filename: `${baseFilename(meta)}.xlsx`,
+      filename: `${baseFilename(meta, table)}.xlsx`,
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       data,
     };

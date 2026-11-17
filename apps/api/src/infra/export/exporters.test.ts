@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
 import type { AttendanceRecord } from '../../attendance/types.js';
 import { CsvExporter } from './CsvExporter.js';
-import { HEADERS } from './SpreadsheetExporter.js';
+import { attendanceTable, HEADERS } from './SpreadsheetExporter.js';
 import { XlsxExporter } from './XlsxExporter.js';
 
 const meta = { title: 'הרצאה 5', courseName: 'הנדסת תוכנה', startedAt: new Date('2026-11-05T08:00:00Z') };
@@ -28,7 +28,7 @@ const records = [
 
 describe('CsvExporter', () => {
   it('writes BOM, Hebrew headers, sorted rows and escapes quotes/commas', async () => {
-    const out = await new CsvExporter().export(records, meta);
+    const out = await new CsvExporter().export(attendanceTable(records), meta);
     if (out.kind !== 'file') throw new Error('expected file');
     expect(out.filename).toBe('2026-11-05 הנדסת תוכנה הרצאה 5.csv');
     const text = out.data.toString('utf8');
@@ -42,7 +42,7 @@ describe('CsvExporter', () => {
 
 describe('XlsxExporter', () => {
   it('produces an RTL workbook whose rows round-trip', async () => {
-    const out = await new XlsxExporter().export(records, meta);
+    const out = await new XlsxExporter().export(attendanceTable(records), meta);
     if (out.kind !== 'file') throw new Error('expected file');
     expect(out.filename.endsWith('.xlsx')).toBe(true);
     const book = XLSX.read(out.data, { type: 'buffer' });

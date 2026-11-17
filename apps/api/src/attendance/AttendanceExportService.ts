@@ -1,4 +1,4 @@
-import type { ExportFormat, ExportOutput, SpreadsheetExporter } from '../infra/export/SpreadsheetExporter.js';
+import { attendanceTable, type ExportFormat, type ExportOutput, type SpreadsheetExporter } from '../infra/export/SpreadsheetExporter.js';
 import { DomainError } from '../shared/errors.js';
 import type { AttendanceRepository, CourseRepository } from './repositories.js';
 import type { Session } from './types.js';
@@ -18,6 +18,6 @@ export class AttendanceExportService {
     const exporter = this.exporters.get(format);
     if (!exporter) throw new DomainError('EXPORT_UNAVAILABLE', `Export format ${format} is not configured`);
     const [records, course] = await Promise.all([this.repo.listBySession(session.id), this.courses.get(session.courseId)]);
-    return exporter.export(records, { title: session.title, courseName: course?.name ?? '', startedAt: session.startedAt });
+    return exporter.export(attendanceTable(records), { title: session.title, courseName: course?.name ?? '', startedAt: session.startedAt });
   }
 }

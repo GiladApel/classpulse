@@ -8,12 +8,23 @@ export interface SessionMeta {
   startedAt: Date;
 }
 
+/** One sheet: the attendance list, a lecture's comments, … */
+export interface Table {
+  /** Sheet name, and a suffix for the file name when `suffix` is set. */
+  name: string;
+  suffix?: string;
+  headers: string[];
+  rows: (string | number)[][];
+  /** Column widths in characters (xlsx only). */
+  widths?: number[];
+}
+
 export type ExportOutput =
   | { kind: 'file'; filename: string; contentType: string; data: Buffer }
   | { kind: 'link'; url: string };
 
 export interface SpreadsheetExporter {
-  export(records: AttendanceRecord[], meta: SessionMeta): Promise<ExportOutput>;
+  export(table: Table, meta: SessionMeta): Promise<ExportOutput>;
 }
 
 const TZ = 'Asia/Jerusalem';
@@ -40,7 +51,11 @@ export function toRows(records: AttendanceRecord[]): (string | number)[][] {
     ]);
 }
 
-export function baseFilename(meta: SessionMeta): string {
+export function attendanceTable(records: AttendanceRecord[]): Table {
+  return { name: 'נוכחות', headers: HEADERS, rows: toRows(records), widths: [12, 22, 10, 8, 8, 10, 10, 30] };
+}
+
+export function baseFilename(meta: SessionMeta, table?: Pick<Table, 'suffix'>): string {
   const safe = `${meta.courseName} ${meta.title}`.replace(/[\\/:*?"<>|]+/g, '').trim();
-  return `${date.format(meta.startedAt)} ${safe}`;
+  return `${date.format(meta.startedAt)} ${safe}${table?.suffix ? ` ${table.suffix}` : ''}`;
 }
