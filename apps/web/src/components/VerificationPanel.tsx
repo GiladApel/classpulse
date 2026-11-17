@@ -2,7 +2,7 @@ import type { RecordModel } from 'pocketbase';
 import { type ChangeEvent, useEffect, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { pb } from '../lib/pb';
-import { isRunning, useCountdown, useLatestChallenge, useProtectedFileUrl } from '../lib/useChallenge';
+import { isAfterClass, isRunning, until, useCountdown, useLatestChallenge, useProtectedFileUrl } from '../lib/useChallenge';
 import { Button, Card, ErrorText } from './ui';
 
 interface Box {
@@ -70,8 +70,8 @@ export default function VerificationPanel({ sessionId, active, presentCount }: P
     });
   };
 
-  const launch = (type: 'rollcall' | 'visual_ping') =>
-    run(() => api.post(`/sessions/${sessionId}/challenges`, { type, headcountId: type === 'visual_ping' ? headcount?.id : undefined }));
+  const launch = (type: 'rollcall' | 'visual_ping', afterClass = false) =>
+    run(() => api.post(`/sessions/${sessionId}/challenges`, { type, headcountId: type === 'visual_ping' ? headcount?.id : undefined, afterClass }));
 
   const closeNow = () => challenge && run(() => api.post(`/challenges/${challenge.id}/close`));
 
@@ -107,12 +107,14 @@ export default function VerificationPanel({ sessionId, active, presentCount }: P
         </div>
       )}
 
-      {active && (
+      {(active || people !== null) && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {running ? (
             <>
               <span className="rounded-full bg-indigo-100 px-3 py-1.5 font-medium text-indigo-800">
-                {challenge.type === 'rollcall' ? 'Roll-call' : 'בדיקה ויזואלית'} פעילה · {left} ש׳ · {responses.length} תגובות
+                {isAfterClass(challenge)
+                  ? `בדיקה אחרי השיעור פתוחה עד ${until(challenge.expires_at)} · ${responses.length} תגובות`
+                  : `${challenge.type === 'rollcall' ? 'Roll-call' : 'בדיקה ויזואלית'} פעילה · ${left} ש׳ · ${responses.length} תגובות`}
               </span>
               <Button variant="secondary" onClick={closeNow} disabled={busy}>
                 סיום עכשיו
@@ -120,11 +122,18 @@ export default function VerificationPanel({ sessionId, active, presentCount }: P
             </>
           ) : (
             <>
-              <Button onClick={() => launch('visual_ping')} disabled={busy || people === null}>
-                בדיקה ויזואלית (45 ש׳)
-              </Button>
-              <Button variant="secondary" onClick={() => launch('rollcall')} disabled={busy}>
-                Roll-call (30 ש׳)
+              {active && (
+                <>
+                  <Button onClick={() => launch('visual_ping')} disabled={busy || people === null}>
+                    בדיקה ויזואלית (45 ש׳)
+                  </Button>
+                  <Button variant="secondary" onClick={() => launch('rollcall')} disabled={busy}>
+                    Roll-call (30 ש׳)
+                  </Button>
+                </>
+              )}
+              <Button variant="secondary" onClick={() => launch('visual_ping', true)} disabled={busy || people === null}>
+                בדיקה אחרי השיעור (24 שעות)
               </Button>
             </>
           )}
