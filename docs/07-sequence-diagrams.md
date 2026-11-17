@@ -178,7 +178,7 @@ sequenceDiagram
   PB--)P: realtime -> answer revealed (shown for 60 s)
 ```
 
-## SD5: Lecture summary with confusion timeline (UC9)
+## SD5: Lecture summary, the lecturer's report and the confusion timeline (UC9)
 
 ```mermaid
 sequenceDiagram
@@ -189,6 +189,7 @@ sequenceDiagram
   participant US as UploadStore
   participant Q as BackgroundQueue
   participant LS as LectureSummarizer
+  participant LC as LectureCoach
   participant LLM as GeminiProvider
   participant CMt as ConfusionMeter
   participant PB as PocketBase
@@ -217,6 +218,12 @@ sequenceDiagram
   LLM-->>LS: {tldr, chapters[startSec], concepts[], questions[5]}
   LS-->>RP: LectureSummary (validated, chapters sorted)
   RP->>PB: update {summary, status: done}
+  RP->>CMt: series(lost signals) gives the spikes, plus LessonSignals (unanswered questions, polls, feedback)
+  RP->>LC: review(same source, class signals)
+  LC->>LLM: generateStructured(task=coach_lecture, schema, video)
+  LLM-->>LC: {scores, verdict, tips[atSec], promises, language, audio}
+  LC-->>RP: LectureCoaching (validated, at most 5 tips)
+  RP->>PB: update {coaching (hidden)} or {coaching_error}, a failure keeps the summary
   RP->>US: remove(id) (the recording is never kept)
   PB--)L: realtime -> summary ready
   L->>API: GET /recordings/:id/timeline
