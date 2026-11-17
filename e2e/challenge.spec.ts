@@ -19,6 +19,30 @@ async function tap(student: Page, fx: number, fy: number) {
   await expect(student.getByText('התקבל ✓')).toBeVisible({ timeout: 8_000 });
 }
 
+test('4c · after-class check: the lecturer starts it after the lesson ended; a student taps their seat from home', async ({ browser }) => {
+  const lp = await lecturerPage(browser, klass.lecturer);
+  const sessionId = await startSession(lp);
+  const sp = await phone(browser, klass.students[0], 0);
+  await checkIn(sp, await qrToken(lp, sessionId));
+
+  const photo = await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#d9d2c3' } }).jpeg().toBuffer();
+  await lp.getByLabel('📷 צילום כיתה').setInputFiles({ name: 'class.jpg', mimeType: 'image/jpeg', buffer: photo });
+  await expect(lp.getByAltText('תמונת הכיתה', { exact: true })).toBeVisible({ timeout: 20_000 });
+  lp.once('dialog', (d) => d.accept());
+  await lp.getByRole('button', { name: 'סיום שיעור' }).click();
+  await expect(lp.getByText('הסתיים', { exact: true })).toBeVisible({ timeout: 10_000 });
+
+  await lp.getByRole('button', { name: 'בדיקה אחרי השיעור (24 שעות)' }).click();
+  await expect(lp.getByText(/בדיקה אחרי השיעור פתוחה עד/)).toBeVisible({ timeout: 8_000 });
+
+  // Later, at home: the student's home page points to the check, and one tap on the lesson page answers it.
+  await sp.goto('/');
+  await sp.getByRole('link', { name: /בדיקת נוכחות/ }).click();
+  await expect(sp.getByText('בדיקת נוכחות לשיעור הזה')).toBeVisible({ timeout: 10_000 });
+  await tap(sp, 0.19, 0.55);
+  await expect(lp.getByText(/1 תגובות/)).toBeVisible({ timeout: 8_000 });
+});
+
 test('4 · Visual Ping: a tap on an empty spot is flagged empty_seat, taps on people are not', async ({ browser }) => {
   const lp = await lecturerPage(browser, klass.lecturer);
   const sessionId = await startSession(lp);
