@@ -1,8 +1,9 @@
-import { Hono } from 'hono';
+import { type Context, Hono } from 'hono';
 import type { AttendanceExportService } from '../attendance/AttendanceExportService.js';
 import type { AttendanceService } from '../attendance/AttendanceService.js';
 import type { SessionService } from '../attendance/SessionService.js';
-import type { ExportFormat } from '../infra/export/SpreadsheetExporter.js';
+import type { CommentsExportService } from '../engagement/CommentsExportService.js';
+import type { ExportFormat, ExportOutput } from '../infra/export/SpreadsheetExporter.js';
 import { type AppEnv, requireLecturer } from './auth.js';
 import { recordDto, sessionDto } from './dto.js';
 import { ValidationError } from './errors.js';
@@ -11,11 +12,20 @@ import { geo, jsonBody, num, oneOf, str } from './validate.js';
 const FORMATS = ['xlsx', 'csv', 'sheets'] as const satisfies readonly ExportFormat[];
 
 /** Lecturer-only session endpoints. */
+const send = (c: Context<AppEnv>, out: ExportOutput) =>
+  out.kind === 'link'
+    ? c.json({ url: out.url })
+    : c.body(new Uint8Array(out.data), 200, {
+        'Content-Type': out.contentType,
+        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(out.filename)}`,
+      });
+
 export class SessionController {
   constructor(
     private readonly sessions: SessionService,
     private readonly attendance: AttendanceService,
     private readonly exports: AttendanceExportService,
+    private readonly commentsExport: CommentsExportService,
   ) {}
 
   routes(): Hono<AppEnv> {
@@ -66,12 +76,14 @@ export class SessionController {
     app.get('/:id/export', requireLecturer, async (c) => {
       const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
       const format = oneOf({ format: c.req.query('format') }, 'format', FORMATS);
-      const out = await this.exports.export(session, format);
-      if (out.kind === 'link') return c.json({ url: out.url });
-      return c.body(new Uint8Array(out.data), 200, {
-        'Content-Type': out.contentType,
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(out.filename)}`,
-      });
+      return send(c, await this.exports.export(session, format));
+    });
+
+    // The lecture's questions and comments as a spreadsheet (anonymous where the screen is).
+    app.get('/:id/comments/export', requireLecturer, async (c) => {
+      const session = await this.sessions.getOwned(c.req.param('id'), c.get('user').id);
+      const format = oneOf({ format: c.req.query('format') }, 'format', FORMATS);
+      return send(c, await this.commentsExport.export(session, format));
     });
 
     return app;

@@ -91,7 +91,7 @@ describe('HTTP: lecture page content after the lecture', () => {
     });
   });
 
-  it('feedback: only after the end, only for those present; the lecturer gets the aggregate from 3 answers', async () => {
+  it('feedback: only after the end, for course members; the lecturer gets the aggregate from 3 answers and can export the comments', async () => {
     const id = (await request('lect', 'POST', '/sessions', { courseId: 'c1', title: 'L', geofenceMode: 'lenient', geofenceRadiusM: 50 })).body.id;
     for (const who of ['dana', 'avi', 'rina'] as const) {
       const { token } = (await request('lect', 'GET', `/sessions/${id}/qr`)).body;
@@ -114,5 +114,15 @@ describe('HTTP: lecture page content after the lecture', () => {
       counts: { clear: 1, too_fast: 2, too_slow: 0, unclear: 0 },
       comments: [{ rating: 'too_fast', text: 'מהר מדי בסוף' }],
     });
+
+    // The lecturer exports the comments: anonymous, no times. Students cannot.
+    const csv = await app.request(`/sessions/${id}/comments/export?format=csv`, { headers: { Authorization: 'Bearer lect' } });
+    expect(csv.status).toBe(200);
+    expect(decodeURIComponent(csv.headers.get('content-disposition') ?? '')).toContain('הערות.csv');
+    const text = await csv.text();
+    expect(text).toContain('הערה על השיעור,מהר מדי בסוף');
+    for (const who of Object.values(USERS)) if (who.role === 'student') expect(text).not.toContain(who.name);
+    expect((await request('dana', 'GET', `/sessions/${id}/comments/export?format=csv`)).status).toBe(403);
+    expect((await request('lect', 'GET', `/sessions/${id}/comments/export?format=pdf`)).status).toBe(400);
   });
 });

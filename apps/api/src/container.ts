@@ -39,6 +39,7 @@ import type {
   SubmissionRepository,
 } from './content/repositories.js';
 import { TextExtractor } from './content/TextExtractor.js';
+import { CommentsExportService } from './engagement/CommentsExportService.js';
 import { ConfusionMeter } from './engagement/ConfusionMeter.js';
 import { FeedService } from './engagement/FeedService.js';
 import { FeedbackService } from './engagement/FeedbackService.js';
@@ -92,6 +93,7 @@ export interface Container {
   courses: CourseService;
   attendance: AttendanceService;
   exports: AttendanceExportService;
+  commentsExport: CommentsExportService;
   challenges: ChallengeManager;
   confusion: ConfusionMeter;
   feed: FeedService;
@@ -165,6 +167,7 @@ export function buildContainer(p: Ports): Container {
     courses,
     attendance,
     exports: new AttendanceExportService(p.attendanceRepo, p.courseRepo, p.exporters),
+    commentsExport: new CommentsExportService(p.postRepo, p.feedbackRepo, p.courseRepo, p.exporters),
     challenges: new ChallengeManager(
       new PeopleDetector(p.llm),
       p.images,
