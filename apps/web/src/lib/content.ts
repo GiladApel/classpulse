@@ -22,6 +22,23 @@ export type RecordingRecord = RecordModel & {
   created_at: string;
 };
 
+/** Feature 4: the lecturer's own report on a lecture (API only, never in the recording record). */
+export interface LectureCoaching {
+  scores: { clarity: number; pace: number; engagement: number };
+  verdict: string;
+  tips: { title: string; evidence: string; atSec: number | null; suggestion: string }[];
+  promises: string[];
+  language: string[];
+  audio: string;
+}
+
+export interface CoachingTrendPoint {
+  sessionId: string;
+  title: string;
+  startedAt: string;
+  scores: LectureCoaching['scores'];
+}
+
 export interface Timeline {
   bucketSec: number;
   buckets: { t: number; count: number }[];

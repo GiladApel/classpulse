@@ -3,10 +3,11 @@ import { api, ApiError } from '../lib/api';
 import { type RecordingRecord, STATUS_HE, type Timeline, uploadRecording } from '../lib/content';
 import { pb } from '../lib/pb';
 import { useLiveRecords } from '../lib/useLiveRecords';
+import CoachingReport from './CoachingReport';
 import SummaryView from './SummaryView';
 import { Button, Card, ErrorText, Field, inputClass } from './ui';
 
-/** Lecturer: upload the lecture recording (or transcript), follow processing live, review the summary, publish it. */
+/** Lecturer: upload the lecture recording (or transcript), follow processing live, review the summary, publish it, and read the report on the lecture. */
 export default function RecordingPanel({ sessionId }: { sessionId: string }) {
   const recordings = useLiveRecords<RecordingRecord>('recordings', pb.filter('session = {:s}', { s: sessionId }), 'created_at');
   const latest = [...recordings].sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
@@ -49,6 +50,7 @@ export default function RecordingPanel({ sessionId }: { sessionId: string }) {
   const busy = progress !== null || (latest && ['uploading', 'queued', 'processing'].includes(latest.status));
 
   return (
+    <>
     <Card>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-semibold">סיכום ההרצאה</h2>
@@ -97,5 +99,7 @@ export default function RecordingPanel({ sessionId }: { sessionId: string }) {
       <ErrorText>{error}</ErrorText>
       {latest?.status === 'done' && latest.summary && <SummaryView summary={latest.summary} timeline={timeline} />}
     </Card>
+    {latest?.status === 'done' && <CoachingReport recordingId={latest.id} refreshKey={latest.updated} />}
+    </>
   );
 }
