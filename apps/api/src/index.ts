@@ -16,13 +16,14 @@ const stuck = (await container.recordings.recoverInterrupted()) + (await contain
 if (stuck) console.warn(`Marked ${stuck} interrupted AI job(s) as failed`);
 serve({ fetch: app.fetch, port: cfg.port }, ({ port }) => console.log(`ClassPulse API on :${port} (LLM: ${cfg.ai.provider})`));
 
-// Challenges close on their own when the timer runs out.
+// Challenges and timed polls close on their own when their time runs out.
 let closing = false;
 setInterval(async () => {
   if (closing) return;
   closing = true;
   try {
     await container.challenges.closeExpired();
+    await container.polls.closeExpired();
   } catch (e) {
     console.error('closeExpired failed:', e);
   } finally {
