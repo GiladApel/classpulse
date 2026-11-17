@@ -14,6 +14,11 @@ interface Draft {
   correctIndex: number | null;
 }
 
+type Editing = Draft & { source: 'ai' | 'manual' };
+
+const MIN_OPTIONS = 2;
+const MAX_OPTIONS = 6;
+
 interface Theme {
   title: string;
   summary: string;
@@ -100,7 +105,7 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
   const [drafts, setDrafts] = useState<Draft[]>([]);
   // The lecturer's example was "close it after two minutes"; 0 = close by hand.
   const [durationSec, setDurationSec] = useState(120);
-  const [editing, setEditing] = useState<Draft | null>(null);
+  const [editing, setEditing] = useState<Editing | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
 
@@ -140,7 +145,7 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
 
   return (
     <Card>
-      <h2 className="mb-3 font-semibold">שאלה משקף</h2>
+      <h2 className="mb-3 font-semibold">סקר בכיתה</h2>
 
       {shown && (
         <div className="mb-4 rounded-xl border border-slate-200 p-3">
@@ -172,6 +177,9 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
               <input type="file" accept="image/*" className="hidden" onChange={fromSlide} />
             </label>
           </div>
+          <Button variant="ghost" onClick={() => setEditing({ question: '', options: ['', ''], correctIndex: null, source: 'manual' })} disabled={!!busy}>
+            ✏️ כתיבת שאלה ידנית
+          </Button>
           {busy === 'drafts' && <p className="text-sm text-slate-500">ה-AI מכין 3 שאלות…</p>}
         </div>
       )}
@@ -180,7 +188,7 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
         <ul className="mt-3 flex flex-col gap-2">
           {drafts.map((d, i) => (
             <li key={i}>
-              <button onClick={() => setEditing(structuredClone(d))} className="w-full rounded-xl border border-slate-200 p-3 text-start hover:border-indigo-400 hover:bg-indigo-50">
+              <button onClick={() => setEditing({ ...structuredClone(d), source: 'ai' })} className="w-full rounded-xl border border-slate-200 p-3 text-start hover:border-indigo-400 hover:bg-indigo-50">
                 <p className="font-medium">{d.question}</p>
                 <p className="mt-1 text-xs text-slate-500">{d.options.map((o, j) => (j === d.correctIndex ? `✓${o}` : o)).join(' · ')}</p>
               </button>
@@ -191,7 +199,16 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
 
       {editing && (
         <div className="flex flex-col gap-2">
-          <textarea value={editing.question} onChange={(e) => setEditing({ ...editing, question: e.target.value })} rows={2} maxLength={300} className={inputClass} />
+          <textarea
+            value={editing.question}
+            onChange={(e) => setEditing({ ...editing, question: e.target.value })}
+            rows={2}
+            maxLength={300}
+            placeholder="השאלה"
+            aria-label="שאלה"
+            className={inputClass}
+          />
+          <p className="text-xs text-slate-500">סמנו את התשובה הנכונה (לא חובה — בלי סימון זה סקר דעה).</p>
           {editing.options.map((o, i) => (
             <div key={i} className="flex items-center gap-2">
               <input
@@ -205,11 +222,31 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
               <input
                 value={o}
                 maxLength={120}
+                placeholder={`תשובה ${i + 1}`}
+                aria-label={`תשובה ${i + 1}`}
                 onChange={(e) => setEditing({ ...editing, options: editing.options.map((x, j) => (j === i ? e.target.value : x)) })}
                 className={`${inputClass} flex-1`}
               />
+              {editing.options.length > MIN_OPTIONS && (
+                <button
+                  type="button"
+                  aria-label={`הסרת תשובה ${i + 1}`}
+                  onClick={() => {
+                    const c = editing.correctIndex;
+                    setEditing({ ...editing, options: editing.options.filter((_, j) => j !== i), correctIndex: c === i ? null : c !== null && c > i ? c - 1 : c });
+                  }}
+                  className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           ))}
+          {editing.options.length < MAX_OPTIONS && (
+            <button type="button" onClick={() => setEditing({ ...editing, options: [...editing.options, ''] })} className="self-start text-sm font-medium text-indigo-700 hover:underline">
+              + הוספת תשובה
+            </button>
+          )}
           <label className="flex items-center gap-2 text-sm text-slate-700">
             סגירה אוטומטית אחרי
             <select value={durationSec} onChange={(e) => setDurationSec(Number(e.target.value))} aria-label="סגירה אוטומטית" className="rounded-lg border border-slate-300 px-2 py-1">
@@ -220,7 +257,7 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
             </select>
           </label>
           <div className="flex gap-2">
-            <Button className="flex-1" disabled={!!busy} onClick={() => launch({ ...editing, source: 'ai' })}>
+            <Button className="flex-1" disabled={!!busy} onClick={() => launch({ ...editing })}>
               פתיחת הסקר
             </Button>
             <Button variant="ghost" onClick={() => setEditing(null)}>
