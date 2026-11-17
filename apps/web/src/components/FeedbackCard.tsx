@@ -89,6 +89,24 @@ interface Summary {
 /** Lecturer: the aggregate only, and only from 3 answers, so no single student can be identified. */
 export function FeedbackResults({ sessionId }: { sessionId: string }) {
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [formats, setFormats] = useState<string[]>([]);
+  const [notice, setNotice] = useState('');
+  useEffect(() => {
+    api.get<{ exportFormats: string[] }>('/config').then((c) => setFormats(c.exportFormats), () => {});
+  }, []);
+  // The lecture's questions and the comments (anonymous, from 3 answers) as a spreadsheet.
+  const exportAs = async (format: string) => {
+    setNotice('');
+    try {
+      const res = await api.download(`/sessions/${sessionId}/comments/export?format=${format}`);
+      if (res.url) {
+        window.open(res.url, '_blank');
+        setNotice('הגיליון עודכן ב-Google Sheets');
+      }
+    } catch {
+      setNotice('הייצוא נכשל — נסו שוב');
+    }
+  };
   const load = useCallback(() => api.get<Summary>(`/sessions/${sessionId}/feedback`).then(setSummary, () => {}), [sessionId]);
   useEffect(() => {
     load();
@@ -100,12 +118,21 @@ export function FeedbackResults({ sessionId }: { sessionId: string }) {
     <Card>
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="font-semibold">
-          משוב על השיעור <span className="text-sm font-normal text-slate-500">({summary.responses} תשובות · אנונימי)</span>
+          הערות על השיעור <span className="text-sm font-normal text-slate-500">({summary.responses} תשובות · אנונימי)</span>
         </h2>
         <button onClick={load} className="text-sm text-indigo-600 hover:underline">
           רענון
         </button>
       </div>
+      {formats.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-slate-600">ייצוא השאלות וההערות:</span>
+          {formats.includes('xlsx') && <Button variant="secondary" onClick={() => exportAs('xlsx')}>Excel</Button>}
+          {formats.includes('csv') && <Button variant="secondary" onClick={() => exportAs('csv')}>CSV</Button>}
+          {formats.includes('sheets') && <Button variant="secondary" onClick={() => exportAs('sheets')}>Google Sheets</Button>}
+          {notice && <span className="text-slate-600">{notice}</span>}
+        </div>
+      )}
       {!summary.visible ? (
         <p className="text-sm text-slate-500">התוצאות יוצגו מ-3 תשובות, כדי שאי אפשר יהיה לזהות מי ענה. ההערות פתוחות שבוע מסיום השיעור, לכל הרשומים לקורס.</p>
       ) : (
