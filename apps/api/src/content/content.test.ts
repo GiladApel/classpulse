@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { HomeworkGuideGenerator } from '../ai/HomeworkGuideGenerator.js';
 import { HomeworkReviewer } from '../ai/HomeworkReviewer.js';
+import { LectureCoach } from '../ai/LectureCoach.js';
 import { LectureSummarizer } from '../ai/LectureSummarizer.js';
 import { LLMOutputError } from '../ai/LLMProvider.js';
 import { DEFAULT_FIXTURES, MockProvider } from '../ai/MockProvider.js';
@@ -104,6 +105,12 @@ describe('RecordingPipeline', () => {
       repo,
       uploads,
       new LectureSummarizer(llm),
+      new LectureCoach(llm),
+      {
+        session: async () => session,
+        of: async () => ({ unansweredQuestions: [{ text: 'מה ההבדל בין State ל-Strategy?', upvotes: 4 }], polls: [], feedback: { responses: 1, counts: null } }),
+        lessonsOf: async () => [session, makeSession({ id: 'sess2', title: 'L2', startedAt: new Date(T0.getTime() + 7 * 86_400_000) })],
+      },
       {
         // Same bucketing contract as ConfusionMeter.series, from a fixed list of signals.
         series: async (_id, from, to, bucketSec = 60) => {
@@ -146,6 +153,34 @@ describe('RecordingPipeline', () => {
     expect(llm.calls[0].files?.[0]).toEqual({ mimeType: 'video/mp4', path: uploads.path(rec.id) });
     expect(await uploads.size(rec.id)).toBe(0);
     expect(await code(p.appendChunk(done, 6, Buffer.from('x')))).toBe('UPLOAD_CLOSED');
+
+    // The lecturer's report read the same video, with the class signals as evidence.
+    expect(done.coaching).toMatchObject({ scores: { clarity: 4, pace: 2, engagement: 3 } });
+    expect(done.coaching!.tips[2].atSec).toBeNull();
+    const coachCall = llm.calls.find((c) => c.task === 'coach_lecture')!;
+    expect(coachCall.files?.[0]).toEqual({ mimeType: 'video/mp4', path: uploads.path(rec.id) });
+    expect(coachCall.prompt).toContain('מה ההבדל בין State ל-Strategy?');
+  });
+
+  it("a failed report keeps the summary; the lecturer retries it from the summary; the course trend lists each lesson's scores", async () => {
+    const fx = { ...DEFAULT_FIXTURES, coach_lecture: { tips: [] } as unknown };
+    llm = new MockProvider(fx as typeof DEFAULT_FIXTURES);
+    const p = pipeline();
+    const rec = await p.start(session, { filename: 'lecture.txt', mimeType: 'text/plain', sizeBytes: 5, offsetSec: 0 });
+    await p.appendChunk(rec, 0, Buffer.from('hello'));
+    await p.complete(rec);
+    await queue.idle();
+    const failed = await p.get(rec.id);
+    expect(failed).toMatchObject({ status: 'done', coaching: null, coachingError: expect.stringContaining('נסו שוב') });
+    expect(failed.summary).not.toBeNull();
+    expect(await p.coachingTrend(session.courseId)).toEqual([]);
+
+    fx.coach_lecture = DEFAULT_FIXTURES.coach_lecture;
+    const retried = await p.retryCoaching(failed);
+    expect(retried).toMatchObject({ coachingError: '', coaching: { scores: { pace: 2 } } });
+    expect(llm.calls.at(-1)!.prompt).toContain('[5:00] Strategy');
+    expect(await p.coachingTrend(session.courseId)).toEqual([{ sessionId: session.id, title: session.title, startedAt: session.startedAt, scores: { clarity: 4, pace: 2, engagement: 3 } }]);
+    expect(await code(p.retryCoaching(await p.start(session, { filename: 'l.mp4', mimeType: 'video/mp4', sizeBytes: 1, offsetSec: 0 })))).toBe('NOT_READY');
   });
 
   it('transcripts are sent as text; an LLM failure marks the recording failed and still deletes the file', async () => {

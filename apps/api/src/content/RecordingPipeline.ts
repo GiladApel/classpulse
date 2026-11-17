@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import type { LectureCoach } from '../ai/LectureCoach.js';
 import type { LectureSummarizer, LectureSource } from '../ai/LectureSummarizer.js';
 import { LLMOutputError } from '../ai/LLMProvider.js';
 import type { AttendanceService } from '../attendance/AttendanceService.js';
@@ -8,8 +9,17 @@ import type { BackgroundQueue } from '../infra/BackgroundQueue.js';
 import type { Clock } from '../infra/Clock.js';
 import type { UploadStore } from '../infra/UploadStore.js';
 import { DomainError, NotFoundError } from '../shared/errors.js';
+import type { LessonSignals } from './LessonSignals.js';
 import type { RecordingRepository } from './repositories.js';
-import type { Recording, RecordingKind, Timeline } from './types.js';
+import type { ClassSignals, LectureCoaching, LectureSummary, Recording, RecordingKind, Timeline } from './types.js';
+
+/** One lesson's report scores, for the lecturer's trend across the course. */
+export interface CoachingTrendPoint {
+  sessionId: string;
+  title: string;
+  startedAt: Date;
+  scores: LectureCoaching['scores'];
+}
 
 export interface RecordingMeta {
   filename: string;
@@ -28,6 +38,8 @@ export class RecordingPipeline {
     private readonly recordings: RecordingRepository,
     private readonly uploads: UploadStore,
     private readonly summarizer: LectureSummarizer,
+    private readonly coach: Pick<LectureCoach, 'review'>,
+    private readonly lessons: Pick<LessonSignals, 'session' | 'of' | 'lessonsOf'>,
     private readonly confusion: Pick<ConfusionMeter, 'series'>,
     private readonly attendance: Pick<AttendanceService, 'presentCount'>,
     private readonly queue: BackgroundQueue,
@@ -55,6 +67,8 @@ export class RecordingPipeline {
       status: 'uploading',
       error: '',
       summary: null,
+      coaching: null,
+      coachingError: '',
       published: false,
       createdAt: this.clock.now(),
     });
@@ -88,6 +102,8 @@ export class RecordingPipeline {
         recording.kind === 'media' ? { media: { mimeType: recording.mimeType, path } } : { transcript: (await readFile(path, 'utf8')).slice(0, 500_000) };
       const summary = await this.summarizer.summarize(source);
       await this.recordings.update(recordingId, { status: 'done', summary, error: '', processedAt: this.clock.now() });
+      // The lecturer's report reads the same source before the file is deleted; its failure never fails the summary.
+      await this.runCoaching({ ...recording, summary }, source);
     } catch (e) {
       console.error(`Recording ${recordingId} failed:`, e);
       const error = e instanceof LLMOutputError ? 'ה-AI החזיר סיכום לא תקין — נסו שוב' : 'העיבוד נכשל — נסו שוב או העלו תמליל';
@@ -95,6 +111,54 @@ export class RecordingPipeline {
     } finally {
       await this.uploads.remove(recordingId);
     }
+  }
+
+  private async runCoaching(recording: Recording, source: LectureSource): Promise<void> {
+    try {
+      const coaching = await this.coach.review(source, await this.signals(recording));
+      await this.recordings.update(recording.id, { coaching, coachingError: '' });
+    } catch (e) {
+      console.error(`Coaching ${recording.id} failed:`, e);
+      const coachingError = e instanceof LLMOutputError ? 'ה-AI החזיר דוח לא תקין — נסו שוב' : 'הכנת הדוח נכשלה — נסו שוב';
+      await this.recordings.update(recording.id, { coaching: null, coachingError });
+    }
+  }
+
+  private async signals(recording: Recording): Promise<ClassSignals> {
+    const session = await this.lessons.session(recording.sessionId);
+    const rest = await this.lessons.of(recording.sessionId);
+    const lostSpikes = session ? (await this.timeline(session, recording)).spikes.map((s) => ({ atSec: s.t, students: s.count, chapter: s.chapter })) : [];
+    return { lostSpikes, ...rest };
+  }
+
+  /**
+   * The recording itself is gone, so a retry reads the stored summary as a stand-in transcript. Allowed when there is a
+   * summary and no report yet (or the last one failed).
+   */
+  async retryCoaching(recording: Recording): Promise<Recording> {
+    if (recording.status !== 'done' || !recording.summary) throw new DomainError('NOT_READY', 'אין עדיין סיכום להרצאה הזו');
+    await this.runCoaching(recording, { transcript: RecordingPipeline.summaryAsText(recording.summary) });
+    return this.get(recording.id);
+  }
+
+  static summaryAsText(summary: LectureSummary): string {
+    const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    return [summary.tldr, ...summary.chapters.map((c) => `[${mmss(c.startSec)}] ${c.title}: ${c.summary}`)].join('\n');
+  }
+
+  /** The three report scores of every lesson in the course that has a report, oldest first. */
+  async coachingTrend(courseId: string): Promise<CoachingTrendPoint[]> {
+    const lessons = await this.lessons.lessonsOf(courseId);
+    const byId = new Map(lessons.map((l) => [l.id, l]));
+    const recordings = (await this.recordings.listBySessions(lessons.map((l) => l.id))).filter((r) => r.coaching);
+    const latest = new Map<string, Recording>();
+    for (const r of recordings) {
+      const prev = latest.get(r.sessionId);
+      if (!prev || r.createdAt > prev.createdAt) latest.set(r.sessionId, r);
+    }
+    return [...latest.values()]
+      .map((r) => ({ sessionId: r.sessionId, title: byId.get(r.sessionId)!.title, startedAt: byId.get(r.sessionId)!.startedAt, scores: r.coaching!.scores }))
+      .sort((a, b) => a.startedAt.getTime() - b.startedAt.getTime());
   }
 
   /** Jobs live in memory; anything unfinished when the API restarted can never complete. */
