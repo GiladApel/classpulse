@@ -25,9 +25,12 @@ test('lecture page: after the lecture ends, a student who missed it sees the ans
   await openTab(lp, 'פורום');
   await lp.getByLabel('🖼️ העלאת תמונה').setInputFiles({ name: 'slide.png', mimeType: 'image/png', buffer: Buffer.from([137, 80, 78, 71]) });
   await lp.getByRole('button', { name: /איזה תבנית עיצוב/ }).click();
+  // It closes by itself after the chosen time (2 minutes by default); everyone sees the countdown.
+  await expect(lp.getByLabel('סגירה אוטומטית')).toHaveValue('120');
   await lp.getByRole('button', { name: 'פתיחת הסקר' }).click();
   await expect(lp.getByText('פתוח · 0 הצבעות')).toBeVisible();
   await expect(sp.getByText('איזה תבנית עיצוב מפרידה בין יצירת אובייקט לשימוש בו?')).toBeVisible();
+  await expect(sp.getByLabel(/נותרו \d+ שניות/)).toContainText(/⏱ [12]:\d\d/);
 
   lp.once('dialog', (d) => d.accept());
   await lp.getByRole('button', { name: 'סיום שיעור' }).click();
