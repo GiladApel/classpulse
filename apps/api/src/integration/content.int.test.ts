@@ -25,7 +25,7 @@ describe('Integration: recordings + homework against real PocketBase', () => {
     await h?.cleanup();
   });
 
-  it('recording summary: lecturer only until published, then every course participant (even one who missed that lecture)', async () => {
+  it('recording summary: lecturer only until published, then every course participant; the lecturer report stays API-only', async () => {
     const transcript = new TextEncoder().encode('00:00 שלום\n05:00 Strategy\n20:00 State');
     const rec = (await h.call(h.lecturer, 'POST', `/sessions/${s1}/recordings`, { filename: 'l.vtt', mimeType: 'text/vtt', sizeBytes: transcript.length })).body;
     const put = await h.app.request(`/recordings/${rec.id}/data?offset=0`, {
@@ -47,6 +47,12 @@ describe('Integration: recordings + homework against real PocketBase', () => {
     expect((await attendedS2Only.pb.collection('recordings').getOne(rec.id)).id).toBe(rec.id);
     await expect(outsider.pb.collection('recordings').getOne(rec.id)).rejects.toMatchObject({ status: 404 });
     await expect(attendedS1.pb.collection('recordings').update(rec.id, { published: false })).rejects.toMatchObject({ status: 403 });
+
+    // The lecturer's report exists, but only the API reads it: not students, not the lecturer through PocketBase.
+    expect((await h.admin.collection('recordings').getOne(rec.id)).coaching.tips.length).toBeGreaterThan(0);
+    expect(stored.coaching).toBeUndefined();
+    expect((await attendedS1.pb.collection('recordings').getOne(rec.id)).coaching).toBeUndefined();
+    expect((await h.call(h.lecturer, 'GET', `/recordings/${rec.id}/coaching`)).body.coaching.scores).toEqual({ clarity: 4, pace: 2, engagement: 3 });
   });
 
   it('homework: the rubric and notes are hidden from everyone, the PDF is for members; a hand-in is kept for the student and the lecturer, its grade API-only', async () => {
