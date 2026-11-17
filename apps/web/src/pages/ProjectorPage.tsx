@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import PollTimer from '../components/PollTimer';
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import PollBars from '../components/PollBars';
@@ -85,6 +86,7 @@ export default function ProjectorPage() {
           />
           <p className="text-center text-2xl text-slate-300">
             {poll.status === 'open' ? `הצביעו בטלפון · ${votes.length} הצבעות` : `${poll.results?.total ?? 0} הצבעות · הסקר נסגר`}
+            {poll.status === 'open' && <PollTimer closesAt={poll.closes_at} className="ms-4" />}
           </p>
         </div>
       ) : visualPing ? (

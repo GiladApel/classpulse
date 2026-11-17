@@ -53,6 +53,8 @@ export type PollRecord = RecordModel & {
   created_at: string;
   opened_at: string;
   closed_at: string;
+  /** Set when the poll closes by itself. */
+  closes_at: string;
 };
 
 export type PostRecord = RecordModel & {

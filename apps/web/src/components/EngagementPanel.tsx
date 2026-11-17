@@ -5,6 +5,7 @@ import { api, ApiError } from '../lib/api';
 import { pb, useQuestionsPaused } from '../lib/pb';
 import { type PollRecord, type PostRecord, tally, useLiveRecords } from '../lib/useLiveRecords';
 import PollBars from './PollBars';
+import PollTimer from './PollTimer';
 import { Button, Card, ErrorText, inputClass } from './ui';
 
 interface Draft {
@@ -97,6 +98,8 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
   // correct_index is hidden from PB reads; remember it from the API response of the poll we launched.
   const [answers, setAnswers] = useState<Record<string, number | null>>({});
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  // The lecturer's example was "close it after two minutes"; 0 = close by hand.
+  const [durationSec, setDurationSec] = useState(120);
   const [editing, setEditing] = useState<Draft | null>(null);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -115,7 +118,7 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
 
   const launch = (body: Record<string, unknown>) =>
     run('launch', async () => {
-      const p = await api.post<{ id: string; correctIndex: number | null }>(`/sessions/${sessionId}/polls`, { ...body, open: true });
+      const p = await api.post<{ id: string; correctIndex: number | null }>(`/sessions/${sessionId}/polls`, { ...body, open: true, ...(durationSec ? { durationSec } : {}) });
       setAnswers((a) => ({ ...a, [p.id]: p.correctIndex }));
       setEditing(null);
       setDrafts([]);
@@ -143,7 +146,9 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
         <div className="mb-4 rounded-xl border border-slate-200 p-3">
           <div className="mb-2 flex items-start justify-between gap-2">
             <p className="font-medium">{shown.question}</p>
-            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">פתוח · {votes.length} הצבעות</span>
+            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">
+              פתוח · {votes.length} הצבעות <PollTimer closesAt={shown.closes_at} className="ms-1" />
+            </span>
           </div>
           {/* The lecturer sees the answer marked; students and the projector see it only after close. */}
           <PollBars options={shown.options} counts={tally(shown.options, votes)} correctIndex={answers[shown.id] ?? -1} />
@@ -205,6 +210,15 @@ function PollManager({ sessionId, active }: { sessionId: string; active: boolean
               />
             </div>
           ))}
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            סגירה אוטומטית אחרי
+            <select value={durationSec} onChange={(e) => setDurationSec(Number(e.target.value))} aria-label="סגירה אוטומטית" className="rounded-lg border border-slate-300 px-2 py-1">
+              <option value={60}>דקה</option>
+              <option value={120}>2 דקות</option>
+              <option value={300}>5 דקות</option>
+              <option value={0}>בלי הגבלה</option>
+            </select>
+          </label>
           <div className="flex gap-2">
             <Button className="flex-1" disabled={!!busy} onClick={() => launch({ ...editing, source: 'ai' })}>
               פתיחת הסקר

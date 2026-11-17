@@ -6,6 +6,7 @@ import { useCountdown } from '../lib/useChallenge';
 import { currentPoll, type PollRecord, type PostRecord, useLiveRecords, useTick } from '../lib/useLiveRecords';
 import FeedbackCard from './FeedbackCard';
 import PollBars from './PollBars';
+import PollTimer from './PollTimer';
 import { Button, Card, ErrorText, inputClass } from './ui';
 
 const message = (e: unknown) => (e instanceof ApiError && e.status < 500 ? e.message : 'שגיאת רשת — נסו שוב');
@@ -129,7 +130,10 @@ function PollCard({ sessionId }: { sessionId: string }) {
   return (
     <div ref={ref}>
       <Card className={poll.status === 'open' ? 'ring-2 ring-indigo-500' : ''}>
-        <p className="mb-1 text-xs font-semibold text-indigo-600">{poll.status === 'open' ? 'סקר פתוח' : 'תוצאות הסקר'}</p>
+        <p className="mb-1 flex items-center justify-between text-xs font-semibold text-indigo-600">
+          {poll.status === 'open' ? 'סקר פתוח' : 'תוצאות הסקר'}
+          {poll.status === 'open' && <PollTimer closesAt={poll.closes_at} className="text-sm" />}
+        </p>
         <h2 className="mb-3 text-lg font-bold">{poll.question}</h2>
         {poll.status === 'open' ? (
           <div className="flex flex-col gap-2">
