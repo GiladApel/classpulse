@@ -20,10 +20,10 @@ Lecturers need **one simple tool** that students open with a phone camera and th
 | F2 | **Anti-fraud**: AI headcount from a class photo; Roll-call challenge; **Blurred Photo Heatmap challenge** | Core |
 | F3 | **Live backchannel**: "I'm lost" confusion meter + questions feed (anonymous option) | High |
 | F4 | **KISS polls**: AI-generated MCQ from a photographed or uploaded slide; live results | High |
-| F5 | **Lecture summary**: AI summary, chapters and review questions from a recording, with confusion spikes on the timeline | Medium |
+| F5 | **Lecture summary and lecturer report**: AI summary, chapters and review questions from a recording for the students; a short report for the lecturer (scores, tips at their moments, promises not kept) with a trend across lessons | Medium |
 | F6 | **Homework review**: the AI builds a hidden rubric from the homework PDF and the lecturer's instructions; students get 2 feedback checks, then hand in; the AI grades hand-ins for the lecturer; class-wide common mistakes (peers' work never shown) | Medium |
 | F7 | **Lecture page**: per-lecture page for the whole course (also for those who missed it): summary, materials, practice questions, poll results, questions with the lecturer's answers | Medium |
-| F8 | **Lecture feedback**: when the lecture ends, students get an optional anonymous form (4 options + comment); the lecturer sees the aggregate from 3 answers | Medium |
+| F8 | **Lecture comments**: for a week after the lecture, every course member can leave an anonymous comment (4 options + text); the lecturer sees the aggregate from 3 answers and exports the questions and comments to Excel | Medium |
 
 **Out of scope:**
 - Integration with Moodle, Zoom or the university's personal-information system (מידע אישי).
