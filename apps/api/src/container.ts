@@ -18,6 +18,7 @@ import { DuplicateStudentRule } from './attendance/DuplicateStudentRule.js';
 import { LessonAccess } from './attendance/LessonAccess.js';
 import { QrTokenService } from './attendance/QrTokenService.js';
 import type { AttendanceRepository, CourseRepository, CourseSlotRepository, EnrollmentRepository, SessionRepository } from './attendance/repositories.js';
+import { StudentLinker } from './attendance/StudentLinker.js';
 import { RosterParser } from './attendance/RosterParser.js';
 import { SessionActiveRule } from './attendance/SessionActiveRule.js';
 import { SessionService } from './attendance/SessionService.js';
@@ -91,6 +92,7 @@ export interface Container {
   tokens: QrTokenService;
   sessions: SessionService;
   courses: CourseService;
+  linker: StudentLinker;
   attendance: AttendanceService;
   exports: AttendanceExportService;
   commentsExport: CommentsExportService;
@@ -153,7 +155,8 @@ export function buildContainer(p: Ports): Container {
     new DeviceBindingRule(p.attendanceRepo),
   ];
   const attendance = new AttendanceService(rules, p.attendanceRepo, p.clock);
-  const courses = new CourseService(p.courseRepo, p.enrollmentRepo, p.slotRepo, p.attendanceRepo, new RosterParser(), p.clock);
+  const linker = new StudentLinker(p.enrollmentRepo, p.userRepo);
+  const courses = new CourseService(p.courseRepo, p.enrollmentRepo, p.slotRepo, p.attendanceRepo, new RosterParser(), linker, p.clock);
   // The forum, polls and "I'm lost" are open to the whole course; attendance and challenges stay with those in the room.
   const lesson = new LessonAccess(attendance, p.sessionRepo, courses);
   const confusion = new ConfusionMeter(p.lostRepo, { requireParticipant: (s, n) => lesson.requireParticipant(s, n), presentCount: (s) => attendance.presentCount(s) }, p.clock);
@@ -165,6 +168,7 @@ export function buildContainer(p: Ports): Container {
     tokens,
     sessions: new SessionService(p.sessionRepo, p.courseRepo, tokens, p.clock, p.headcountRepo),
     courses,
+    linker,
     attendance,
     exports: new AttendanceExportService(p.attendanceRepo, p.courseRepo, p.exporters),
     commentsExport: new CommentsExportService(p.postRepo, p.feedbackRepo, p.courseRepo, p.exporters),

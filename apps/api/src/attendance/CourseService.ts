@@ -1,7 +1,8 @@
 import type { Clock } from '../infra/Clock.js';
 import { ConflictError, DomainError, NotFoundError } from '../shared/errors.js';
 import type { AttendanceRepository, CourseRepository, CourseSlotRepository, EnrollmentRepository } from './repositories.js';
-import type { RosterParser, SkippedRow } from './RosterParser.js';
+import { isEmail, normalizeEmail, type RosterParser, type RosterRow, type SkippedRow } from './RosterParser.js';
+import type { StudentLinker } from './StudentLinker.js';
 import type { Course, CourseSlot, Enrollment } from './types.js';
 
 export interface SlotInput {
@@ -19,7 +20,14 @@ export interface RosterImport {
 
 export const MAX_SLOTS = 14;
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
-const STUDENT_NUMBER = /^\d{9}$/;
+// A 9-digit ID from the roster, or a 12-digit key the system generated for a student who signed in by email.
+const STUDENT_KEY = /^(\d{9}|\d{12})$/;
+
+export interface NewEnrollment {
+  email?: string;
+  studentNumber?: string;
+  name?: string;
+}
 
 /**
  * A course as the lecturer sets it up: who is enrolled (the roster) and when it meets (the weekly timetable).
@@ -32,6 +40,7 @@ export class CourseService {
     private readonly slots: CourseSlotRepository,
     private readonly attendance: Pick<AttendanceRepository, 'attendedCourse'>,
     private readonly parser: Pick<RosterParser, 'fromText' | 'fromFile'>,
+    private readonly linker: Pick<StudentLinker, 'linkRow'>,
     private readonly clock: Clock,
   ) {}
 
@@ -40,36 +49,68 @@ export class CourseService {
     return this.courses.create({ code, name, lecturerId });
   }
 
-  /** Adds new students and updates names; never removes anyone (removing is a separate, deliberate action). */
+  /**
+   * Adds new students and fills in names and missing emails; never removes anyone (removing is a separate, deliberate
+   * action). A row whose email belongs to a user who has already signed in is linked at once.
+   */
   async importRoster(course: Course, source: { text: string } | { file: Buffer }): Promise<RosterImport> {
     const parsed = 'text' in source ? this.parser.fromText(source.text) : this.parser.fromFile(source.file);
-    if (parsed.rows.length === 0) throw new DomainError('EMPTY_ROSTER', 'לא נמצאו בקובץ מספרי סטודנט');
+    if (parsed.rows.length === 0) throw new DomainError('EMPTY_ROSTER', 'לא נמצאו בקובץ כתובות מייל או מספרי סטודנט');
     const result: RosterImport = { added: 0, updated: 0, skipped: parsed.skipped };
     for (const row of parsed.rows) {
-      const existing = await this.enrollments.findByCourseAndStudent(course.id, row.studentNumber);
+      const existing = await this.findRow(course.id, row);
       if (!existing) {
-        await this.enrollments.create({ courseId: course.id, studentNumber: row.studentNumber, name: row.name, addedAt: this.clock.now() });
+        await this.linker.linkRow(await this.enrollments.create({ courseId: course.id, ...row, addedAt: this.clock.now() }));
         result.added++;
-      } else if (row.name && row.name !== existing.name) {
-        await this.enrollments.update(existing.id, { name: row.name });
-        result.updated++;
+        continue;
       }
+      const patch: Partial<Enrollment> = {};
+      if (row.name && row.name !== existing.name) patch.name = row.name;
+      if (row.email && !existing.email) patch.email = row.email;
+      if (Object.keys(patch).length === 0) continue;
+      await this.linker.linkRow(await this.enrollments.update(existing.id, patch));
+      result.updated++;
     }
     return result;
   }
 
-  /** One student, e.g. "add" next to a check-in from someone not on the roster. Idempotent. */
-  async enroll(course: Course, studentNumber: string, name: string): Promise<Enrollment> {
-    if (!STUDENT_NUMBER.test(studentNumber)) throw new DomainError('INVALID_STUDENT_NUMBER', 'מספר סטודנט צריך להכיל 9 ספרות');
-    const existing = await this.enrollments.findByCourseAndStudent(course.id, studentNumber);
+  /** One student, by email from the roster page or by key from "add" next to a check-in. Idempotent. */
+  async enroll(course: Course, input: NewEnrollment): Promise<Enrollment> {
+    const email = normalizeEmail(input.email ?? '');
+    const studentNumber = (input.studentNumber ?? '').trim();
+    if (email && !isEmail(email)) throw new DomainError('INVALID_EMAIL', 'כתובת המייל לא תקינה');
+    if (studentNumber && !STUDENT_KEY.test(studentNumber)) throw new DomainError('INVALID_STUDENT_NUMBER', 'מספר סטודנט צריך להכיל 9 ספרות');
+    if (!email && !studentNumber) throw new DomainError('INVALID_EMAIL', 'צריך כתובת מייל');
+    const row: RosterRow = { email, studentNumber, name: (input.name ?? '').trim() };
+    const existing = await this.findRow(course.id, row);
     if (existing) return existing;
-    return this.enrollments.create({ courseId: course.id, studentNumber, name: name.trim(), addedAt: this.clock.now() });
+    return this.linker.linkRow(await this.enrollments.create({ courseId: course.id, ...row, addedAt: this.clock.now() }));
   }
 
-  async unenroll(course: Course, studentNumber: string): Promise<void> {
-    const existing = await this.enrollments.findByCourseAndStudent(course.id, studentNumber);
-    if (!existing) throw new NotFoundError('Enrollment');
-    await this.enrollments.delete(existing.id);
+  /** Fixes a mistyped email; if that student has already signed in, they become a member at once. */
+  async updateEmail(course: Course, enrollmentId: string, email: string): Promise<Enrollment> {
+    const row = await this.ownRow(course, enrollmentId);
+    const next = normalizeEmail(email);
+    if (!isEmail(next)) throw new DomainError('INVALID_EMAIL', 'כתובת המייל לא תקינה');
+    if (next === row.email) return row;
+    const clash = await this.enrollments.findByCourseAndEmail(course.id, next);
+    if (clash) throw new ConflictError('EMAIL_IN_ROSTER', 'המייל הזה כבר ברשימת הקורס');
+    // The row now belongs to whoever signs in with the new email, so a link to the old one is dropped.
+    return this.linker.linkRow(await this.enrollments.update(row.id, { email: next, studentNumber: row.email ? '' : row.studentNumber }));
+  }
+
+  async unenroll(course: Course, enrollmentId: string): Promise<void> {
+    await this.enrollments.delete((await this.ownRow(course, enrollmentId)).id);
+  }
+
+  private async findRow(courseId: string, row: RosterRow): Promise<Enrollment | null> {
+    return (await this.enrollments.findByCourseAndEmail(courseId, row.email)) ?? (await this.enrollments.findByCourseAndStudent(courseId, row.studentNumber));
+  }
+
+  private async ownRow(course: Course, enrollmentId: string): Promise<Enrollment> {
+    const row = await this.enrollments.get(enrollmentId);
+    if (!row || row.courseId !== course.id) throw new NotFoundError('Enrollment');
+    return row;
   }
 
   roster(courseId: string): Promise<Enrollment[]> {
