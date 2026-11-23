@@ -23,6 +23,9 @@ export interface CourseRepository {
 
 export interface EnrollmentRepository extends Repository<Enrollment> {
   findByCourseAndStudent(courseId: string, studentNumber: string): Promise<Enrollment | null>;
+  findByCourseAndEmail(courseId: string, email: string): Promise<Enrollment | null>;
+  /** Rows with this email in every course, for linking a user who signs in with it. */
+  listByEmail(email: string): Promise<Enrollment[]>;
   listByCourse(courseId: string): Promise<Enrollment[]>;
   delete(id: string): Promise<void>;
 }

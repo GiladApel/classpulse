@@ -4,13 +4,36 @@ import { InMemoryRepository } from '../InMemoryRepository.js';
 
 export class InMemoryEnrollmentRepository extends InMemoryRepository<Enrollment> implements EnrollmentRepository {
   async create(data: Omit<Enrollment, 'id'>): Promise<Enrollment> {
-    // Mirrors the unique index (course, student_number), checked synchronously like the DB.
-    if (this.all().some((e) => e.courseId === data.courseId && e.studentNumber === data.studentNumber)) throw new Error('UNIQUE constraint');
+    this.checkUnique(data);
     return super.create(data);
   }
 
+  async update(id: string, patch: Partial<Omit<Enrollment, 'id'>>): Promise<Enrollment> {
+    const current = this.items.get(id);
+    if (current) this.checkUnique({ ...current, ...patch }, id);
+    return super.update(id, patch);
+  }
+
+  /** Mirrors the unique indexes (course, student_number) and (course, email), each when not empty; synchronous like the DB. */
+  private checkUnique(e: Omit<Enrollment, 'id'>, self?: string) {
+    const clash = this.all().some(
+      (o) => o.id !== self && o.courseId === e.courseId && ((e.studentNumber && o.studentNumber === e.studentNumber) || (e.email && o.email === e.email)),
+    );
+    if (clash) throw new Error('UNIQUE constraint');
+  }
+
   async findByCourseAndStudent(courseId: string, studentNumber: string) {
+    if (!studentNumber) return null;
     return this.all().find((e) => e.courseId === courseId && e.studentNumber === studentNumber) ?? null;
+  }
+
+  async findByCourseAndEmail(courseId: string, email: string) {
+    if (!email) return null;
+    return this.all().find((e) => e.courseId === courseId && e.email === email) ?? null;
+  }
+
+  async listByEmail(email: string) {
+    return email ? this.all().filter((e) => e.email === email) : [];
   }
 
   async listByCourse(courseId: string) {

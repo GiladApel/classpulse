@@ -9,8 +9,19 @@ export class PbEnrollmentRepository extends PbRepository<Enrollment> implements 
     super(pb, 'enrollments');
   }
 
-  findByCourseAndStudent(courseId: string, studentNumber: string) {
+  async findByCourseAndStudent(courseId: string, studentNumber: string) {
+    if (!studentNumber) return null;
     return this.first('course = {:c} && student_number = {:n}', { c: courseId, n: studentNumber });
+  }
+
+  async findByCourseAndEmail(courseId: string, email: string) {
+    if (!email) return null;
+    return this.first('course = {:c} && email = {:e}', { c: courseId, e: email });
+  }
+
+  async listByEmail(email: string) {
+    if (!email) return [];
+    return (await this.col.getFullList({ filter: this.pb.filter('email = {:e}', { e: email }) })).map((r) => this.toEntity(r));
   }
 
   async listByCourse(courseId: string) {
@@ -23,11 +34,11 @@ export class PbEnrollmentRepository extends PbRepository<Enrollment> implements 
   }
 
   protected toEntity(r: RecordModel): Enrollment {
-    return { id: r.id, courseId: r.course, studentNumber: r.student_number, name: r.name, addedAt: toDate(r.added_at)! };
+    return { id: r.id, courseId: r.course, email: r.email ?? '', studentNumber: r.student_number ?? '', name: r.name, addedAt: toDate(r.added_at)! };
   }
 
   protected toRecord(d: Partial<Omit<Enrollment, 'id'>>): Record<string, unknown> {
-    return compact({ course: d.courseId, student_number: d.studentNumber, name: d.name, added_at: d.addedAt?.toISOString() });
+    return compact({ course: d.courseId, email: d.email, student_number: d.studentNumber, name: d.name, added_at: d.addedAt?.toISOString() });
   }
 }
 

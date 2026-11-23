@@ -31,4 +31,25 @@ export class PbUserRepository implements UserRepository {
   async setRole(id: string, role: Role): Promise<ManagedUser> {
     return toUser(await this.pb.collection('users').update(id, { role }));
   }
+
+  findByEmail(email: string) {
+    return this.first(this.pb.filter('email = {:e}', { e: email.toLowerCase() }));
+  }
+
+  findByStudentNumber(studentNumber: string) {
+    return studentNumber ? this.first(this.pb.filter('student_id = {:n}', { n: studentNumber })) : Promise.resolve(null);
+  }
+
+  async setStudentNumber(id: string, studentNumber: string): Promise<ManagedUser> {
+    return toUser(await this.pb.collection('users').update(id, { student_id: studentNumber }));
+  }
+
+  private async first(filter: string): Promise<ManagedUser | null> {
+    try {
+      return toUser(await this.pb.collection('users').getFirstListItem(filter));
+    } catch (e) {
+      if (e instanceof ClientResponseError && e.status === 404) return null;
+      throw e;
+    }
+  }
 }

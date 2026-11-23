@@ -18,10 +18,14 @@ export interface Course {
   termEnd?: Date;
 }
 
-/** A row of the course roster uploaded by the lecturer, keyed by student ID. */
+/**
+ * A row of the course roster uploaded by the lecturer. The lecturer gives an email (or, in older rosters, an ID);
+ * `studentNumber` is the student's key, '' until a user who signs in with that email is linked to the row.
+ */
 export interface Enrollment {
   id: string;
   courseId: string;
+  email: string;
   studentNumber: string;
   name: string;
   addedAt: Date;

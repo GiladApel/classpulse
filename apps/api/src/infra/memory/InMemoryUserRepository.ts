@@ -20,4 +20,22 @@ export class InMemoryUserRepository implements UserRepository {
     user.role = role;
     return { ...user };
   }
+
+  async findByEmail(email: string) {
+    const u = this.users.find((x) => x.email.toLowerCase() === email.toLowerCase());
+    return u ? { ...u } : null;
+  }
+
+  async findByStudentNumber(studentNumber: string) {
+    const u = studentNumber ? this.users.find((x) => x.studentNumber === studentNumber) : undefined;
+    return u ? { ...u } : null;
+  }
+
+  /** Mirrors the unique index on users.student_id. */
+  async setStudentNumber(id: string, studentNumber: string) {
+    if (this.users.some((u) => u.id !== id && u.studentNumber === studentNumber)) throw new Error('UNIQUE constraint');
+    const user = this.users.find((u) => u.id === id)!;
+    user.studentNumber = studentNumber;
+    return { ...user };
+  }
 }
