@@ -81,7 +81,8 @@ export async function lecturerPage(browser: Browser, who: Person): Promise<Page>
   const context = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     geolocation: CLASSROOM,
-    permissions: ['geolocation', 'clipboard-read', 'clipboard-write'],
+    // WebKit has no clipboard permissions; Chromium needs them for the "copy link" buttons.
+    permissions: browser.browserType().name() === 'chromium' ? ['geolocation', 'clipboard-read', 'clipboard-write'] : ['geolocation'],
   });
   return login(context, who.email);
 }

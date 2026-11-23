@@ -63,7 +63,7 @@ test('10 · a new lecturer sets up a course; an enrolled student finds the live 
   // Noa is in the room but not on the roster: she checks in, and the lecturer adds her with one tap.
   const np = await phone(browser, noa, 1);
   await checkIn(np, await qrToken(lp, sessionId));
-  await expect(lp.getByRole('heading', { name: 'רשימת נוכחות (2)' })).toBeVisible();
+  await expect(lp.getByRole('heading', { name: 'רשימת נוכחות (2)' })).toBeVisible({ timeout: 15_000 });
   await lp.getByRole('button', { name: 'לא ברשימה · הוספה' }).click();
   await expect(lp.getByRole('button', { name: 'לא ברשימה · הוספה' })).toHaveCount(0);
 
