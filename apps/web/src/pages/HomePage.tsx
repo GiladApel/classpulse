@@ -1,6 +1,7 @@
 import { Link, Navigate } from 'react-router';
 import AfterClassChecks from '../components/AfterClassChecks';
 import AppShell from '../components/AppShell';
+import { LinkStudent } from '../components/guards';
 import Timetable from '../components/Timetable';
 import { Card } from '../components/ui';
 import { type UserRecord, useUser } from '../lib/pb';
@@ -10,7 +11,7 @@ export default function HomePage() {
   const user = useUser();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'lecturer') return <Navigate to="/dash" replace />;
-  if (!user.student_id) return <Navigate to="/onboarding" replace />;
+  if (!user.student_id) return <LinkStudent />;
   return <StudentHome user={user} />;
 }
 
@@ -49,7 +50,10 @@ function StudentHome({ user }: { user: UserRecord }) {
       <Card>
         <h2 className="mb-2 font-semibold">הקורסים שלי</h2>
         {loaded && courses.length === 0 && (
-          <p className="text-sm text-slate-500">עוד לא נרשמת לקורס. המרצה מוסיף/ה אותך לפי מספר הסטודנט, או שסורקים את הקוד בכיתה.</p>
+          <p className="text-sm text-slate-500">
+            עוד לא נרשמת לקורס. נכנסת עם <span dir="ltr" className="font-medium text-slate-700">{user.email}</span> — המרצה מוסיף/ה אותך לפי
+            המייל הזה. אם הוא רשום אצלו/ה אחרת, בקשו לעדכן. אפשר גם לסרוק את הקוד בכיתה.
+          </p>
         )}
         <ul className="divide-y divide-slate-100">
           {courses.map((c) => (
