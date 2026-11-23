@@ -137,4 +137,4 @@
 | NFR-08 | **Availability:** the demo still works if the LLM is unavailable (Mock provider and manual approval). |
 
 ## 5. Traceability
-Each FR maps to a use case in [04-use-cases.md](04-use-cases.md) (column "FRs") and to tests in `08-testing.md` (milestone 2).
+Each FR maps to a use case in [05-use-cases.md](05-use-cases.md) (column "FRs") and to tests in `08-stp-std.md` (milestone 2).

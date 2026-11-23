@@ -1,6 +1,6 @@
 # Sequence Diagrams: ClassPulse
 
-The participants are the classes from [06-class-diagrams.md](06-class-diagrams.md). `PB` stands for PocketBase, which the API reaches through the `Pb*Repository` classes.
+The participants are the classes from [class-diagrams.md](class-diagrams.md). `PB` stands for PocketBase, which the API reaches through the `Pb*Repository` classes.
 
 ## SD1: Student check-in (UC1)
 

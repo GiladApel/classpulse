@@ -17,7 +17,7 @@ const K = { code: 6, prose: 5 } as const;
 const SKETCH = 256;
 
 /**
- * Copy detection by fingerprints, not embeddings. Field test T9 (docs/01-tools-report.md): embeddings scored
+ * Copy detection by fingerprints, not embeddings. Field test T9 (docs/02-tools-report.md): embeddings scored
  * a renamed copy 0.93 and two independent correct solutions 0.94; normalised code shingles scored the copy 1.00 and
  * every honest pair ≤ 0.33. Code is normalised so renaming identifiers does not hide a copy.
  */

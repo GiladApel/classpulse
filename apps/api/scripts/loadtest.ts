@@ -1,4 +1,4 @@
-// Fixture and realtime side of the NFR-02 load test (docs/08-testing.md §4). k6 (loadtest/checkin.js) does the HTTP load.
+// Fixture and realtime side of the NFR-02 load test (docs/08-stp-std.md §4). k6 (loadtest/checkin.js) does the HTTP load.
 //   prepare <baseUrl> [n=80]  creates a lecturer, n students, a course and an active session; writes loadtest/.fixture.json
 //   listen                    n students subscribe to attendance_records (SSE) and wait for their own check-in event
 //   cleanup                   deletes the course (sessions and records cascade) and every load-test account

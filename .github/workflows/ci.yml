@@ -1,4 +1,4 @@
-# Runs the test levels of docs/08-testing.md on every push and pull request.
+# Runs the test levels of docs/08-stp-std.md on every push and pull request.
 # The AI provider is the MockProvider, so no API key is needed. The PocketBase superuser below is a
 # throwaway account that exists only inside the CI container.
 name: CI

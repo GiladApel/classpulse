@@ -51,16 +51,16 @@ docs/         design artifacts (see below)
 
 ## Design documents
 
-1. [Tools report](docs/01-tools-report.md)
-2. [Statement of Work](docs/02-sow.md)
-3. [SRS](docs/03-srs.md)
-4. [Use cases](docs/04-use-cases.md)
-5. [Components](docs/05-components.md)
-6. [Class diagrams](docs/06-class-diagrams.md)
-7. [Sequence diagrams](docs/07-sequence-diagrams.md)
-8. [Testing strategy](docs/08-testing.md)
+1. [Tools report](docs/02-tools-report.md)
+2. [Statement of Work](docs/03-sow.md)
+3. [SRS](docs/04-srs.md)
+4. [Use cases](docs/05-use-cases.md)
+5. [Components](docs/06-sdd.md)
+6. [Class diagrams](docs/07-edd/class-diagrams.md)
+7. [Sequence diagrams](docs/07-edd/sequence-diagrams.md)
+8. [Testing strategy](docs/08-stp-std.md)
 9. Conclusion *(after demo)*
-10. [ADR-001: PocketBase as the data layer](docs/10-adr-database.md)
+10. [ADR-001: PocketBase as the data layer](docs/adr/ADR-001-database.md)
 
 ## Run locally
 

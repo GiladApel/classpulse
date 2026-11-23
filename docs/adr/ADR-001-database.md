@@ -5,7 +5,7 @@
 | **Status** | Accepted (M1), reviewed after M13 |
 | **Deciders** | Gilad Apel (architecture and implementation) |
 | **Scope** | Persistence, authentication, realtime push and file storage |
-| **Related** | [Components](05-components.md) §3 (architectural rules), [Tools report](01-tools-report.md) T1, [Testing](08-testing.md) |
+| **Related** | [Components](../06-sdd.md) §3 (architectural rules), [Tools report](../02-tools-report.md) T1, [Testing](../08-stp-std.md) |
 
 ## 1. Context
 

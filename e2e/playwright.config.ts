@@ -1,6 +1,6 @@
 import { defineConfig } from '@playwright/test';
 
-// E2E scenarios of docs/08-testing.md §3. Needs the local PocketBase (docker compose up -d pocketbase).
+// E2E scenarios of docs/08-stp-std.md §3. Needs the local PocketBase (docker compose up -d pocketbase).
 // Starts its own API (MockProvider, 3 s QR windows) on :8788 and Vite on :5174, so the dev servers can keep running.
 // Locally it runs on the installed Edge; CI runs Chromium and WebKit (Safari's engine, as on iPhones).
 const CI = !!process.env.CI;
