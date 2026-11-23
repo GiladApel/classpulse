@@ -170,7 +170,7 @@ export function buildContainer(p: Ports): Container {
     courses,
     linker,
     attendance,
-    exports: new AttendanceExportService(p.attendanceRepo, p.courseRepo, p.exporters),
+    exports: new AttendanceExportService(p.attendanceRepo, p.courseRepo, p.userRepo, p.exporters),
     commentsExport: new CommentsExportService(p.postRepo, p.feedbackRepo, p.courseRepo, p.exporters),
     challenges: new ChallengeManager(
       new PeopleDetector(p.llm),

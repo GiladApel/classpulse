@@ -31,17 +31,22 @@ const TZ = 'Asia/Jerusalem';
 const time = new Intl.DateTimeFormat('he-IL', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 const date = new Intl.DateTimeFormat('en-CA', { timeZone: TZ });
 
-export const HEADERS = ['מס׳ סטודנט', 'שם', 'שעת הגעה', 'אופן', 'סטטוס', 'מרחק (מ׳)', 'חריגת מיקום', 'הערה'];
+export const HEADERS = ['מס׳ סטודנט', 'שם', 'מייל', 'שעת הגעה', 'אופן', 'סטטוס', 'מרחק (מ׳)', 'חריגת מיקום', 'הערה'];
+
+/** A 9-digit student ID is shown; a key generated for a student known only by email is not. */
+const shownId = (n: string) => (/^\d{9}$/.test(n) ? n : '');
 
 const METHOD = { qr: 'QR', manual: 'ידני' } as const;
 const STATUS = { present: 'נוכח', flagged: 'לבדיקה', removed: 'הוסר' } as const;
 
-export function toRows(records: AttendanceRecord[]): (string | number)[][] {
+/** `emails`: the sign-in email of each student, by user id. */
+export function toRows(records: AttendanceRecord[], emails: ReadonlyMap<string, string> = new Map()): (string | number)[][] {
   return [...records]
     .sort((a, b) => a.checkedInAt.getTime() - b.checkedInAt.getTime())
     .map((r) => [
-      r.studentNumber,
+      shownId(r.studentNumber),
       r.studentName,
+      (r.studentId && emails.get(r.studentId)) || '',
       time.format(r.checkedInAt),
       METHOD[r.method],
       STATUS[r.status],
@@ -51,8 +56,8 @@ export function toRows(records: AttendanceRecord[]): (string | number)[][] {
     ]);
 }
 
-export function attendanceTable(records: AttendanceRecord[]): Table {
-  return { name: 'נוכחות', headers: HEADERS, rows: toRows(records), widths: [12, 22, 10, 8, 8, 10, 10, 30] };
+export function attendanceTable(records: AttendanceRecord[], emails?: ReadonlyMap<string, string>): Table {
+  return { name: 'נוכחות', headers: HEADERS, rows: toRows(records, emails), widths: [12, 22, 28, 10, 8, 8, 10, 10, 30] };
 }
 
 export function baseFilename(meta: SessionMeta, table?: Pick<Table, 'suffix'>): string {
