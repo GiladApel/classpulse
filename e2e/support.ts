@@ -31,7 +31,8 @@ export interface Person {
 }
 
 /** Throwaway lecturer, course and students for one spec file; `cleanup()` deletes them (records cascade with the course). */
-export async function makeClass(tag: string, studentNames: string[], opts: { admin?: boolean } = {}) {
+/** `noIds`: students who never typed an ID, so the app knows them only by the email they sign in with. */
+export async function makeClass(tag: string, studentNames: string[], opts: { admin?: boolean; noIds?: boolean } = {}) {
   const pb = new PocketBase(PB_URL);
   pb.autoCancellation(false);
   await pb.collection('_superusers').authWithPassword(env.PB_SUPERUSER_EMAIL, env.PB_SUPERUSER_PASSWORD);
@@ -48,7 +49,7 @@ export async function makeClass(tag: string, studentNames: string[], opts: { adm
   const students: Person[] = [];
   for (const [i, name] of studentNames.entries()) {
     const sid = `6${String(Date.now()).slice(-6)}${String(i).padStart(2, '0')}`;
-    students.push(await create(`s${i}-${run}@classpulse.test`, { name, role: 'student', student_id: sid }));
+    students.push(await create(`s${i}-${run}@classpulse.test`, { name, role: 'student', student_id: opts.noIds ? '' : sid }));
   }
 
   return {

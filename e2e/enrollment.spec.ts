@@ -73,6 +73,36 @@ test('10 · a new lecturer sets up a course; an enrolled student finds the live 
   await openTab(lp, 'חומרים');
   await lp.getByLabel('שאלה לתרגול').fill('מה ההבדל בין מחלקה לאובייקט?');
   await lp.getByRole('button', { name: 'פרסום שאלה' }).click();
+  await expect(lp.getByText('1. מה ההבדל בין מחלקה לאובייקט?')).toBeVisible();
   await openTab(yp, 'חומרים');
   await expect(yp.getByText('מה ההבדל בין מחלקה לאובייקט?')).toBeVisible();
+});
+
+test('10b · roster by email: a mistyped email keeps the student out until the lecturer fixes it', async ({ browser }) => {
+  const mail = await makeClass('mail', ['רוני לב'], { noIds: true });
+  try {
+    const [roni] = mail.students;
+    const lp = await lecturerPage(browser, mail.lecturer);
+    await lp.goto(`/course/${mail.courseId}?tab=students`);
+    await lp.getByLabel('רשימה להדבקה').fill(`typo-${roni.email} רוני לב`);
+    await lp.getByRole('button', { name: 'הוספת הרשימה' }).click();
+    await expect(lp.getByText('נוספו 1, עודכנו 0')).toBeVisible();
+    await expect(lp.getByText('1 ברשימה עוד לא נכנסו לאפליקציה')).toBeVisible();
+
+    // Roni signs in with her real email: no ID to type, but no course either, and the page shows which email she used.
+    const rp = await phone(browser, roni, 0);
+    await expect(rp.getByText('עוד לא נרשמת לקורס')).toBeVisible({ timeout: 10_000 });
+    await expect(rp.getByText(roni.email)).toBeVisible();
+
+    // The lecturer fixes the email; Roni is linked at once and finds the course.
+    await lp.getByRole('button', { name: 'תיקון המייל של רוני לב' }).click();
+    await lp.getByLabel('מייל מתוקן').fill(roni.email);
+    await lp.getByRole('button', { name: 'שמירה' }).click();
+    await expect(lp.getByRole('row', { name: /רוני לב/ })).toContainText('✓ רוני לב', { timeout: 10_000 });
+    await expect(lp.getByText('ברשימה עוד לא נכנסו לאפליקציה')).toHaveCount(0);
+    await rp.reload();
+    await expect(rp.getByRole('link', { name: new RegExp(`E2E · E2E mail`) })).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await mail.cleanup();
+  }
 });
