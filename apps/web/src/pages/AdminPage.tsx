@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router';
 import { Button, Card, ErrorText, inputClass } from '../components/ui';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, shownStudentId } from '../lib/api';
 import { useUser } from '../lib/pb';
 
 interface AdminUser {
@@ -72,7 +72,7 @@ export default function AdminPage() {
                 </div>
                 <div className="truncate text-sm text-slate-500" dir="ltr">
                   {u.email}
-                  {u.studentNumber && ` · ${u.studentNumber}`}
+                  {shownStudentId(u.studentNumber) && ` · ${u.studentNumber}`}
                 </div>
               </div>
               {u.id !== user.id &&

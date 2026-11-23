@@ -3,7 +3,7 @@ import { useParams } from 'react-router';
 import AppShell from '../components/AppShell';
 import HomeworkReport from '../components/HomeworkReport';
 import { Button, Card, ErrorText } from '../components/ui';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, shownStudentId } from '../lib/api';
 import { MAX_CHECKS, openHandInFile, type SubmissionView } from '../lib/content';
 import { parseDate } from '../lib/device';
 
@@ -49,7 +49,7 @@ export default function SubmissionPage() {
           <Card className="flex flex-col gap-2">
             <h1 className="text-xl font-bold">{s.studentName}</h1>
             <p className="text-sm text-slate-500" dir="auto">
-              {s.studentNumber} · {s.checkCount}/{MAX_CHECKS} בדיקות
+              {shownStudentId(s.studentNumber) && `${s.studentNumber} · `}{s.checkCount}/{MAX_CHECKS} בדיקות
             </p>
             {s.handedInAt ? (
               <>

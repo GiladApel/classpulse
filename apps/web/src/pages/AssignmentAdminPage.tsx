@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import AppShell from '../components/AppShell';
 import ClassChart from '../components/ClassChart';
 import { Button, Card, ErrorText, inputClass } from '../components/ui';
-import { api, ApiError } from '../lib/api';
+import { api, ApiError, shownStudentId } from '../lib/api';
 import { type AssignmentRecord, type GuideOutline, MAX_CHECKS, openHomeworkPdf, type Rubric, type SubmissionDto, type SubmissionRecord } from '../lib/content';
 import { parseDate } from '../lib/device';
 import { pb } from '../lib/pb';
@@ -199,7 +199,7 @@ export default function AssignmentAdminPage() {
                       </Link>
                     </td>
                     <td className="px-3 py-2 tabular-nums" dir="ltr">
-                      {s.studentNumber}
+                      {shownStudentId(s.studentNumber)}
                     </td>
                     <td className="px-3 py-2 tabular-nums">
                       {s.checkCount}/{MAX_CHECKS}

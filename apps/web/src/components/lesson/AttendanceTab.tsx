@@ -1,6 +1,6 @@
 import type { RecordModel } from 'pocketbase';
 import { type FormEvent, useEffect, useState } from 'react';
-import { api, ApiError, type RecordDto } from '../../lib/api';
+import { api, ApiError, type RecordDto, shownStudentId } from '../../lib/api';
 import { formatTime } from '../../lib/device';
 import { pb } from '../../lib/pb';
 import { useAttendance } from '../../lib/useAttendance';
@@ -202,7 +202,7 @@ function AttendanceTable({
                 )}
               </td>
               <td className="px-3 py-2 tabular-nums" dir="ltr">
-                {r.studentNumber}
+                {shownStudentId(r.studentNumber)}
               </td>
               <td className="px-3 py-2 tabular-nums">{formatTime(r.checkedInAt)}</td>
               <td className="px-3 py-2">{METHOD_LABEL[r.method]}</td>

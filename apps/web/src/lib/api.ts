@@ -68,3 +68,6 @@ export interface SessionDto {
   status: 'active' | 'ended';
   startedAt: string;
 }
+
+/** Only a real 9-digit student ID is shown; a key the system generated for an email sign-in means nothing to people. */
+export const shownStudentId = (n: string | undefined) => (n && /^[0-9]{9}$/.test(n) ? n : '');
