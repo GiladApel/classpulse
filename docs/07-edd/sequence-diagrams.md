@@ -2,7 +2,7 @@
 
 The participants are the classes from [class-diagrams.md](class-diagrams.md). `PB` stands for PocketBase, which the API reaches through the `Pb*Repository` classes.
 
-## SD1: Student check-in (UC1)
+## SD1: Student check-in (UC-01)
 
 ```mermaid
 sequenceDiagram
@@ -49,7 +49,7 @@ sequenceDiagram
   end
 ```
 
-## SD2: Headcount + Blurred Photo Heatmap Challenge (UC4, UC5)
+## SD2: Headcount + Blurred Photo Heatmap Challenge (UC-13, UC-02)
 
 ```mermaid
 sequenceDiagram
@@ -111,7 +111,7 @@ sequenceDiagram
   AS->>PB: update status = removed
 ```
 
-## SD3: Roll-call challenge (UC4 alternative)
+## SD3: Roll-call challenge (UC-13 alternative)
 
 ```mermaid
 sequenceDiagram
@@ -137,7 +137,7 @@ sequenceDiagram
   PB--)L: realtime -> flagged list
 ```
 
-## SD4: AI poll from slide (UC8, UC7)
+## SD4: AI poll from slide (UC-14, UC-04)
 
 ```mermaid
 sequenceDiagram
@@ -178,7 +178,7 @@ sequenceDiagram
   PB--)P: realtime -> answer revealed (shown for 60 s)
 ```
 
-## SD5: Lecture summary, the lecturer's report and the confusion timeline (UC9)
+## SD5: Lecture summary, the lecturer's report and the confusion timeline (UC-15)
 
 ```mermaid
 sequenceDiagram
@@ -235,7 +235,7 @@ sequenceDiagram
   Note over PB: list rule now lets every course participant read the summary
 ```
 
-## SD6: Homework: publish, check, hand in, grade (UC11, UC10, UC21)
+## SD6: Homework: publish, check, hand in, grade (UC-17, UC-09, UC-10)
 
 ```mermaid
 sequenceDiagram
@@ -289,7 +289,7 @@ sequenceDiagram
   API-->>L: common mistakes, similar hand-ins for review by hand
 ```
 
-## SD7: "I'm lost" and the questions feed (UC6)
+## SD7: "I'm lost" and the questions feed (UC-03)
 
 ```mermaid
 sequenceDiagram
@@ -330,7 +330,7 @@ sequenceDiagram
   FS-->>L: Theme[] (AI groups open questions)
 ```
 
-## SD8: Entering a live lesson from home (UC20)
+## SD8: Entering a live lesson from home (UC-05)
 
 ```mermaid
 sequenceDiagram
@@ -354,7 +354,7 @@ sequenceDiagram
   AS-->>S: record, the app opens the lesson's forum tab with a confirmation
 ```
 
-## SD9: Uploading the course roster (UC18)
+## SD9: Uploading the course roster (UC-19)
 
 ```mermaid
 sequenceDiagram
