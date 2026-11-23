@@ -1,140 +1,234 @@
 # Software Requirements Specification: ClassPulse
 
+> Assignment step 4. What the system shall do, in testable statements. Each requirement has an ID, a priority
+> (MoSCoW: **M**ust, **S**hould, **C**ould) and a source deliverable from the [SoW](03-sow.md). Appendix C traces every
+> requirement to its use cases, design and tests.
+
 ## 1. Introduction
-- **Product:** ClassPulse, a web-based classroom tool (PWA) for attendance, live engagement and AI-assisted learning analysis.
-- **Users:** Student, Lecturer, Admin (decides who is a lecturer), System (scheduled jobs / AI).
-- **Definitions:**
-  - **Session:** one lecture meeting.
-  - **Check-in:** a student's attendance record in a session.
-  - **Challenge:** an on-demand verification of the students who are checked in.
+
+### 1.1 Purpose
+This document is the agreed list of what ClassPulse does. Developers build from it, the tests in the [STP/STD](08-stp-std.md) verify it, and the demo proves it.
+
+### 1.2 Scope
+ClassPulse is a web app for in-person lectures. Students use it in their phone's browser; the lecturer uses a computer and the classroom projector. It covers attendance, live engagement, AI help after the lecture, and homework feedback (features F1–F10 of the SoW). Out of scope: see [SoW §3](03-sow.md#3-scope).
+
+### 1.3 Definitions and glossary
+Each feature is described in plain words and with a picture to remember it by.
+
+| Term | Meaning | Think of it as |
+|------|---------|----------------|
+| **Lesson** (session) | One lecture meeting of a course, from "start" to "end" | A class period on the timetable |
+| **Check-in** | A student's attendance record in a lesson | **A concert ticket scanned at the gate**: you scan once at the entrance and you are in |
+| **Rotating QR** | The code on the projector; it changes every 10 seconds | A ticket that expires every few seconds, so a photo sent to a friend at home is useless |
+| **Location check** (geofence) | A check-in far from the lecturer's position is flagged (lenient) or refused (strict) | The usher who looks up when someone enters from the wrong door |
+| **Headcount** | The number of people the AI counts in a class photo | Counting heads from the front of the room |
+| **Challenge** (Roll-call, Visual Ping) | A short check of those who checked in, when the headcount does not match | A spot check: "everyone who is here, point at your seat on this photo" |
+| **"I'm lost" meter** | Anonymous taps that show how many are lost right now | A dashboard warning light: it does not say who, only that something needs attention |
+| **Forum** | Questions and comments of a lesson (while it is live) or of the course (any time) | A raised hand that does not interrupt the lecture |
+| **Poll** | A multiple-choice question every phone switches to | A quiz-show buzzer round with a clock |
+| **Lecture summary** | AI summary of a recording for students | The notes of the friend who never misses a lecture |
+| **Lecturer report** | Short AI report for the lecturer only, with scores and tips | A coach watching the game tape with you, not a 70-page report |
+| **Rubric** | What each section of a homework must contain, built by the AI from the PDF; hidden from students | The grader's answer sheet, which stays in the grader's drawer |
+| **Feedback check** | A student's practice submission, scored per section, without answers | A driving lesson before the test: you learn what to fix, nobody gives you the answer |
+| **Hand-in** | The student's final submission, graded by the AI as a draft for the lecturer | Submitting the exam paper |
+| **Roster** | The list of students of a course, by email | The guest list at the door: the email you sign in with is your name on the list |
+| **Student key** | The internal number that ties a student's records together; a 9-digit ID when the roster has one, otherwise generated | The cloakroom ticket number: you never see it, it just keeps your things together |
+
+### 1.4 References
+[README](../README.md) · [SoW](03-sow.md) · [Use cases](05-use-cases.md) · [SDD](06-sdd.md) · [EDD](07-edd/README.md) · [STP/STD](08-stp-std.md) · [Tools report](02-tools-report.md)
 
 ## 2. Overall description
-- Students use a mobile web app opened from the QR code. No install is needed; it can optionally be installed as a PWA.
-- Lecturers use a desktop dashboard and a full-screen projector view.
-- The system is split into three parts:
-  - **PocketBase:** authentication, data storage and realtime updates.
-  - **Hono API:** all business rules.
-  - **LLM provider:** Gemini by default, behind an interface.
 
-## 3. Functional requirements
+### 2.1 Product perspective
+A new, self-contained product. Three parts: **PocketBase** (sign-in, data, live updates), the **ClassPulse API** (every business rule), and an **LLM provider** (Gemini by default, behind an interface). Students' phones and the lecturer's computer read data directly from PocketBase and write through the API ([SDD](06-sdd.md)).
 
-### F1: Attendance
-| ID | Requirement |
-|----|-------------|
-| FR-ATT-01 | The lecturer can start and end a session. Starting records the lecturer's geolocation and the geofence mode (lenient/strict) and radius (default 50 m). |
-| FR-ATT-02 | While a session is active, the projector view shows a QR code that encodes a URL with an HMAC-signed token. A new token is issued every 10 s. |
-| FR-ATT-03 | A token is accepted only within its own or the next window (≤20 s) and only for its session. A tampered token is rejected. |
-| FR-ATT-04 | On first visit, the student signs in with Google and enters a student ID once. Later visits need no input beyond one tap. |
-| FR-ATT-05 | A student can check in at most once per session. A device can be used by at most one student per session. |
-| FR-ATT-06 | Lenient mode: a check-in beyond the radius is accepted and flagged. Strict mode: it is rejected with a message. Missing location counts as "beyond radius". |
-| FR-ATT-07 | The dashboard shows check-ins in realtime: name, ID, time, distance, flags, status. |
-| FR-ATT-08 | The lecturer can manually approve a student (late arrival or phone problem) with a note, and can remove a record. |
-| FR-ATT-09 | The lecturer can export the session's attendance as `.xlsx` / `.csv` and sync it to a Google Sheet. |
+### 2.2 User classes
+| Class | Uses | Frequency |
+|-------|------|-----------|
+| Student | Phone browser: check-in, forum, polls, lecture page, homework | Every lecture |
+| Lecturer | Computer and projector: runs lessons, rosters, homework, reports | Every lecture |
+| Admin | Appoints lecturers | Rarely |
+| System | Background jobs: AI summaries, grading, timers that close polls and checks | Continuously |
 
-### F2: Anti-fraud
-| ID | Requirement |
-|----|-------------|
-| FR-AF-01 | The lecturer can upload or take a class photo. The system returns a people count, a confidence value and person bounding boxes from the LLM. |
-| FR-AF-02 | The dashboard compares the people count with the number of present check-ins and highlights a mismatch beyond a tolerance (default 10%). |
-| FR-AF-03 | **Roll-call challenge:** the lecturer launches a 30 s one-time QR. Checked-in students who don't rescan in time are marked `no_response`. |
-| FR-AF-04 | **Visual Ping challenge:** the system blurs the photo server-side and sends it via realtime only to students who are checked in. Each student taps their seat once within 45 s. |
-| FR-AF-05 | The lecturer sees the taps as a live heatmap on the clear photo. |
-| FR-AF-06 | When a challenge closes, each response is labelled `ok`, `empty_seat`, `collision` or `no_response` by hit-testing against the person boxes. Every label other than `ok` flags the attendance record. |
-| FR-AF-07 | The lecturer makes the final decision: keep or remove each flagged record. |
-| FR-AF-08 | The clear photo is visible only to the lecturer and is deleted when the session ends. |
-| FR-AF-09 | **After-class check:** from a class photo, the lecturer can also run the Visual Ping for 24 hours, during or after the lesson. Checked-in students see it as a card on the lesson page (and a notice on their home page) and answer with the same single tap; labels and flags are the same as FR-AF-06, and the lecturer still decides (FR-AF-07). |
+### 2.3 Operating environment
+Current iOS Safari and Android Chrome on the students' side; a current desktop browser on the lecturer's side. Server: Linux with Docker, behind Cloudflare (HTTPS).
 
-### F3: Live backchannel
-| ID | Requirement |
-|----|-------------|
-| FR-BC-01 | A student can press "I'm lost" (at most once per 60 s). The dashboard shows a confusion level over a rolling 2-minute window. After the tap, the student may optionally write what is unclear; the note is posted to the questions feed anonymously. |
-| FR-BC-02 | A student can post a question or suggestion, optionally anonymously, in a lesson's forum while the lesson is live. After it ends, that forum is read-only and points to the course forum. |
-| FR-BC-03 | Participants can upvote posts (once each). The lecturer can mark a post as answered. |
-| FR-BC-04 | The lecturer can request an AI clustering of open posts into themes. |
-| FR-BC-05 | While a lesson is live, every course member takes part in it ("I'm lost", questions, upvotes, polls) whether or not they checked in, so students at home can follow and ask. Attendance itself is recorded only by the QR in the room. |
-| FR-BC-06 | Every course has a general forum, open to its members at any time: they ask (optionally anonymously) and upvote; the lecturer answers and marks questions answered. |
-| FR-BC-07 | During a live lesson the lecturer can switch students' questions off ("questions only after class"), for lecturers who prefer phones down. Polls and "I'm lost" are not affected; students are told to ask in the course forum or the lecture comments. |
+### 2.4 Constraints
+- No integration with Moodle, Zoom or the university's personal-information system.
+- No face recognition; class photos are used only to count people.
+- Design only what is implemented (every requirement here exists in the code).
+- KISS: nothing to install; Hebrew right-to-left interface.
 
-### F4: Polls
-| ID | Requirement |
-|----|-------------|
-| FR-PL-01 | A poll is created from a slide: the lecturer photographs it (camera) or uploads an image of it (gallery or computer). The lecturer can also write one by hand (2–6 answers; marking a correct answer is optional, so it can be an opinion poll). |
-| FR-PL-02 | The AI returns 3 MCQ drafts for the slide; the lecturer picks one, may edit it, and opens it. |
-| FR-PL-03 | When a poll opens, every connected student's screen switches to it automatically. One vote per student. |
-| FR-PL-04 | Results update live on the projector. The correct answer is revealed when the poll closes. |
-| FR-PL-05 | When opening a poll the lecturer may choose an automatic close (1, 2 or 5 minutes; 2 by default, like a quiz timer). Phones, the projector and the dashboard show the countdown; the poll closes and reveals the answer by itself. |
+### 2.5 Assumptions
+Students have a smartphone with a camera and a Google account; the classroom has a projector and network coverage; the lecturer records lectures independently.
 
-### F5: Lecture summary and the lecturer's report
-| ID | Requirement |
-|----|-------------|
-| FR-VS-01 | The lecturer can upload a recording (mp4) or transcript (vtt/txt) for a session. |
-| FR-VS-02 | The system processes it asynchronously and shows its status: queued → processing → done / failed. |
-| FR-VS-03 | The output contains a TL;DR, timestamped chapters, key concepts and 5 review questions. |
-| FR-VS-04 | The timeline overlays "I'm lost" spikes, aligned using the recording's offset from the session start. |
-| FR-VS-05 | The lecturer can publish the summary to students. |
-| FR-VS-06 | **Report for the lecturer:** from the same recording or transcript, plus what the class did ("I'm lost" spikes, unanswered questions, poll results, the feedback distribution), the AI writes a short report meant to improve the lecture: clarity, pace and engagement scores (1–5), 3–5 tips each tied to a moment, promises made and not kept, repeated language slips and, for a recording, sound quality. It is short on purpose and is never shown to students. |
-| FR-VS-07 | The lecturer sees the three scores across the course's lessons as a trend, and can rebuild a failed report. |
+## 3. Specific requirements
 
-### F6: Homework review
-| ID | Requirement |
-|----|-------------|
-| FR-HW-01 | The lecturer publishes a homework in a lesson (or in the course) as a PDF, with a title, an optional due date and optional instructions to the AI (what the rubric should check, what to be strict about, what not to require). The AI turns the PDF, once, into a rubric that follows those instructions: its questions, their sections, the requirements of each section, the key points of a correct answer and what would count as giving it away. If reading the PDF fails, the lecturer can retry. |
-| FR-HW-02 | The rubric and the lecturer's instructions are shown to the lecturer only. Students see the homework PDF; in their feedback each section is named by what it asks, without its requirements or expected answer. |
-| FR-HW-03 | The lecturer can change the instructions and have the rubric built again until the first student hands in. After that the rubric is locked, so every hand-in is graded against the same rubric. |
-| FR-HW-04 | Before handing in, a student uploads a solution (one PDF, or up to 10 photos of a handwritten solution) and gets feedback: for each section a score from 1 to 100 (0 if not answered), what meets the requirements, what is missing and which direction to take, plus a list of the sections not answered. The feedback never contains the answer, working code, a final result or a rewritten passage. |
-| FR-HW-05 | A question's score is the plain average of its sections; the total is the plain average of the questions, rounded, at least 1. The server computes them, not the model. |
-| FR-HW-06 | A student has 2 feedback checks per homework. A check that fails for a technical reason does not count. Each check replaces the previous result. A practice solution file is never stored. |
-| FR-HW-07 | A student hands in once (one PDF or up to 10 photos), with a confirmation. After that there are no more checks and the files cannot be replaced. The files are stored and only the student and the lecturer can open them. A hand-in after the due date is marked late. |
-| FR-HW-08 | The AI grades the hand-in against the rubric in the background, as a draft for the lecturer: total, per-question and per-section scores and comments. The student sees only that the homework was handed in, and when. If grading fails, the lecturer can run it again. |
-| FR-HW-09 | The lecturer sees for each student the checks used, the hand-in time and files, the AI grade and its report, and a chart of the graded hand-ins with names, by total, question or section, with equal scores sharing a place. Students see no chart and no ranking. |
-| FR-HW-10 | The lecturer can build the class-wide common mistakes from the graded hand-ins (also shown to students, without names) and see highly similar hand-ins for review by hand, and can delete a homework with its checks and hand-ins. Text in a solution that addresses the reviewer does not change any score. |
+### 3.1 Functional requirements
 
-### F7: Lecture page
-| ID | Requirement |
-|----|-------------|
-| FR-LP-01 | Every lecture has a page for every course member (on the roster, or attended any lesson of the course), including students who missed it: published summary, materials, practice questions, the closed polls with results, and the questions with answers. While it is live every course member may also ask, upvote and vote (FR-BC-05); afterwards questions go to the course forum (FR-BC-06). |
-| FR-LP-02 | During or after the lecture, the lecturer publishes open review questions (no answer options), written by hand or drafted by the AI from the lecture's slide deck (PDF or image, ≤50 MB): up to 8 drafts, of which the lecturer publishes the ones they select. Students read them on the lecture page; there is nothing to submit. |
-| FR-LP-03 | During or after the lecture, the lecturer attaches files or images (≤50 MB; one button opens the file picker and uploads at once) and links. Files are downloadable only by course participants. |
-| FR-LP-04 | The lecturer can write an answer under a student's question, during or after the lecture; it marks the question answered. |
-| FR-LP-05 | A lesson with homework shows it next to its title, in the course's lesson list and in the lesson header: "homework to hand in" with the earliest due date, or "homework handed in" once the student handed in all of it. |
+#### F1: Attendance (source D-9/F1)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-ATT-01 | let the lecturer start and end a lesson; starting records the lecturer's location, the location-check mode (lenient/strict) and radius (default 50 m) | M |
+| FR-ATT-02 | show, while a lesson is active, a QR code on the projector that encodes a URL with an HMAC-signed token, issuing a new token every 10 s | M |
+| FR-ATT-03 | accept a token only within its own or the next window (≤ 20 s) and only for its lesson, and reject a tampered token | M |
+| FR-ATT-04 | sign a student in with Google; a student whose email is on a roster needs no other input, and later check-ins need one tap | M |
+| FR-ATT-05 | record at most one check-in per student per lesson, and accept at most one student per device per lesson | M |
+| FR-ATT-06 | in lenient mode accept and flag a check-in beyond the radius; in strict mode reject it with a message; treat a missing location as beyond the radius | M |
+| FR-ATT-07 | show check-ins on the lecturer's list in real time: name, ID (when the roster gave one), time, distance, flags, status | M |
+| FR-ATT-08 | let the lecturer approve a student by hand with a note, and remove a record | M |
+| FR-ATT-09 | export a lesson's attendance as `.xlsx` or `.csv`, or to a Google Sheet, with each student's name and email | M |
 
-### F8: Lecture comments
-| ID | Requirement |
-|----|-------------|
-| FR-FB-01 | When the lecturer ends the lecture, every course member (checked in or not) is offered an optional, anonymous comment on it: one of four options (clear and well paced · too fast · too slow · the material was not clear) and free text. It appears at once on phones still open and stays on the lecture page for 7 days, so students who watched it later can comment too. |
-| FR-FB-02 | One answer per student. The form states that it is anonymous. |
-| FR-FB-03 | The lecturer sees only the aggregate (count per option and the comments, ordered by option, never by time) and only from 3 answers. No one, the lecturer included, can read a single answer or its author. |
-| FR-FB-04 | The lecturer can export a lecture's questions (with their answers and upvotes; a name only where the student posted with one) and its comments (anonymous, from 3 answers, without times) to Excel, CSV or Google Sheets. |
+#### F2: Anti-fraud (source D-9/F2)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-AF-01 | take a class photo from the lecturer and return a people count, a confidence value and person boxes from the LLM | M |
+| FR-AF-02 | compare the people count with the present check-ins and highlight a mismatch beyond a tolerance (default 10 %) | M |
+| FR-AF-03 | run a **Roll-call**: a 30 s one-time QR; checked-in students who do not rescan in time are marked `no_response` | M |
+| FR-AF-04 | run a **Visual Ping**: blur the photo on the server and send it only to checked-in students, who each tap their seat once within 45 s | M |
+| FR-AF-05 | show the lecturer the taps as a live heatmap on the clear photo | S |
+| FR-AF-06 | label each response `ok`, `empty_seat`, `collision` or `no_response` when the challenge closes, by hit-testing against the person boxes, and flag every record not `ok` | M |
+| FR-AF-07 | leave the final decision to the lecturer: keep or remove each flagged record | M |
+| FR-AF-08 | show the clear photo only to the lecturer and delete it when the lesson ends | M |
+| FR-AF-09 | run a Visual Ping **after class** for 24 hours, during or after the lesson, answered from a card on the lesson page with the same labels and the lecturer's decision | S |
 
-### F9: Administration
-| ID | Requirement |
-|----|-------------|
-| FR-AD-01 | Admins are set by email in the server configuration. An admin searches registered users by name, email or student ID and makes a user a lecturer or a student again. An admin cannot change their own role. |
-| FR-AD-02 | A lecturer creates their own courses (code and name); a lecturer cannot have two courses with the same code. |
+#### F3: Live backchannel (source D-9/F3)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-BC-01 | accept "I'm lost" at most once per 60 s per student and show the share of those present who pressed it in the last 2 minutes, never who; after the tap the student may add an anonymous note to the forum | M |
+| FR-BC-02 | accept questions and suggestions, optionally anonymous, in a lesson's forum while it is live; after it ends, keep that forum read-only and point to the course forum | M |
+| FR-BC-03 | let participants upvote a post once each, and let the lecturer mark it answered | M |
+| FR-BC-04 | group open posts into themes with the AI on the lecturer's request | C |
+| FR-BC-05 | let every course member take part in a live lesson ("I'm lost", questions, upvotes, polls), checked in or not; attendance is recorded only by the QR in the room | M |
+| FR-BC-06 | give every course a general forum open to its members at any time, where the lecturer answers | M |
+| FR-BC-07 | let the lecturer switch questions off during a lesson ("questions only after class"), without affecting polls and "I'm lost" | S |
 
-### F10: Enrollment and timetable
-| ID | Requirement |
-|----|-------------|
-| FR-EN-01 | The lecturer uploads the course roster as an Excel or CSV file, or pastes it: one student per row, student ID and name in any column order. A repeated upload adds new students and updates names; it never removes anyone. Rows without a valid ID, or repeated, are reported by line number. |
-| FR-EN-02 | The lecturer adds or removes a single student. The roster shows, next to each roster name, the name the student signed up with, or that they have not signed up yet. |
-| FR-EN-03 | A student signs up once (Google and student ID). Every course whose roster has their student ID appears on their home screen, with no link or code per lesson. A student sees only their own roster row. |
-| FR-EN-04 | A student not on the roster who checks in is accepted and marked "not on roster" in the lecturer's lists, with a one-tap "add". |
-| FR-TT-01 | The lecturer sets the course's weekly meetings (day, start, end, room; no two overlapping on the same day) and, optionally, the term dates. |
-| FR-TT-02 | Lecturers and students see a weekly timetable of their courses: the whole week on a computer, one day at a time on a phone. A course with a live lesson is marked. |
-| FR-TT-03 | The home screen shows every live lesson of the user's courses; a student enters it in one tap. The lecturer's home shows the meeting happening now with a one-tap start (lenient location check, title "Lecture N"). |
-| FR-TT-04 | Each lesson has one page with tabs: attendance, forum (questions and polls), materials, homework. Scanning the QR checks in and opens the lesson's forum tab. |
+#### F4: Polls (source D-9/F4)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-PL-01 | create a poll from a photo or image of a slide, or written by hand with 2–6 answers and an optional correct answer | M |
+| FR-PL-02 | return 3 AI multiple-choice drafts for a slide, which the lecturer picks from and edits before opening | M |
+| FR-PL-03 | switch every connected student's screen to a poll when it opens, and accept one vote per student | M |
+| FR-PL-04 | update results live on the projector and reveal the correct answer when the poll closes | M |
+| FR-PL-05 | close a poll automatically after the time the lecturer picks (1, 2 or 5 minutes; default 2), showing a countdown on phones, the projector and the dashboard | S |
 
-## 4. Non-functional requirements
-| ID | Requirement |
-|----|-------------|
-| NFR-01 | **Usability:** a returning student checks in in ≤2 taps and ≤5 s from scanning. The UI is in Hebrew (RTL). |
-| NFR-02 | **Performance:** 80 check-ins within 30 s with p95 API latency < 500 ms. Realtime dashboard updates in < 1 s. |
-| NFR-03 | **Security:** HTTPS only. The QR secret stays server-side. Business-rule writes are possible only through the API. |
-| NFR-04 | **Privacy:** no facial recognition. Only blurred photos are shared. Photos are purged at session end. Anonymous posts hide the author from everyone except the system. |
-| NFR-05 | **Portability:** works on current iOS Safari and Android Chrome without installation. |
-| NFR-06 | **Maintainability:** domain logic is in TS classes behind interfaces, so the LLM provider and exporters can be swapped without touching services. |
-| NFR-07 | **Testability:** ≥80% line coverage on domain classes. The LLM and the clock are injectable. |
-| NFR-08 | **Availability:** the demo still works if the LLM is unavailable (Mock provider and manual approval). |
+#### F5: Lecture summary and the lecturer's report (source D-9/F5)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-VS-01 | accept a recording (video/audio up to 2 GB, in 50 MB chunks) or a transcript (vtt/srt/txt) for a lesson | S |
+| FR-VS-02 | process it in the background and show its status: queued → processing → done / failed | S |
+| FR-VS-03 | produce a TL;DR, timestamped chapters, key concepts and 5 review questions | S |
+| FR-VS-04 | overlay "I'm lost" spikes on the timeline, aligned by the recording's offset from the lesson start | S |
+| FR-VS-05 | let the lecturer publish the summary to students | S |
+| FR-VS-06 | write a short **report for the lecturer** from the same source and the class signals: clarity, pace and engagement scores (1–5), 3–5 tips each tied to a moment, promises not kept, language slips and, for a recording, sound quality; never shown to students | S |
+| FR-VS-07 | show the three scores across the course's lessons as a trend, and rebuild a failed report | C |
 
-## 5. Traceability
-Each FR maps to a use case in [05-use-cases.md](05-use-cases.md) (column "FRs") and to tests in `08-stp-std.md` (milestone 2).
+#### F6: Homework review (source D-9/F6)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-HW-01 | let the lecturer publish a homework PDF with a title, an optional due date and optional instructions to the AI, and build from them, once, a rubric: questions, sections, requirements, key points and what would give the answer away | S |
+| FR-HW-02 | show the rubric and the instructions to the lecturer only; students see the PDF and section names only | S |
+| FR-HW-03 | rebuild the rubric with new instructions until the first hand-in, then lock it | S |
+| FR-HW-04 | give feedback on a solution (one PDF or up to 10 photos): per section a score 1–100 (0 if unanswered), what meets the requirements, what is missing and a direction, without ever giving the answer | S |
+| FR-HW-05 | compute scores on the server: a question is the average of its sections, the total is the average of the questions, rounded, at least 1 | S |
+| FR-HW-06 | allow 2 feedback checks per student per homework; a failed check does not count; practice files are never stored | S |
+| FR-HW-07 | accept one hand-in per student with a confirmation, store its files for the student and the lecturer only, and mark a late hand-in | S |
+| FR-HW-08 | grade a hand-in against the rubric in the background as a draft visible only to the lecturer, with a retry on failure | S |
+| FR-HW-09 | show the lecturer per student the checks used, the hand-in, the AI grade and report, and a chart of the graded hand-ins; students see no chart or ranking | S |
+| FR-HW-10 | build class-wide common mistakes (shown to students without names), list highly similar hand-ins for the lecturer, and ignore text in a solution that addresses the reviewer | C |
+
+#### F7: Lecture page (source D-9/F7)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-LP-01 | give every lecture a page for every course member, including those who missed it: summary, materials, practice questions, closed polls with results, questions with answers | S |
+| FR-LP-02 | let the lecturer publish open review questions, by hand or as up to 8 AI drafts from the slide deck (≤ 50 MB) | C |
+| FR-LP-03 | let the lecturer attach files (≤ 50 MB) and links, downloadable only by course members | S |
+| FR-LP-04 | let the lecturer answer a question under it, which marks it answered | S |
+| FR-LP-05 | show next to a lesson with homework "homework to hand in" with the earliest due date, or "homework handed in" | C |
+
+#### F8: Lecture comments (source D-9/F8)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-FB-01 | offer every course member an optional anonymous comment on a lecture once it ends (one of four options plus text), on open phones at once and on the lecture page for 7 days | S |
+| FR-FB-02 | accept one comment per student and state that it is anonymous | S |
+| FR-FB-03 | show the lecturer only the aggregate, and only from 3 answers, ordered by option, never by time; nobody can read a single answer or its author | S |
+| FR-FB-04 | export a lecture's questions (with answers and upvotes; a name only where given) and comments (anonymous, from 3 answers, without times) to Excel, CSV or Google Sheets | S |
+
+#### F9: Administration (source D-9/F9)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-AD-01 | let admins (set by email in the server configuration) find users and make a user a lecturer or a student; an admin cannot change their own role | M |
+| FR-AD-02 | let a lecturer create courses (code and name), unique per lecturer and code | M |
+
+#### F10: Enrollment and timetable (source D-9/F10)
+| ID | The system shall… | Pri |
+|----|-------------------|-----|
+| FR-EN-01 | import a roster from Excel, CSV or a pasted list: one student per row with an **email** (an ID is optional) and a name, in any column order; a repeat upload adds and updates but never removes; invalid, missing or repeated rows are reported by line | M |
+| FR-EN-02 | let the lecturer add or remove one student and **fix a mistyped email**; the roster shows who has signed in and highlights rows still waiting for a sign-in | M |
+| FR-EN-03 | link a student to every roster row with the email they sign in with, on their first visit and whenever the lecturer adds or fixes that email; a student sees only their own roster row | M |
+| FR-EN-04 | accept a check-in from a student not on the roster, mark it "not on roster", and let the lecturer add them in one tap | S |
+| FR-EN-05 | tell a signed-in student with no course which email they used, so a mismatch can be fixed | S |
+| FR-TT-01 | let the lecturer set the weekly meetings (day, start, end, room; no overlaps on a day) and the term dates | S |
+| FR-TT-02 | show a weekly timetable of the user's courses: the whole week on a computer, one day on a phone; mark a course with a live lesson | S |
+| FR-TT-03 | show every live lesson of the user's courses on the home screen; the lecturer's home shows the meeting happening now with a one-tap start | M |
+| FR-TT-04 | give each lesson one page with tabs: attendance, forum, materials, homework; scanning the QR checks in and opens the forum tab | M |
+
+### 3.2 External interfaces
+| Interface | Description |
+|-----------|-------------|
+| User interface | Hebrew, right-to-left, responsive web app; phone layout for students, wide layout and a full-screen projector view for the lecturer |
+| HTTP API | JSON over HTTPS under `/api`, Bearer token from PocketBase sign-in ([API docs](07-edd/README.md#api)) |
+| Realtime | PocketBase server-sent events; access rules decide who receives each event |
+| LLM | `LLMProvider` interface: Gemini (default model `gemini-3.1-flash-lite`) or the mock |
+| Google OAuth | Student sign-in through PocketBase |
+| Google Sheets API | Optional live export, through a service account |
+
+### 3.3 Non-functional requirements
+| ID | Requirement | Verified by |
+|----|-------------|-------------|
+| NFR-01 | **Usability:** a returning student checks in in ≤ 2 taps and ≤ 5 s from scanning; Hebrew RTL UI | E2E scenario 1, field test T7 |
+| NFR-02 | **Performance:** 80 check-ins within 30 s with server p95 < 500 ms; realtime updates in < 1 s | Load test T1 (p95 183 ms) |
+| NFR-03 | **Security:** HTTPS only; the QR secret stays on the server; business writes only through the API | Integration tests on access rules |
+| NFR-04 | **Privacy:** no face recognition; only blurred photos are shared and photos are deleted at lesson end; anonymous authors hidden from everyone except the system | Integration tests on hidden fields |
+| NFR-05 | **Portability:** works on current iOS Safari and Android Chrome without installing | E2E on WebKit and Chromium in CI |
+| NFR-06 | **Maintainability:** domain logic in classes behind interfaces; the LLM provider and exporters can be swapped without touching services | Class diagrams, ADR-001 |
+| NFR-07 | **Testability:** ≥ 80 % line coverage on domain packages; the LLM and the clock are injectable | CI coverage gate |
+| NFR-08 | **Availability:** the demo works if the LLM is unavailable (mock provider, manual approval) | E2E runs on the mock |
+
+## 4. Appendices
+
+### A. Use cases
+See [05-use-cases.md](05-use-cases.md). Each use case lists the requirements it covers.
+
+### B. Data dictionary
+Collections in PocketBase (schema as code in `pocketbase/pb_migrations`). **Hidden** fields are never returned to clients; only the API (superuser) reads them. Every collection also has `id`.
+
+| Collection | Fields (hidden in **bold**) | Purpose |
+|------------|-----------------------------|---------|
+| users | email, name, avatar, student_id (student key), role | Accounts; Google sign-in |
+| courses | code, name, lecturer → users, term_start, term_end | A lecturer's course |
+| enrollments | course, email, student_number (key, set when linked), name, added_at | The roster |
+| course_slots | course, weekday, starts, ends, room | The weekly timetable |
+| sessions | course, title, status, started_at, ended_at, geo_lat, geo_lng, geo_radius_m, geofence_mode, **qr_secret**, questions_paused | Lessons |
+| attendance_records | session, student, student_number, student_name, device_id, checked_in_at, method, distance_m, geo_flag, status, note | Check-ins |
+| headcounts | session, photo (lecturer only), blurred_photo, people_count, confidence, boxes, checkins_at_snap | Class photos and AI counts |
+| challenges | session, headcount, type, status, started_at, expires_at, **secret**, image | Roll-call and Visual Ping |
+| challenge_responses | challenge, student, student_number, x, y, responded_at, verdict | Answers to challenges |
+| lost_signals | session, **student**, **student_number**, at | "I'm lost" taps |
+| feed_posts | course, session (empty = course forum), **author**, **author_number**, display_name, anonymous, text, votes, answered, answer, posted_at | Forum posts |
+| post_votes | post, voter, voter_number | Upvotes |
+| polls | session, question, options, **correct_index**, answer_index, status, source, results, created_at, opened_at, closed_at, closes_at | Polls |
+| poll_votes | poll, student, student_number, option_index | Votes |
+| lesson_feedback | session, **student**, **student_number**, rating, comment, submitted_at | Anonymous lecture comments |
+| recordings | session, kind, filename, mime_type, size_bytes, offset_sec, status, error, summary, published, created_at, processed_at, **coaching**, coaching_error | Summaries and lecturer reports |
+| materials | session, title, kind, url, file, filename, added_at | Lecture files and links |
+| practice_questions | session, question, source, created_at | Open review questions |
+| assignments | course, session, title, due_at, file, **outline**, **guide**, guide_status, guide_error, **rubric_notes**, created_at | Homework and its hidden rubric |
+| submissions | assignment, student, student_number, student_name, **fingerprint**, status, error, total, late, submitted_at, reviewed_at, check_count, report, handed_in_at, files (protected), final_status, final_error, **final_report**, **final_total** | Feedback checks and hand-ins |
+| assignment_insights | assignment, submission_count, common_mistakes, **similar_pairs**, built_at | Class-wide analysis |
+
+### C. Traceability matrix
+Generated by `tools/trace.ts` from the use cases, the design documents and the test titles; CI fails when a Must requirement has no test. Status: **Passed** (has automated tests, CI green), **Manual** (verified by a manual or field test), **Gap** (no test yet).
+
+<!-- trace:start -->
+<!-- trace:end -->
