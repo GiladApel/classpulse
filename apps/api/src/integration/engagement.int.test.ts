@@ -110,7 +110,7 @@ describe('Integration: backchannel + polls against real PocketBase', () => {
 
   it('a student enrolled but not checked in sees the open poll and takes part through the API; attendance is untouched', async () => {
     const home = await h.makeUser('student', h.studentNo());
-    await h.container.courses.enroll(await h.container.sessions.getCourse(h.course.id), home.record.student_id, 'מהבית');
+    await h.container.courses.enroll(await h.container.sessions.getCourse(h.course.id), { studentNumber: home.record.student_id, name: 'מהבית' });
     const poll = (await h.call(h.lecturer, 'POST', `/sessions/${sessionId}/polls`, { question: 'מהבית?', options: ['כן', 'לא'], correctIndex: 0 })).body;
     await expect(home.pb.collection('polls').getOne(poll.id)).rejects.toMatchObject({ status: 404 }); // a draft
     await h.call(h.lecturer, 'POST', `/polls/${poll.id}/open`);
@@ -128,7 +128,7 @@ describe('Integration: backchannel + polls against real PocketBase', () => {
 
   it('course forum: members read general questions, outsiders do not; the author stays hidden; lecturer sees votes; no direct writes', async () => {
     const home = await h.makeUser('student', h.studentNo());
-    await h.container.courses.enroll(await h.container.sessions.getCourse(h.course.id), home.record.student_id, 'בבית');
+    await h.container.courses.enroll(await h.container.sessions.getCourse(h.course.id), { studentNumber: home.record.student_id, name: 'בבית' });
     const post = (await h.call(home, 'POST', `/courses/${h.course.id}/posts`, { text: 'שאלה כללית', anonymous: true })).body;
     expect(post).toMatchObject({ courseId: h.course.id, sessionId: null });
 

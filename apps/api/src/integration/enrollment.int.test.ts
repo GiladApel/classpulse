@@ -22,7 +22,7 @@ describe('Integration: roster and timetable access against real PocketBase', () 
       await h.makeUser('student', h.studentNo()),
     ];
     await h.container.courses.importRoster(course, { text: `${enrolled.record.student_id} רשום\n999999998 עוד מישהו` });
-    await h.container.courses.enroll(await h.container.sessions.getCourse(other.id), otherCourseOnly.record.student_id, 'אחר');
+    await h.container.courses.enroll(await h.container.sessions.getCourse(other.id), { studentNumber: otherCourseOnly.record.student_id, name: 'אחר' });
     await h.container.courses.setTimetable(course, [{ weekday: 0, starts: '10:00', ends: '12:00', room: '305' }]);
 
     s1 = (await h.startSession()).id;
@@ -61,6 +61,25 @@ describe('Integration: roster and timetable access against real PocketBase', () 
     expect(await list(h.lecturer, 'course_slots', byCourse)).toHaveLength(1);
     expect(await list(otherCourseOnly, 'course_slots', byCourse)).toEqual([]);
     expect(await list(outsider, 'course_slots', byCourse)).toEqual([]);
+  });
+
+  it('a roster row by email opens the course only to the student who signs in with that email, once linked', async () => {
+    // Neither user has a student key yet, and the new row's key is empty: an empty key must never match an empty key.
+    const newcomer = await h.makeUser('student');
+    const stranger = await h.makeUser('student');
+    // As if the lecturer uploaded the roster before this student ever signed in (enroll() would link her at once).
+    await h.admin.collection('enrollments').create({ course: course.id, email: newcomer.record.email, student_number: '', name: 'חדשה', added_at: new Date().toISOString() });
+    const bySession = `session = "${s1}"`;
+    for (const u of [newcomer, stranger]) {
+      expect(await list(u, 'polls', bySession)).toEqual([]);
+      expect(await list(u, 'enrollments', `course = "${course.id}"`)).toEqual([]);
+    }
+
+    const linked = await h.call(newcomer, 'POST', '/me/link');
+    expect(linked.body).toMatchObject({ courses: 1 });
+    expect(await list(newcomer, 'polls', bySession)).toHaveLength(1);
+    expect((await list(newcomer, 'enrollments', `course = "${course.id}"`)).map((e) => e.email)).toEqual([newcomer.record.email]);
+    expect(await list(stranger, 'polls', bySession)).toEqual([]);
   });
 
   it('roster and timetable are written only through the API', async () => {
