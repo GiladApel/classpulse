@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { CourseService, SlotInput } from '../attendance/CourseService.js';
 import type { SessionService } from '../attendance/SessionService.js';
+import type { StudentLinker } from '../attendance/StudentLinker.js';
 import type { CourseSlot, Enrollment } from '../attendance/types.js';
 import { type AppEnv, requireLecturer } from './auth.js';
 import { ValidationError } from './errors.js';
@@ -8,7 +9,7 @@ import { jsonBody, num, str } from './validate.js';
 
 export const MAX_ROSTER_BYTES = 5 * 1024 * 1024;
 
-const enrollmentDto = (e: Enrollment) => ({ studentNumber: e.studentNumber, name: e.name });
+const enrollmentDto = (e: Enrollment) => ({ id: e.id, email: e.email, studentNumber: e.studentNumber, name: e.name });
 const slotDto = (s: CourseSlot) => ({ id: s.id, weekday: s.weekday, starts: s.starts, ends: s.ends, room: s.room });
 
 const optionalDate = (body: Record<string, unknown>, key: string): Date | undefined => {
@@ -19,15 +20,23 @@ const optionalDate = (body: Record<string, unknown>, key: string): Date | undefi
   return d;
 };
 
-/** The lecturer's course setup: create a course, its roster and its weekly timetable. */
+/** The lecturer's course setup (a course, its roster and its weekly timetable), and linking a student to it by email. */
 export class CourseController {
   constructor(
     private readonly courses: CourseService,
     private readonly sessions: SessionService,
+    private readonly linker: Pick<StudentLinker, 'link'>,
   ) {}
 
   routes(): Hono<AppEnv> {
     const app = new Hono<AppEnv>();
+
+    // Called by the web app after sign-in: links the user to every roster row with their email. Idempotent.
+    app.post('/me/link', async (c) => {
+      const user = c.get('user');
+      if (user.role === 'lecturer') return c.json({ studentNumber: '', courses: 0 });
+      return c.json(await this.linker.link({ ...user }));
+    });
 
     app.post('/courses', requireLecturer, async (c) => {
       const b = await jsonBody(c.req);
@@ -50,13 +59,24 @@ export class CourseController {
     app.post('/courses/:id/enrollments', requireLecturer, async (c) => {
       const course = await this.sessions.getOwnedCourse(c.req.param('id'), c.get('user').id);
       const b = await jsonBody(c.req);
-      const e = await this.courses.enroll(course, str(b, 'studentNumber', { max: 20 }), str(b, 'name', { max: 80, optional: true }));
+      const e = await this.courses.enroll(course, {
+        email: str(b, 'email', { max: 120, optional: true }),
+        studentNumber: str(b, 'studentNumber', { max: 20, optional: true }),
+        name: str(b, 'name', { max: 80, optional: true }),
+      });
       return c.json(enrollmentDto(e), 201);
     });
 
-    app.delete('/courses/:id/enrollments/:studentNumber', requireLecturer, async (c) => {
+    // Fixes a mistyped email on the roster.
+    app.put('/courses/:id/enrollments/:eid', requireLecturer, async (c) => {
       const course = await this.sessions.getOwnedCourse(c.req.param('id'), c.get('user').id);
-      await this.courses.unenroll(course, c.req.param('studentNumber'));
+      const e = await this.courses.updateEmail(course, c.req.param('eid'), str(await jsonBody(c.req), 'email', { max: 120 }));
+      return c.json(enrollmentDto(e));
+    });
+
+    app.delete('/courses/:id/enrollments/:eid', requireLecturer, async (c) => {
+      const course = await this.sessions.getOwnedCourse(c.req.param('id'), c.get('user').id);
+      await this.courses.unenroll(course, c.req.param('eid'));
       return c.json({ ok: true });
     });
 

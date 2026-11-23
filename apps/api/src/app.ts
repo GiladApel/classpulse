@@ -21,7 +21,7 @@ export function createApp(c: Container): Hono<AppEnv> {
   app.use('*', requireUser(c.resolveUser));
   app.get('/config', (ctx) => ctx.json({ exportFormats: c.exports.formats() }));
   app.route('/', new AdminController(c.admins).routes());
-  app.route('/', new CourseController(c.courses, c.sessions).routes());
+  app.route('/', new CourseController(c.courses, c.sessions, c.linker).routes());
   app.route('/sessions', new SessionController(c.sessions, c.attendance, c.exports, c.commentsExport).routes());
   app.route('/', new AttendanceController(c.attendance, c.sessions, c.tokens, c.clock).routes());
   app.route('/', new ChallengeController(c.challenges, c.sessions, c.attendance).routes());

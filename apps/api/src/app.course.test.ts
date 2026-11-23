@@ -30,7 +30,7 @@ describe('HTTP: course setup (roster and weekly timetable)', () => {
 
   it("roster: the course's lecturer uploads a pasted list or a CSV file; nobody else can", async () => {
     const pasted = await call('lect', 'POST', '/courses/c1/roster', { text: '111111111 דנה כהן\n222222222 אבי\nבלי מספר 7' });
-    expect(pasted).toMatchObject({ status: 200, body: { added: 2, updated: 0, skipped: [{ line: 3, reason: 'NO_ID' }] } });
+    expect(pasted).toMatchObject({ status: 200, body: { added: 2, updated: 0, skipped: [{ line: 3, reason: 'NO_EMAIL_OR_ID' }] } });
 
     const form = new FormData();
     form.set('file', new File(['ת.ז.,שם\n444444444,רינה\n111111111,דנה כהן\n'], 'roster.csv', { type: 'text/csv' }));
@@ -43,17 +43,33 @@ describe('HTTP: course setup (roster and weekly timetable)', () => {
     expect((await call('lect', 'POST', '/courses/nope/roster', { text: '333333333 x' })).status).toBe(404);
   });
 
-  it('one student is added and removed', async () => {
-
-    expect(await call('lect', 'POST', '/courses/c1/enrollments', { studentNumber: '222222222', name: 'אבי' })).toEqual({
-      status: 201,
-      body: { studentNumber: '222222222', name: 'אבי' },
-    });
+  it('one student is added (by email or ID), has their email fixed, and is removed', async () => {
+    const added = await call('lect', 'POST', '/courses/c1/enrollments', { email: 'avi@x.com', name: 'אבי' });
+    expect(added).toMatchObject({ status: 201, body: { email: 'avi@x.com', studentNumber: '', name: 'אבי' } });
     expect((await call('lect', 'POST', '/courses/c1/enrollments', { studentNumber: '22' })).body.code).toBe('INVALID_STUDENT_NUMBER');
-    expect((await call('dana', 'POST', '/courses/c1/enrollments', { studentNumber: '111111111' })).status).toBe(403);
+    expect((await call('lect', 'POST', '/courses/c1/enrollments', { email: 'avi@' })).body.code).toBe('INVALID_EMAIL');
+    expect((await call('dana', 'POST', '/courses/c1/enrollments', { email: 'x@x.com' })).status).toBe(403);
 
-    expect((await call('lect', 'DELETE', '/courses/c1/enrollments/222222222')).body).toEqual({ ok: true });
-    expect((await call('lect', 'DELETE', '/courses/c1/enrollments/222222222')).status).toBe(404);
+    // The lecturer fixes the email to the one the student signs in with; that student is linked at once.
+    const fixed = await call('lect', 'PUT', `/courses/c1/enrollments/${added.body.id}`, { email: 'new@x.com' });
+    expect(fixed).toMatchObject({ status: 200, body: { email: 'new@x.com' } });
+    expect(fixed.body.studentNumber).toMatch(/^\d{12}$/);
+    expect((await call('dana', 'PUT', `/courses/c1/enrollments/${added.body.id}`, { email: 'd@x.com' })).status).toBe(403);
+    expect((await call('lect', 'PUT', `/courses/c1/enrollments/${added.body.id}`, {})).status).toBe(400);
+
+    expect((await call('lect', 'DELETE', `/courses/c1/enrollments/${added.body.id}`)).body).toEqual({ ok: true });
+    expect((await call('lect', 'DELETE', `/courses/c1/enrollments/${added.body.id}`)).status).toBe(404);
+  });
+
+  it('after sign-in a student is linked to every roster row with their email; a lecturer is not', async () => {
+    await call('lect', 'POST', '/courses/c1/enrollments', { email: 'NEW@x.com' });
+    const linked = await call('fresh', 'POST', '/me/link');
+    expect(linked.status).toBe(200);
+    expect(linked.body).toMatchObject({ courses: 1 });
+    expect(linked.body.studentNumber).toMatch(/^\d{12}$/);
+    expect((await call('fresh', 'POST', '/me/link')).body).toEqual(linked.body);
+    expect((await call('dana', 'POST', '/me/link')).body).toEqual({ studentNumber: '111111111', courses: 0 });
+    expect((await call('lect', 'POST', '/me/link')).body).toEqual({ studentNumber: '', courses: 0 });
   });
 
   it('timetable: the lecturer sets the weekly slots and term dates; bad input is refused', async () => {

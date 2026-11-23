@@ -52,7 +52,7 @@ export const USERS: Record<string, UserIdentity> = {
   dana: { id: 'u1', name: 'דנה כהן', email: 'd@x', role: 'student', studentNumber: '111111111' },
   avi: { id: 'u2', name: 'אבי', email: 'a@x', role: 'student', studentNumber: '222222222' },
   rina: { id: 'u4', name: 'רינה', email: 'r@x', role: 'student', studentNumber: '444444444' },
-  fresh: { id: 'u3', name: 'חדש', email: 'n@x', role: 'student', studentNumber: '' },
+  fresh: { id: 'u3', name: 'חדש', email: 'new@x.com', role: 'student', studentNumber: '' },
   boss: { id: 'adm1', name: 'מנהל', email: 'Boss@x', role: 'lecturer', studentNumber: '' },
 };
 
