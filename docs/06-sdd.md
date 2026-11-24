@@ -201,3 +201,13 @@ Every requirement of the [SRS](04-srs.md) is allocated to the component that imp
 | §2.9 Infrastructure | FR-ATT-09 and FR-FB-04 (exporters), FR-AF-04 (blur), FR-VS-01 (chunked upload) |
 | §2.10 PocketBase | NFR-03, NFR-04 (access rules, hidden fields), the realtime parts of FR-ATT-07, FR-PL-03, FR-PL-04 |
 | Whole system | NFR-01, NFR-02, NFR-05 … NFR-08 |
+
+## 8. Architectural rules
+
+1. **Dependency direction:** `http → domain → (ai, infra interfaces)`. Domain packages never import PocketBase, sharp or the Gemini SDK.
+2. **Read/write split:** clients read and subscribe to PocketBase directly, filtered by the collection rules; every write that carries a business rule goes through the API. Those collections have no create/update rule, so only the API (superuser) writes them.
+3. **Observer through PocketBase realtime:** PocketBase is the subject; each client subscribes to what it shows, and an API write notifies them. No custom WebSocket server.
+4. **Composition root:** `container.ts` builds every object once and injects its dependencies. Switching Gemini and the mock is configuration (`LLM_PROVIDER`); another vendor is one new `LLMProvider` class.
+5. **Persistence behind repositories:** the domain uses named repository methods, never PocketBase filters ([ADR-001](adr/ADR-001-database.md)).
+6. **Secrets stay on the server:** QR secrets, the LLM key and the Google service-account key.
+7. **One API instance:** the background queue and `KeyedLock` live in memory, by design for this scale.
