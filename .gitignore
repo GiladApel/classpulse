@@ -13,3 +13,12 @@ coverage/
 # Personal working notes, not part of the submission
 CLAUDE.md
 docs/demo-script.md
+
+# Spike inputs that show real people or student work
+spikes/**/*.jpg
+spikes/**/*.jpeg
+spikes/**/*.png
+spikes/**/*.mp4
+spikes/**/*.mp3
+spikes/**/*.pcm
+spikes/**/*.pdf
