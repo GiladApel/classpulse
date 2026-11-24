@@ -11,4 +11,3 @@
 | Gemini embeddings (`gemini-embedding-001`) | 0.97 | 0.94 | No: 0.03 apart |
 
 - **Decision:** fingerprints ([ADR-005](../../docs/adr/ADR-005-copy-detection.md)). Embeddings measure *what the code is about*, and every solution to the same task is about the same thing.
-- **Time spent:** ~1 hour, both runs.
