@@ -1,112 +1,99 @@
 # ClassPulse
 
-A KISS, LLM-ready web teaching tool for live lectures. Built for Ariel University, *Introduction to Software Engineering*, Ex2.
+[![CI](https://github.com/GiladApel/classpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/GiladApel/classpulse/actions/workflows/ci.yml)
+
+**One web app for the in-person lecture: attendance that is hard to fake, a live channel from the class to the lecturer, and AI help after class — on every student's phone, with nothing to install.**
+Built for *Introduction to Software Engineering*, Ariel University (Assignment 2).
 
 ## Problem
+An in-person lecture runs on scattered tools: a paper sheet or a form for attendance that is easy to fake, a separate app for polls, questions that never get asked, and feedback that arrives after the course is over. Recordings and homework pile up without anyone analysing them. Lecturers need **one simple tool** that students open with the phone camera, and that uses AI where it actually helps.
 
-Today's online teaching tools are heavy and fragmented:
-- Attendance is still a paper sheet or a Moodle form that is trivial to fake.
-- Student feedback arrives too late to change the lecture.
-- Polls need a separate app.
-- Recordings and homework pile up without anyone analysing them.
+## Features
 
-Lecturers need **one simple tool** that students open with a phone camera and that uses LLMs where they actually help.
+| # | Feature | Think of it as |
+|---|---------|----------------|
+| F1 | **Attendance:** a QR on the projector that changes every 10 s; one scan checks in; the lecturer's list fills live; export to Excel, CSV or Google Sheets | A concert ticket scanned at the gate |
+| F2 | **Anti-fraud:** the AI counts people in a class photo; when check-ins don't match, students tap their seat on a blurred copy of the photo (or rescan a one-time QR); the lecturer decides | A spot check: "point at your seat" |
+| F3 | **Live channel:** "I'm lost" (how many, never who), anonymous questions with upvotes, a course forum | A raised hand that does not interrupt |
+| F4 | **Polls:** from a photo of a slide (AI drafts 3) or written by hand; closes by itself after 2 minutes | A quiz-show buzzer round with a clock |
+| F5 | **Lecture summary and lecturer report:** a summary for students from the recording; a short report for the lecturer with scores and tips at their moments, and a trend | A coach watching the game tape with you |
+| F6 | **Homework review:** a hidden AI rubric from the homework PDF; 2 feedback checks that never give the answer; one hand-in graded as a draft for the lecturer; copy detection | A driving lesson before the test |
+| F7 | **Lecture page:** everything about one lecture, also for those who missed it | The notes of a friend who never misses class |
+| F8 | **Lecture comments:** anonymous, for a week, shown from 3 answers, exported to Excel | A suggestion box |
+| F9 | **Administration:** admins appoint lecturers; lecturers create courses | — |
+| F10 | **Courses and timetable:** the roster by email, the weekly timetable, live lessons on the home screen | The guest list at the door |
 
-## Scope
+**Out of scope:** Zoom/Meet attendance, Moodle and the university's personal-information system, face recognition, store apps, submitting grades ([SoW §3](docs/03-sow.md#3-scope)).
 
-| # | Feature | Priority |
-|---|---------|----------|
-| F1 | **Attendance**: rotating server-signed QR → one-tap check-in; live dashboard; xlsx + Google Sheet export; geofence (lenient/strict); manual approval | **Core** |
-| F2 | **Anti-fraud**: AI headcount from a class photo; Roll-call challenge; **Blurred Photo Heatmap challenge** | Core |
-| F3 | **Live backchannel**: "I'm lost" confusion meter + questions feed (anonymous option) | High |
-| F4 | **KISS polls**: AI-generated MCQ from a photographed or uploaded slide; live results | High |
-| F5 | **Lecture summary and lecturer report**: AI summary, chapters and review questions from a recording for the students; a short report for the lecturer (scores, tips at their moments, promises not kept) with a trend across lessons | Medium |
-| F6 | **Homework review**: the AI builds a hidden rubric from the homework PDF and the lecturer's instructions; students get 2 feedback checks, then hand in; the AI grades hand-ins for the lecturer; class-wide common mistakes (peers' work never shown) | Medium |
-| F7 | **Lecture page**: per-lecture page for the whole course (also for those who missed it): summary, materials, practice questions, poll results, questions with the lecturer's answers | Medium |
-| F8 | **Lecture comments**: for a week after the lecture, every course member can leave an anonymous comment (4 options + text); the lecturer sees the aggregate from 3 answers and exports the questions and comments to Excel | Medium |
+## Quick start
 
-**Out of scope:**
-- Integration with Moodle, Zoom or the university's personal-information system (מידע אישי).
-- Facial recognition.
-- Native mobile apps.
-- Grade submission.
+**Use it:** open https://classpulse.giladautomation.com on a phone and sign in with Google. A lecturer adds your email to a course roster; the course then appears on your home screen.
 
-## Stack
-
-| Layer | Choice |
-|---|---|
-| Frontend | React + Vite + TypeScript + Tailwind, PWA, Hebrew RTL |
-| Data / auth / realtime | PocketBase (SQLite, Google OAuth, SSE realtime, file storage) |
-| Domain API | Node + Hono + TypeScript (all business rules, OOP domain layer) |
-| AI | Gemini, behind an `LLMProvider` strategy (a Mock for tests; another vendor is one new class) |
-
-## Repository layout
-
-```
-apps/api      Hono API: domain classes (attendance/, challenge/, engagement/, content/, ai/, infra/)
-apps/web      React PWA (student + lecturer + projector views)
-pocketbase/   migrations (schema as code)
-docs/         design artifacts (see below)
-```
-
-## Design documents
-
-1. [Tools report](docs/02-tools-report.md)
-2. [Statement of Work](docs/03-sow.md)
-3. [SRS](docs/04-srs.md)
-4. [Use cases](docs/05-use-cases.md)
-5. [Components](docs/06-sdd.md)
-6. [EDD: class, sequence and state diagrams, API docs](docs/07-edd/README.md)
-8. [Testing strategy](docs/08-stp-std.md)
-9. Conclusion *(after demo)*
-10. [ADR-001: PocketBase as the data layer](docs/adr/ADR-001-database.md)
-
-## Run locally
-
+**Run it locally** (Node 24, Docker):
 ```bash
-cp .env.example .env          # fill in the PocketBase superuser credentials
+cp .env.example .env                 # fill in a PocketBase superuser email and password; LLM_PROVIDER=mock needs no key
 npm install
-docker compose up pocketbase  # applies pocketbase/pb_migrations; admin UI at http://127.0.0.1:8090/_/
+docker compose up -d pocketbase      # applies pocketbase/pb_migrations; admin UI http://127.0.0.1:8090/_/
+npm run dev:api                      # http://localhost:8787/health
+npm run dev:web                      # http://localhost:5173 (proxies /api to the API)
 npm run seed -w apps/api -- lecturer@example.com 'Passw0rd!' "Dr. Lecturer" I2SE "Introduction to Software Engineering"
-npm run dev:api               # http://127.0.0.1:8787/health
-npm run dev:web               # http://127.0.0.1:5173  (Vite proxies /api → 8787)
-npm test                      # unit + HTTP tests (in-memory, no PocketBase needed)
-npm run test:int -w apps/api  # integration tests against the running PocketBase
 ```
 
-E2E and load tests:
+## Usage example: one lesson's attendance
+1. The lecturer taps **"start the lesson now"** on the home screen (during a meeting from the timetable) and opens the projector view.
+2. Students scan the QR with the phone camera. A first-time student signs in with Google and is linked to the course by email; after that a check-in is one scan.
+3. The lecturer's attendance tab fills live. A student who checked in from 300 m away is flagged.
+4. The lecturer takes a class photo: "~28 in the photo · 33 checked in". A Visual Ping sends the blurred photo to the checked-in phones; each student taps their seat. A tap on an empty seat is flagged; the lecturer removes it.
+5. The lecturer exports the list to Excel: name, email, time, method, flags.
+
+## Configuration
+Settings are environment variables in `.env` (never committed; names only here):
+`PB_URL`, `PB_SUPERUSER_EMAIL`, `PB_SUPERUSER_PASSWORD`, `QR_WINDOW_SEC`, `ADMIN_EMAILS`, `LLM_PROVIDER` (`gemini` or `mock`), `GEMINI_API_KEY`, `GEMINI_MODEL`, `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_SHEETS_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. The web app reads `VITE_PB_URL` from `apps/web/.env`. Without a Gemini key, use `LLM_PROVIDER=mock`: every feature still works with fixed AI replies.
+
+## Tests
 ```bash
-npm run e2e                                   # Playwright (docs/08 §3); needs the local PocketBase, starts its own API + Vite
-SSH_HOST=do-server PB_ADMIN_URL=http://127.0.0.1:18092/pb loadtest/run.sh https://<host> 80   # k6 + 80 SSE listeners (docs/08 §4)
+npm test                                   # unit + HTTP (in memory, ~5 s)
+npm run coverage -w apps/api               # with the ≥ 80 % line gate on the domain packages
+npm run test:int -w apps/api               # integration, against the running PocketBase
+npm run e2e                                # browser scenarios (Playwright), against PocketBase
+npm run trace                              # rebuild the requirements traceability matrix
+```
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs all of them on every push, the browser scenarios on Chromium and WebKit. The plan and the test cases are in the [STP/STD](docs/08-stp-std.md).
+
+## Repository structure
+```
+apps/api      Hono API in TypeScript: the domain classes (attendance, challenge, engagement, content, ai, infra)
+apps/web      React app: student, lecturer and projector screens (Hebrew, right to left)
+pocketbase/   schema migrations (schema as code)
+e2e/          Playwright browser scenarios
+spikes/       hands-on tests of the tools, against the real services
+loadtest/     k6 load test
+tools/        trace.ts (traceability matrix)
+deploy/       Docker Compose and the deploy script
+docs/         the design documents (below)
 ```
 
-## Deploy
+## Documents
 
-`deploy/deploy.sh` (Git Bash) builds the API and the web app, copies them with the migrations to `do-server:/opt/classpulse`, and runs the stack in `deploy/docker-compose.yml`: PocketBase, the API and nginx on `127.0.0.1:8092`. Point a Cloudflare tunnel hostname at that port. In the Google OAuth client, add the redirect URI `https://<host>/pb/api/oauth2-redirect`. Use the PocketBase admin through an SSH tunnel (`ssh -L 18092:127.0.0.1:8092 do-server`, then http://127.0.0.1:18092/pb/_/), since it is blocked through Cloudflare.
+| Step | Document |
+|------|----------|
+| 1 | Problem and scope: this README |
+| 2 | [Tools report](docs/02-tools-report.md), [ADRs](docs/adr/), [spikes](spikes/) |
+| 3 | [Statement of Work](docs/03-sow.md) |
+| 4 | [SRS](docs/04-srs.md) (glossary, requirements, data dictionary, traceability matrix) |
+| 5 | [Use cases](docs/05-use-cases.md) |
+| 6 | [SDD](docs/06-sdd.md) |
+| 7 | [EDD](docs/07-edd/README.md): class, sequence and state diagrams, API docs |
+| 8 | [STP / STD](docs/08-stp-std.md) |
+| 9 | The app: `apps/`, live at https://classpulse.giladautomation.com |
+| 10 | [Demo plan](docs/10-demo-plan.md) |
+| 11 | [Conclusion](docs/11-conclusion.md) |
 
-**Google sign-in for students:** in the PocketBase admin, open *users → Options → OAuth2 → Google* and enter the client ID and secret from Google Cloud. Add `https://<pb-host>/api/oauth2-redirect` as an authorized redirect URI.
+## Deployment
+`deploy/deploy.sh` builds locally, copies the build and the migrations to the server and runs PocketBase, the API and nginx with Docker Compose behind a Cloudflare tunnel ([SDD §5](docs/06-sdd.md#5-deployment), [ADR-007](docs/adr/ADR-007-hosting.md)).
 
-### Lecture summary and homework (M6)
-- **Summary:** on the session dashboard, upload the recording (video/audio up to 2 GB, sent in 50 MB chunks) or a transcript (vtt/srt/txt), and set how many minutes after the session start the recording began. Gemini returns a TL;DR, timestamped chapters, key concepts and 5 review questions. The timeline marks "I'm lost" spikes inside the chapter where they happened. The recording itself is deleted after processing. **Publish** makes the summary visible to every student who attended any session of the course.
-- **Homework:** in a lesson's (or the course's) homework tab the lecturer uploads the homework PDF, optionally with instructions to the AI for the rubric. The AI builds a rubric (requirements and expected answer per section) that only the lecturer sees, and can rebuild it with new instructions until the first hand-in. A student gets per-section feedback on a solution (PDF or photos) up to 2 times, then hands in once; the files are kept for the lecturer and the AI grades them as a draft only the lecturer sees, with a chart of the grades by name. **✨ ניתוח ההגשות** ("analyse hand-ins") shows class-wide common mistakes (which students also see, without names) and near-identical hand-ins for the lecturer to check by hand.
+## Contributing
+Small commits, one part each (a class with its tests, a migration, a page, a document), with messages like `feat(api): …`, `docs(srs): …`, pushed after each part. A change to a domain class updates its EDD diagram in the same change; a renamed test updates its test case in the STD (`npm run trace` checks it).
 
-### Live class flow (M5)
-After checking in, the student's page stays open and shows:
-- **🤯 הלכתי לאיבוד** ("I'm lost"): one tap, at most once a minute. The dashboard's confusion meter shows how many of those present pressed it in the last 2 minutes, never who.
-- **Questions and comments**: posted with a name or anonymously, upvoted by classmates, and allowed after class too. The lecturer marks them answered, and **✨ קיבוץ לנושאים** (group into themes) asks the AI to group open questions.
-- **Polls**: when the lecturer opens one, every phone switches to it. **📷 צילום שקף** (photograph slide) opens the camera; **🖼️ העלאת תמונה** (upload image) takes a screenshot or photo from the gallery or computer. The AI drafts 3 multiple-choice questions to pick from and edit. The projector shows live bars and reveals the correct answer when the lecturer closes the poll.
-
-### Anti-fraud flow (M4)
-1. On the dashboard, **📷 צילום כיתה** (class photo): take or upload a photo of the room. AI (Gemini, or the mock) returns the people count and person boxes; the server blurs a copy. The dashboard shows "~N in the photo · M registered" and warns when check-ins exceed the count.
-2. **בדיקה ויזואלית** (visual check, 45 s): every checked-in phone shows the *blurred* photo and the student taps where they sit. The lecturer watches a live heatmap on the clear photo.
-3. **Roll-call** (30 s): the projector turns red with a new rotating QR, and students in the room re-scan it.
-4. When time runs out, each student gets a verdict: `ok`, `empty_seat`, `collision` or `no_response`. Every non-ok record is flagged in the table, and the lecturer chooses **keep** or **remove**.
-5. Privacy: no face recognition, and only the blurred photo ever reaches students. The clear photo is deleted when the session ends.
-
-Real AI: set `LLM_PROVIDER=gemini` and `GEMINI_API_KEY=…` in `.env` (default model `gemini-3.1-flash-lite`; `gemini-2.5-*` is closed to new keys). Without them the mock provider is used: it finds 3 people and returns fixed poll drafts.
-
-### Attendance flow (M3)
-1. The lecturer signs in at `/dash`, then clicks **Start session**. The browser location becomes the classroom centre.
-2. **Projector** (`/projector/:id`) shows a QR code with a new HMAC token every 10 s. Each token is valid for ≤20 s.
-3. A student scans with the phone camera and is checked in on opening the page (`/c/:token`). Only the first visit asks for Google sign-in and a student ID.
-4. The lecturer's dashboard updates live through PocketBase realtime. From there the lecturer can approve a student manually, remove a record, and export to Excel, CSV or Google Sheets.
+## Contact
+Gilad Apel — [GitHub @GiladApel](https://github.com/GiladApel).
