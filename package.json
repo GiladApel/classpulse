@@ -11,7 +11,8 @@
     "test": "npm test -w apps/api",
     "build": "npm run build -w apps/api && npm run build -w apps/web",
     "e2e": "playwright test -c e2e/playwright.config.ts",
-    "trace": "tsx tools/trace.ts"
+    "trace": "tsx tools/trace.ts",
+    "demo:video": "playwright test -c e2e/demo.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"

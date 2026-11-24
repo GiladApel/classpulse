@@ -22,3 +22,6 @@ spikes/**/*.mp4
 spikes/**/*.mp3
 spikes/**/*.pcm
 spikes/**/*.pdf
+
+# Backup demo video (npm run demo:video)
+demo-video/

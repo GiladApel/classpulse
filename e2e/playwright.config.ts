@@ -7,6 +7,7 @@ const CI = !!process.env.CI;
 
 export default defineConfig({
   testDir: '.',
+  testIgnore: 'demo/**', // the backup demo video has its own config (demo.config.ts)
   timeout: 90_000,
   workers: 1,
   retries: CI ? 1 : 0,

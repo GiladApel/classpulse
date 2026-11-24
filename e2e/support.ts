@@ -16,6 +16,8 @@ export const CLASSROOM = { latitude: 32.1048, longitude: 35.2073, accuracy: 15 }
 export const metersNorth = (m: number) => ({ ...CLASSROOM, latitude: CLASSROOM.latitude + m / 111_320 });
 const PASSWORD = 'e2e-pass-1234';
 const PHONES = [devices['iPhone 13'], devices['Pixel 7']];
+/** `DEMO_VIDEO=<dir>` records every window (the backup demo video, docs/10-demo-plan.md). */
+const video = process.env.DEMO_VIDEO ? { recordVideo: { dir: process.env.DEMO_VIDEO } } : {};
 
 // Every phone and lecturer window keeps live connections open; close them after each test so tests don't starve each other.
 const opened: BrowserContext[] = [];
@@ -80,6 +82,7 @@ export async function login(context: BrowserContext, email: string): Promise<Pag
 
 export async function lecturerPage(browser: Browser, who: Person): Promise<Page> {
   const context = await browser.newContext({
+    ...video,
     viewport: { width: 1280, height: 900 },
     geolocation: CLASSROOM,
     // WebKit has no clipboard permissions; Chromium needs them for the "copy link" buttons.
@@ -89,7 +92,7 @@ export async function lecturerPage(browser: Browser, who: Person): Promise<Page>
 }
 
 export async function phone(browser: Browser, who: Person, i: number, geolocation = metersNorth(20)): Promise<Page> {
-  const context = await browser.newContext({ ...PHONES[i % PHONES.length], geolocation, permissions: ['geolocation'] });
+  const context = await browser.newContext({ ...video, ...PHONES[i % PHONES.length], geolocation, permissions: ['geolocation'] });
   return login(context, who.email);
 }
 
