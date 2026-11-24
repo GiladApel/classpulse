@@ -30,6 +30,8 @@ jobs:
         run: npm run coverage -w apps/api
       - name: Build
         run: npm run build
+      - name: Traceability (every Must requirement has a test case; referenced tests exist)
+        run: npm run trace -- --check
 
   integration:
     name: Integration tests (real PocketBase)
